@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "이글스 (구단앱 PoC)",
+    "slug": "club-sample",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F2F2F7",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {}
+  }
+}

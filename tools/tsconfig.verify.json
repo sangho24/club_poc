@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "outDir": "../.tmp",
+    "rootDir": ".."
+  },
+  "include": ["verify-stats.ts", "../src/sabermetrics.ts", "../src/roster.ts", "../src/liveEngine.ts"]
+}

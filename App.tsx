@@ -1,0 +1,210 @@
+// 한화 이글스 구단 앱 (PoC)
+//
+// ── 이 앱이 KBO 공식 앱과 다른 점 ────────────────────────────
+//   KBO 앱  = 리그의 공적 인프라. 열 개 구단을 공평하게 다루고, 원정 팬을 돕고, 공시를 낸다
+//   구단 앱 = 한 구단의 팬덤 미디어. 우리 팀 하나만 깊게 파고, 커머스를 판다
+//
+// 시각 문법은 KBO 앱과 **같은 것을 쓴다**(iOS 그룹 리스트 · 떠 있는 캡슐 탭 · 작은 회색
+// 머리글). 구단 앱임을 드러내는 것은 색의 면적이 아니라 자리다 - 브랜드 마크·선택 상태·
+// 핵심 수치를 이글스 오렌지가 가져가고, 지면과 본문은 무채색이 가져간다.
+//
+// ── 온보딩·개인화 (kbo_poc S1 이식) ──────────────────────────
+// 프로필(지식수준·최애 선수·알림)은 저장소(src/storage.ts)에 영속된다. 온보딩은
+// 최초 1회만 탭 앞에 놓이고, 이후의 개별 변경(설명 깊이·최애 변경)은 각 화면이 갖는다.
+import { useEffect, useState } from 'react';
+import { Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
+
+import { GamedayScreen } from './src/screens/GamedayScreen';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { LiveScreen } from './src/screens/LiveScreen';
+import { MyScreen } from './src/screens/MyScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { PlayersScreen } from './src/screens/PlayersScreen';
+import { StoreScreen } from './src/screens/StoreScreen';
+import { ClubWordmark } from './src/components/photos';
+import { DEFAULT_PROFILE, KnowledgeLevel, UserProfile, normalizeProfile } from './src/profile';
+import { STORAGE_KEYS, loadValue, saveValue } from './src/storage';
+import { colors, radius, spacing, tabCapsule, typography } from './src/theme';
+
+type TabKey = 'home' | 'live' | 'players' | 'gameday' | 'store' | 'my';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'home', label: '홈' },
+  { key: 'live', label: '라이브' },
+  { key: 'players', label: '선수' },
+  { key: 'gameday', label: '직관' },
+  { key: 'store', label: '굿즈' },
+  { key: 'my', label: 'MY' },
+];
+
+export default function App() {
+  const [tab, setTab] = useState<TabKey>('home');
+  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  // 저장소를 읽기 전에 온보딩이 번쩍이면 안 된다 - 읽기가 끝날 때까지 빈 화면
+  const [boot, setBoot] = useState<'loading' | 'onboarding' | 'ready'>('loading');
+
+  useEffect(() => {
+    (async () => {
+      const done = await loadValue<boolean>(STORAGE_KEYS.onboardingDone, false);
+      const stored = await loadValue<unknown>(STORAGE_KEYS.profile, null);
+      if (stored !== null) setProfile(normalizeProfile(stored));
+      setBoot(done ? 'ready' : 'onboarding');
+    })();
+  }, []);
+
+  // 프로필 변경은 전부 이 함수를 지나 저장소에 남는다
+  const updateProfile = (p: UserProfile) => {
+    setProfile(p);
+    void saveValue(STORAGE_KEYS.profile, p);
+  };
+
+  const setLevel = (level: KnowledgeLevel) => updateProfile({ ...profile, level });
+  const setFavorite = (id?: string) => updateProfile({ ...profile, favoritePlayerId: id });
+  const setAlert = (key: keyof UserProfile['alerts'], value: boolean) =>
+    updateProfile({ ...profile, alerts: { ...profile.alerts, [key]: value } });
+
+  // MY 의 '온보딩 다시 하기' - 현재 프로필에서 시작한다 (kbo_poc 판단 유지)
+  const resetOnboarding = () => {
+    void saveValue(STORAGE_KEYS.onboardingDone, false);
+    setBoot('onboarding');
+  };
+
+  const completeOnboarding = (p: UserProfile) => {
+    updateProfile(p);
+    void saveValue(STORAGE_KEYS.onboardingDone, true);
+    setBoot('ready');
+  };
+
+  if (boot === 'loading') {
+    return <SafeAreaView style={s.root} />;
+  }
+
+  if (boot === 'onboarding') {
+    return (
+      <SafeAreaView style={s.root}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+        <OnboardingScreen initialProfile={profile} onDone={completeOnboarding} />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={s.root}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+
+      {/* ── 상단 브랜드 바 ─────────────────────────────────── */}
+      <View style={s.brandBar}>
+        {/* 26px 에서는 워드마크 위쪽의 'Hanwha' 가 뭉개져 읽히지 않는다.
+            두 줄로 짜인 로고라 작은 쪽 글자가 판독 하한을 정한다 */}
+        <ClubWordmark height={32} />
+        <Text style={s.brandMeta}>대전 한화생명 볼파크</Text>
+      </View>
+
+      {/* ── 본문 ───────────────────────────────────────────── */}
+      <View style={{ flex: 1 }}>
+        {tab === 'home' ? (
+          <HomeScreen
+            profile={profile}
+            onFavorite={setFavorite}
+            onGoLive={() => setTab('live')}
+            onGoStore={() => setTab('store')}
+          />
+        ) : null}
+        {tab === 'live' ? <LiveScreen profile={profile} onLevel={setLevel} /> : null}
+        {tab === 'players' ? <PlayersScreen profile={profile} onLevel={setLevel} /> : null}
+        {tab === 'gameday' ? <GamedayScreen /> : null}
+        {tab === 'store' ? <StoreScreen profile={profile} /> : null}
+        {tab === 'my' ? (
+          <MyScreen
+            profile={profile}
+            onLevel={setLevel}
+            onFavorite={setFavorite}
+            onAlert={setAlert}
+            onResetOnboarding={resetOnboarding}
+          />
+        ) : null}
+      </View>
+
+      {/* ── 하단 탭 - 떠 있는 캡슐 ─────────────────────────── */}
+      <View style={s.tabBar}>
+        {TABS.map((t) => {
+          const on = tab === t.key;
+          return (
+            <Pressable
+              key={t.key}
+              onPress={() => setTab(t.key)}
+              style={({ pressed }) => [
+                s.tabBtn,
+                on && s.tabBtnOn,
+                pressed && !on && { opacity: 0.6 },
+              ]}
+              accessibilityRole="tab"
+              accessibilityLabel={t.label}
+              accessibilityState={{ selected: on }}
+              aria-selected={on}
+            >
+              <Text style={[s.tabLabel, on && s.tabLabelOn]} numberOfLines={1}>
+                {t.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+
+  brandBar: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.screenX,
+    // 바탕색이 페이지와 같아서 경계가 없으면 로고가 콘텐츠 위에 떠 있는 것처럼 보인다.
+    // 헤어라인 하나가 "여기까지가 크롬"을 말해 준다
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  brandMeta: typography.micro,
+
+  // 화면 가장자리에 붙지 않고 떠 있는 캡슐. 선택 탭만 흰 버블
+  tabBar: {
+    position: 'absolute',
+    bottom: tabCapsule.offset,
+    left: spacing.lg,
+    right: spacing.lg,
+    height: tabCapsule.height,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: tabCapsule.pad,
+    borderRadius: radius.chip,
+    backgroundColor: 'rgba(244,245,247,0.82)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    // 유리는 내비게이션 층에만 (kbo_poc design.md §1). 본문이 캡슐 아래로 흐를 때
+    // 비쳐 보여야 "떠 있다"가 성립한다 - 불투명하면 그냥 회색 바다
+    ...(Platform.OS === 'web'
+      ? {
+          boxShadow: '0 4px 20px rgba(9, 22, 45, 0.10)',
+          backdropFilter: 'saturate(180%) blur(16px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(16px)',
+        }
+      : null),
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: spacing.touchMin,
+    borderRadius: radius.chip,
+  },
+  tabBtnOn: {
+    backgroundColor: colors.card,
+    ...(Platform.OS === 'web' ? { boxShadow: '0 1px 8px rgba(9, 22, 45, 0.16)' } : null),
+  },
+  tabLabel: { fontSize: 12, fontWeight: '600', color: colors.subText, letterSpacing: -0.2 },
+  tabLabelOn: { color: colors.brandText, fontWeight: '800' },
+});
