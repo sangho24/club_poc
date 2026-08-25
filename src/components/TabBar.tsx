@@ -27,6 +27,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import BagIcon from '../../assets/icons/tab-bag.svg';
+import BatIcon from '../../assets/icons/tab-bat.svg';
+import DiamondIcon from '../../assets/icons/tab-diamond.svg';
+import HomeIcon from '../../assets/icons/tab-home.svg';
+import LiveIcon from '../../assets/icons/tab-live.svg';
+import PersonIcon from '../../assets/icons/tab-person.svg';
 import { colors, radius, spacing, tabCapsule } from '../theme';
 
 /** 드래그로 인정하기 시작하는 가로 이동량 - 이보다 작으면 '누름'이다 */
@@ -59,132 +65,33 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 // ─────────────────────────────────────────────────────────────
 // 픽토그램
 //
-// 아이콘 라이브러리를 넣지 않았다. 여섯 개를 위해 SVG 런타임을 붙이면 번들이
-// 그만큼 무거워지고, 이 저장소는 이미 View 로 마크를 그리는 관용구를 갖고 있다
-// (common.tsx 의 BellButton, photos.tsx 의 CapMark). 같은 방식으로 그린다.
+// 초판은 View 를 쌓아 만들었다. 의존성은 0 이었지만 **획이 아니라 상자라서** 끝이
+// 각지고 굵기가 자리마다 어긋났다 - 작게 놓으니 그게 곧 촌스러움으로 읽혔다.
 //
-// 전부 **선(획) 문법**으로 통일했다 - 굵기 1.8 하나. 채운 것과 선인 것이 섞이면
-// 한 줄에 놓였을 때 무게가 들쭉날쭉해 어느 탭이 선택된 것인지가 흐려진다.
-// (지붕만은 삼각형이라 채운다 - 1.8px 선 두 개로 꺾인 각을 만들면 이 크기에서
-//  이음매가 뭉개진다)
-//
-// 색은 넘겨받는다. 선택/비선택 두 벌을 겹쳐 놓고 투명도로 교차시키기 때문에
-// 아이콘 자신은 자기가 선택됐는지 모른다.
+// 지금은 assets/icons/*.svg 를 그대로 불러온다. path 문자열을 코드에 박아 두면
+// **고치려면 개발자가 필요해지지만**, 파일로 두면 벡터 편집기로 열어 고치고 덮어쓰면
+// 끝이다. 규칙은 24 격자 · 굵기 1.75 · 끝과 이음매는 둥글게, 그리고 색은 파일에
+// 넣지 않는다(currentColor) - 선택/비선택 두 벌을 겹쳐 교차시키려면 색이 밖에서
+// 와야 한다.
 // ─────────────────────────────────────────────────────────────
 
-export type TabIconName = 'home' | 'live' | 'bat' | 'diamond' | 'bag' | 'person';
+const TAB_ICONS = {
+  home: HomeIcon,
+  live: LiveIcon,
+  bat: BatIcon,
+  diamond: DiamondIcon,
+  bag: BagIcon,
+  person: PersonIcon,
+};
 
-const STROKE = 1.8;
+export type TabIconName = keyof typeof TAB_ICONS;
+
+const ICON_BOX = 23;
 
 function TabIcon({ name, color }: { name: TabIconName; color: string }) {
-  switch (name) {
-    // 집 - 지붕은 채우고 몸통은 선
-    case 'home':
-      return (
-        <View style={ic.box}>
-          <View style={[ic.roof, { borderBottomColor: color }]} />
-          <View style={[ic.houseBody, { borderColor: color }]} />
-        </View>
-      );
-
-    // 방송 중 - 가운데 점과 그것을 둘러싼 링. 녹화·생중계의 관용 기호다
-    case 'live':
-      return (
-        <View style={ic.box}>
-          <View style={[ic.ring, { borderColor: color }]} />
-          <View style={[ic.ringDot, { backgroundColor: color }]} />
-        </View>
-      );
-
-    // 배트 - 사람 모양을 쓰면 MY 와 겹친다. 이 탭은 '선수단'이지 '나'가 아니다
-    case 'bat':
-      return (
-        <View style={ic.box}>
-          <View style={ic.batWrap}>
-            <View style={[ic.batBarrel, { backgroundColor: color }]} />
-            <View style={[ic.batHandle, { backgroundColor: color }]} />
-            <View style={[ic.batKnob, { backgroundColor: color }]} />
-          </View>
-        </View>
-      );
-
-    // 내야 다이아몬드 - 야구장을 한 획으로 말하는 형태
-    case 'diamond':
-      return (
-        <View style={ic.box}>
-          <View style={[ic.diamond, { borderColor: color }]} />
-        </View>
-      );
-
-    // 쇼핑백 - 손잡이는 위쪽만 둥근 'ㄇ' 로 만든다. 원의 한쪽 테두리만 남기는
-    // 방식은 플랫폼마다 이음매가 달라 이 크기에서 지저분해진다
-    case 'bag':
-      return (
-        <View style={ic.box}>
-          <View style={[ic.bagHandle, { borderColor: color }]} />
-          <View style={[ic.bagBody, { borderColor: color }]} />
-        </View>
-      );
-
-    // 사람 - 머리와 어깨. 어깨는 아래가 열린 반원이라 '상반신'으로 읽힌다
-    case 'person':
-      return (
-        <View style={ic.box}>
-          <View style={[ic.head, { borderColor: color }]} />
-          <View style={[ic.shoulders, { borderColor: color }]} />
-        </View>
-      );
-  }
+  const Icon = TAB_ICONS[name];
+  return <Icon width={ICON_BOX} height={ICON_BOX} color={color} />;
 }
-
-const ic = StyleSheet.create({
-  box: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
-
-  roof: {
-    width: 0,
-    height: 0,
-    borderBottomWidth: 8,
-    borderLeftWidth: 9,
-    borderRightWidth: 9,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  houseBody: { width: 12, height: 8, borderWidth: STROKE, borderTopWidth: 0 },
-
-  ring: { width: 18, height: 18, borderRadius: 999, borderWidth: STROKE },
-  ringDot: { position: 'absolute', width: 7, height: 7, borderRadius: 999 },
-
-  // 손잡이 끝(knob)이 아래로 오게 세운 뒤 통째로 기울인다
-  batWrap: { alignItems: 'center', transform: [{ rotate: '38deg' }] },
-  batBarrel: { width: 5, height: 10, borderRadius: 2.5 },
-  batHandle: { width: 2.4, height: 6, marginTop: -0.5 },
-  batKnob: { width: 4.4, height: 2.2, borderRadius: 1.1 },
-
-  diamond: { width: 13, height: 13, borderWidth: STROKE, transform: [{ rotate: '45deg' }] },
-
-  bagHandle: {
-    width: 9,
-    height: 5,
-    borderWidth: STROKE,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 4.5,
-    borderTopRightRadius: 4.5,
-    // 몸통 테두리와 겹쳐 두 선이 이어져 보이게 한다
-    marginBottom: -STROKE,
-  },
-  bagBody: { width: 15, height: 11, borderWidth: STROKE, borderRadius: 3 },
-
-  head: { width: 7.5, height: 7.5, borderRadius: 999, borderWidth: STROKE },
-  shoulders: {
-    width: 15,
-    height: 7,
-    borderWidth: STROKE,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 7.5,
-    borderTopRightRadius: 7.5,
-    marginTop: 2,
-  },
-});
 
 export function TabBar<T extends string>({
   tabs,

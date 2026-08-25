@@ -151,11 +151,9 @@ export function MyScreen({
 
           {/* 요약 셋은 "올해 내가 얼마나 갔나"에 답하고 끝난다. 어느 날 누구와
               어디 앉았는지는 **다시 들춰 볼 때만** 필요한 것이라 눌러서 연다 */}
+          {/* 제목 하나면 된다 - 설명 줄을 붙이면 그게 다시 읽을 거리가 된다 */}
           <Row last style={st.logRow} onPress={() => setLogOpen(true)}>
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={st.logLabel}>경기 기록</Text>
-              <Text style={st.logHint}>{ATTENDANCE.length}경기 · 날짜 · 상대 · 좌석</Text>
-            </View>
+            <Text style={st.logLabel}>경기 기록</Text>
             <Text style={st.chevron}>›</Text>
           </Row>
         </Card>
@@ -215,8 +213,7 @@ const st = StyleSheet.create({
 
   // 접어 둔 기록을 여는 줄 - 카드 안이라 Row 의 좌우 여백을 지우고 카드에 맞춘다
   logRow: { paddingHorizontal: 0, paddingVertical: 0 },
-  logLabel: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
-  logHint: { ...typography.micro, fontWeight: '500', lineHeight: 17 },
+  logLabel: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
 
   gameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 10 },
   gameDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },

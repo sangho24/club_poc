@@ -54,7 +54,10 @@ import {
 import { TODAY_GAME } from '../game';
 import { countdown } from '../goods';
 import { Partner, TIER_SPEC, couponCode, sortedPartners, todayPerks } from '../partners';
-import { colors, radius, spacing, tabularFigures, typography } from '../theme';
+import BringIcon from '../../assets/icons/bring.svg';
+import GateIcon from '../../assets/icons/gate.svg';
+import TransitIcon from '../../assets/icons/transit.svg';
+import { colors, radius, spacing, states, tabularFigures, typography } from '../theme';
 
 type Sub = 'go' | 'eat';
 
@@ -67,11 +70,49 @@ type Sub = 'go' | 'eat';
  */
 type InfoKey = 'gate' | 'bring' | 'transit';
 
-const INFO_META: Record<InfoKey, { title: string; hint: string }> = {
-  gate: { title: '입장 게이트', hint: '어느 문이 덜 붐비나' },
-  bring: { title: '반입 규정', hint: '가지고 들어갈 수 있는 것 · 없는 것' },
-  transit: { title: '대중교통', hint: '기차 · 버스 · 도보' },
+const INFO_META: Record<InfoKey, { title: string }> = {
+  gate: { title: '입장 게이트' },
+  bring: { title: '반입 규정' },
+  transit: { title: '대중교통' },
 };
+
+const INFO_ORDER: InfoKey[] = ['gate', 'bring', 'transit'];
+
+/**
+ * 셋을 여는 타일. 세로로 쌓지 않고 **한 줄에 나란히** 둔다.
+ *
+ * 세로로 쌓으면 목록이 되고, 목록은 "위에서부터 읽는 것"이라 셋 다 훑게 만든다.
+ * 나란히 두면 **고르는 것**이 되어 필요한 하나만 짚고 지나간다. 설명 줄을 뺀 것도
+ * 같은 이유다 - 세 칸에 여섯 줄이 들어차면 그게 다시 읽을 거리가 된다.
+ */
+function InfoTiles({ onPick }: { onPick: (k: InfoKey) => void }) {
+  return (
+    <View style={st.infoRow}>
+      {INFO_ORDER.map((k) => (
+        <Pressable
+          key={k}
+          onPress={() => onPick(k)}
+          style={({ pressed }) => [st.infoTile, pressed && states.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={INFO_META[k].title}
+        >
+          <GamedayIcon name={k} color={colors.brandText} />
+          <Text style={st.infoTileLabel} numberOfLines={1}>
+            {INFO_META[k].title}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+/** 세 타일의 픽토그램. 하단 탭과 같은 규칙 - 파일에서 불러오고 색만 밖에서 준다 */
+const INFO_ICONS = { gate: GateIcon, bring: BringIcon, transit: TransitIcon };
+
+function GamedayIcon({ name, color }: { name: InfoKey; color: string }) {
+  const Icon = INFO_ICONS[name];
+  return <Icon width={24} height={24} color={color} />;
+}
 
 /** 시연 기준 시각 - Date.now() 를 쓰면 실행할 때마다 카운트다운이 달라진다 */
 const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
@@ -251,26 +292,9 @@ export function GamedayScreen() {
               {/* ── 가기 전에 ─────────────────────────────────
                   게이트 · 반입 · 교통은 필요한 정보지만 **매번 읽는 것은 아니다.**
                   펼쳐 두면 이 화면이 실제로 답해야 하는 것(어디 대나)이 그만큼
-                  아래로 밀린다. 한 줄로 접고 눌러서 연다 */}
+                  아래로 밀린다. 한 줄에 나란히 접고 눌러서 연다 */}
               <SectionTitle title="가기 전에" />
-              <GroupCard>
-                {(['gate', 'bring', 'transit'] as InfoKey[]).map((k, i, arr) => (
-                  <Row
-                    key={k}
-                    last={i === arr.length - 1}
-                    style={st.lotRow}
-                    onPress={() => setInfo(k)}
-                  >
-                    <View style={{ flex: 1, gap: 3 }}>
-                      <Text style={st.lotName}>{INFO_META[k].title}</Text>
-                      {/* 눌러서 무엇이 나오는지 미리 적는다 - 제목만 있으면
-                          누를지 말지를 누른 뒤에야 알게 된다 */}
-                      <Text style={st.infoHint}>{INFO_META[k].hint}</Text>
-                    </View>
-                    <Text style={st.chevron}>›</Text>
-                  </Row>
-                ))}
-              </GroupCard>
+              <InfoTiles onPick={setInfo} />
             </>
           ) : (
             <>
@@ -652,6 +676,22 @@ const st = StyleSheet.create({
   lotMeta: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
   lotStatus: { ...typography.caption, color: colors.text, fontWeight: '600' },
   chevron: { fontSize: 18, color: colors.mutedText, marginTop: 2 },
+
+  // 셋을 여는 타일 - 한 줄에 나란히. 각자 곡률 사각형을 등에 지고 서로 갈린다
+  infoRow: { flexDirection: 'row', gap: spacing.sm },
+  infoTile: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoTileLabel: { fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
   // 접어 둔 지면을 여는 줄. 제목 아래 한 줄이 "눌러서 무엇이 나오는지"를 미리 말한다
   infoHint: { ...typography.micro, fontWeight: '500', lineHeight: 17 },
 
