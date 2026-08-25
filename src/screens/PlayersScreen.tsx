@@ -17,7 +17,7 @@
 //   ③ 용어 설명이 화면 **맨 아래**에 떠서, 누른 타일과 멀찍이 떨어져 나타났다
 // 셋 다 "목록 안"이라는 자리에서 나온 문제라 자리를 옮긴다. 굿즈·직관이 쓰는
 // DetailSheet 를 그대로 쓴다 - 폭과 높이를 다 쓰고, 목록 행은 다시 훑기 좋게 작아진다.
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -289,6 +289,14 @@ export function PlayersScreen({ profile }: { profile: UserProfile }) {
                 </ScrollView>
               ) : null}
 
+              {/* ── 첫 줄은 펼쳐 둔다 ─────────────────────────
+                  목록만 있으면 화면에 들어왔을 때 **읽을 것이 하나도 없다.** 전부
+                  눌러야 나오는 화면은 "무엇을 눌러야 하는지"부터 정해야 해서, 이
+                  탭이 무엇을 보여주는 곳인지 자체가 안 보인다.
+
+                  그래서 지금 정렬 기준 1위 한 명을 펼친 채로 둔다. 들어오자마자
+                  이 탭의 성격(심화 지표를 이만큼 판다)이 그림으로 읽히고, 나머지는
+                  같은 것을 눌러서 본다. 정렬을 바꾸면 펼쳐지는 사람도 따라 바뀐다 */}
               <View style={{ marginTop: spacing.md }}>
                 <GroupCard>
                   {rows.map((r, i) => (
@@ -297,6 +305,16 @@ export function PlayersScreen({ profile }: { profile: UserProfile }) {
                       data={r}
                       last={i === rows.length - 1}
                       onPress={() => openPlayer(r.id)}
+                      detail={
+                        i === 0 ? (
+                          <FeaturedDetail
+                            row={r}
+                            profile={profile}
+                            glossaryKey={glossaryKey}
+                            onGlossary={setGlossaryKey}
+                          />
+                        ) : null
+                      }
                     />
                   ))}
                 </GroupCard>
@@ -809,9 +827,120 @@ function LeaderCard({
  * 상세가 시트로 빠지면서 이 행이 할 일은 **훑기**뿐이다. 등번호·이름·기본 스탯 한 줄과
  * 정렬 기준인 WAR 만 남긴다.
  */
-function PlayerRow({ data, last, onPress }: { data: RowData; last: boolean; onPress: () => void }) {
+/**
+ * 펼쳐 둔 한 명의 상세 - 목록 첫 줄 아래에 붙는다.
+ *
+ * 시트에 있는 것을 전부 옮기지 않는다. **들어오자마자 읽히는 만큼만** 둔다 -
+ * 폼 · 심화 지표 셋 · 그 값이 어느 구간인지 · 그리고 이 선수를 한 줄로 말하는 문장.
+ * 작년 대비 · 월별 · 상황별처럼 파고드는 것은 눌러서 시트로 간다.
+ */
+function FeaturedDetail({
+  row,
+  profile,
+  glossaryKey,
+  onGlossary,
+}: {
+  row: RowData;
+  profile: UserProfile;
+  glossaryKey: string | null;
+  onGlossary: (k: string | null) => void;
+}) {
+  const batter = BATTERS.find((x) => x.id === row.id);
+  const pitcher = PITCHERS.find((x) => x.id === row.id);
+
+  const glossary = (
+    <GlossaryCard statKey={glossaryKey} profile={profile} onClose={() => onGlossary(null)} />
+  );
+
+  if (batter) {
+    const st0 = batter.stat;
+    const wrc = wrcPlusOf(st0, PARK);
+    const woba = wobaOf(st0);
+    const babip = babipOf(st0);
+    return (
+      <>
+        <PlayerFormLoop playerId={batter.id} label="타격 준비" height={170} />
+        <View style={st.metricRow}>
+          <MetricTile
+            label="wRC+"
+            value={String(wrc)}
+            statKey="wrcPlus"
+            sample={st0.pa}
+            onGlossary={onGlossary}
+            active={glossaryKey === 'wrcPlus'}
+          />
+          <MetricTile
+            label="wOBA"
+            value={woba.toFixed(3)}
+            statKey="woba"
+            sample={st0.pa}
+            onGlossary={onGlossary}
+            active={glossaryKey === 'woba'}
+          />
+          <MetricTile
+            label="BABIP"
+            value={babip.toFixed(3)}
+            statKey="babip"
+            sample={st0.pa}
+            onGlossary={onGlossary}
+            active={glossaryKey === 'babip'}
+          />
+        </View>
+        {glossary}
+        <View style={{ gap: spacing.md }}>
+          <MetricGauge statKey="wrcPlus" label="wRC+" value={wrc} />
+          <MetricGauge statKey="woba" label="wOBA" value={woba} />
+          <MetricGauge statKey="babip" label="BABIP" value={babip} />
+        </View>
+        <Text style={st.note}>{batter.note}</Text>
+      </>
+    );
+  }
+
+  if (!pitcher) return null;
+  const st1 = pitcher.stat;
+  const era = eraOf(st1);
+  const fip = fipOf(st1);
   return (
-    <Row last={last} onPress={onPress} style={st.playerRow}>
+    <>
+      <PlayerFormLoop playerId={pitcher.id} label="와인드업" height={170} />
+      <View style={st.metricRow}>
+        <StatTile label="ERA" value={era.toFixed(2)} />
+        <StatTile label="FIP" value={fip.toFixed(2)} tone="brand" />
+        <StatTile label="WHIP" value={whipOf(st1).toFixed(2)} />
+      </View>
+      <Label>구종</Label>
+      <View style={{ gap: spacing.sm }}>
+        {pitcher.pitches.map((pt, i) => (
+          <View key={pt.name} style={st.pitchRow}>
+            <Text style={st.pitchName}>{pt.name}</Text>
+            <View style={{ flex: 1 }}>
+              <Gauge position={pt.usage} category={i} />
+            </View>
+            <Text style={st.pitchPct}>{Math.round(pt.usage * 100)}%</Text>
+            {pt.velo ? <Text style={st.pitchVelo}>{pt.velo}</Text> : null}
+          </View>
+        ))}
+      </View>
+      <Text style={st.note}>{pitcher.note}</Text>
+    </>
+  );
+}
+
+function PlayerRow({
+  data,
+  last,
+  onPress,
+  detail,
+}: {
+  data: RowData;
+  last: boolean;
+  onPress: () => void;
+  /** 펼쳐 둘 줄이면 여기에 상세가 들어온다. 나머지 줄은 눌러서 시트로 본다 */
+  detail?: ReactNode;
+}) {
+  const row = (
+    <Row last={last || !!detail} onPress={onPress} style={st.playerRow}>
       <PlayerAvatar playerId={data.id} team="HH" size={42} />
       <View style={{ flex: 1 }}>
         <View style={st.nameRow}>
@@ -828,6 +957,13 @@ function PlayerRow({ data, last, onPress }: { data: RowData; last: boolean; onPr
       </View>
       <Text style={st.rowChevron}>›</Text>
     </Row>
+  );
+  if (!detail) return row;
+  return (
+    <View style={!last ? st.featuredWrap : undefined}>
+      {row}
+      <View style={st.featured}>{detail}</View>
+    </View>
   );
 }
 
@@ -1832,6 +1968,10 @@ const st = StyleSheet.create({
   summaryWar: { ...typography.metric, ...tabularFigures, fontSize: 30, color: colors.brandText },
 
   metricRow: { flexDirection: 'row', gap: spacing.sm },
+
+  // 펼쳐 둔 줄 - 목록 안이지만 카드 안쪽 여백을 그대로 쓴다
+  featured: { gap: spacing.md, paddingHorizontal: spacing.cardPad, paddingBottom: spacing.lg },
+  featuredWrap: { borderBottomWidth: 1, borderBottomColor: colors.border },
 
   // 공용 StatTile 과 같은 문법 - 상자를 걷고 숫자를 키운다
   metricTile: { flex: 1, gap: 4 },
