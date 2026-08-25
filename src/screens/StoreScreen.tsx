@@ -28,8 +28,16 @@ import {
   Row,
   SectionTitle,
 } from '../components/common';
-import { PlayerAvatar, TeamEmblem } from '../components/photos';
-import { DROPS, GoodsDrop, countdown, dropAlerts, statusLabel, stockLeft, stockRatio } from '../goods';
+import { GoodsShowcase, PlayerAvatar, TeamEmblem } from '../components/photos';
+import {
+  DROPS,
+  GoodsDrop,
+  countdown,
+  dropAlerts,
+  statusLabel,
+  stockLeft,
+  stockRatio,
+} from '../goods';
 import { UserProfile } from '../profile';
 import { BATTERS, PITCHERS } from '../roster';
 import { colors, radius, spacing, tabularFigures, typography } from '../theme';
@@ -116,15 +124,9 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
 
         <View style={{ gap: spacing.cardGap, marginTop: spacing.md }}>
           {list.map((d) => (
-            <DropCard
-              key={d.id}
-              drop={d}
-              alerted={!!alerts[d.id]}
-              onPress={() => openDrop(d)}
-            />
+            <DropCard key={d.id} drop={d} alerted={!!alerts[d.id]} onPress={() => openDrop(d)} />
           ))}
         </View>
-
       </ScrollView>
 
       {/* ── 드롭 상세 ──────────────────────────────────────── */}
@@ -184,10 +186,7 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
                   <View style={st.stockHead}>
                     <Label>남은 수량</Label>
                     <Text
-                      style={[
-                        st.stockValue,
-                        stockRatio(open)! <= 0.2 && { color: colors.live },
-                      ]}
+                      style={[st.stockValue, stockRatio(open)! <= 0.2 && { color: colors.live }]}
                     >
                       {stockLeft(open)?.toLocaleString()}개
                     </Text>
@@ -196,13 +195,21 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
               </View>
             ) : null}
 
+            {/* 물건이 보여야 커머스다. 사이즈 표만 있으면 팬은 사진을 찾으러 앱을 나간다 */}
+            <View style={{ marginTop: spacing.cardGap }}>
+              <GoodsShowcase kind={/모자|캡|CAP/i.test(open.title) ? 'cap' : 'emblem'} />
+            </View>
+
             {/* 구성 */}
             {open.items.length > 0 ? (
               <View style={{ marginTop: spacing.cardGap }}>
                 <SectionTitle title="구성" />
                 <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
                   {open.items.map((it, i) => (
-                    <View key={it.name} style={[st.itemRow, i < open.items.length - 1 && st.divider]}>
+                    <View
+                      key={it.name}
+                      style={[st.itemRow, i < open.items.length - 1 && st.divider]}
+                    >
                       <View style={{ flex: 1 }}>
                         <Text style={st.itemName}>{it.name}</Text>
                         {it.limit ? (
@@ -229,12 +236,15 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
                   {open.items
                     .find((i) => i.sizes)!
                     .sizes!.map((sz) => (
-                      <Chip key={sz} label={sz} selected={size === sz} onPress={() => setSize(sz)} />
+                      <Chip
+                        key={sz}
+                        label={sz}
+                        selected={size === sz}
+                        onPress={() => setSize(sz)}
+                      />
                     ))}
                 </View>
-                <Text style={st.footNote}>
-                  선택한 사이즈는 공식몰로 넘어갈 때 함께 전달됩니다.
-                </Text>
+                <Text style={st.footNote}>선택한 사이즈는 공식몰로 넘어갈 때 함께 전달됩니다.</Text>
               </View>
             ) : null}
 
@@ -370,7 +380,12 @@ const st = StyleSheet.create({
   stockFill: { height: 6, borderRadius: radius.bar },
 
   dropFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dropFootText: { ...typography.micro, ...tabularFigures, color: colors.brandText, fontWeight: '700' },
+  dropFootText: {
+    ...typography.micro,
+    ...tabularFigures,
+    color: colors.brandText,
+    fontWeight: '700',
+  },
 
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   itemRow: {

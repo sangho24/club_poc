@@ -173,8 +173,7 @@ export const opsOf = (b: BatterStatLine) => r3(obpOf(b) + slgOf(b));
  * 홈런은 야수가 손댈 수 없으므로 둘 다 "수비가 개입할 여지"가 없다.
  * 남은 것이 인플레이 타구이고, 그중 몇 개가 안타가 됐는지를 세는 값이다.
  */
-export const babipOf = (b: BatterStatLine) =>
-  r3(safe(b.h - b.hr, b.ab - b.so - b.hr + b.sf));
+export const babipOf = (b: BatterStatLine) => r3(safe(b.h - b.hr, b.ab - b.so - b.hr + b.sf));
 
 /** 피BABIP - 투수판. 계산 구조는 같다 */
 export function babipAllowedOf(p: PitcherStatLine): number {

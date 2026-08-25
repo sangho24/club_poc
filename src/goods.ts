@@ -22,13 +22,7 @@ export type DropStatus = 'teaser' | 'upcoming' | 'onsale' | 'soldout' | 'ended';
 
 /** 굿즈 드롭을 만든 '사건' - 상품이 아니라 이게 단위다 */
 export type DropOccasion =
-  | '은퇴'
-  | '기록달성'
-  | '헤리티지'
-  | '시즌권'
-  | '포스트시즌'
-  | '콜라보'
-  | '어린이날';
+  '은퇴' | '기록달성' | '헤리티지' | '시즌권' | '포스트시즌' | '콜라보' | '어린이날';
 
 export interface GoodsItem {
   name: string;
@@ -81,8 +75,20 @@ export const DROPS: GoodsDrop[] = [
       '1999년 한국시리즈 우승 당시 유니폼을 원단과 자수까지 복각했습니다. ' +
       '8월 15일 홈경기에서 선수단이 이 유니폼을 입고 뜁니다.',
     items: [
-      { name: '레플리카 유니폼 (마킹 없음)', price: 89000, limit: 1999, remain: 1999, sizes: ['S', 'M', 'L', 'XL', '2XL'] },
-      { name: '레플리카 유니폼 (선수 마킹)', price: 119000, limit: 500, remain: 500, sizes: ['S', 'M', 'L', 'XL', '2XL'] },
+      {
+        name: '레플리카 유니폼 (마킹 없음)',
+        price: 89000,
+        limit: 1999,
+        remain: 1999,
+        sizes: ['S', 'M', 'L', 'XL', '2XL'],
+      },
+      {
+        name: '레플리카 유니폼 (선수 마킹)',
+        price: 119000,
+        limit: 500,
+        remain: 500,
+        sizes: ['S', 'M', 'L', 'XL', '2XL'],
+      },
       { name: '기념 모자', price: 39000 },
     ],
     shopUrl: 'https://www.hanwhaeagles.co.kr',
@@ -248,7 +254,13 @@ export function dropAlerts(nowMs: number, favoritePlayerId?: string): DropAlert[
 }
 
 export function statusLabel(s: DropStatus): string {
-  return { teaser: '공개 예정', upcoming: '발매 예정', onsale: '판매 중', soldout: '품절', ended: '종료' }[s];
+  return {
+    teaser: '공개 예정',
+    upcoming: '발매 예정',
+    onsale: '판매 중',
+    soldout: '품절',
+    ended: '종료',
+  }[s];
 }
 
 /**

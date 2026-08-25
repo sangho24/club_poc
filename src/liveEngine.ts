@@ -245,9 +245,18 @@ export function situationAdjustments(
   // ③ 볼카운트 - 야구에서 단일 요인으로 가장 큰 변수다
   const count = `${s.balls}-${s.strikes}`;
   const COUNT_DELTA: Record<string, number> = {
-    '3-0': 0.155, '3-1': 0.105, '2-0': 0.085, '3-2': 0.045,
-    '1-0': 0.028, '2-1': 0.026, '0-0': 0,
-    '1-1': -0.012, '2-2': -0.03, '0-1': -0.032, '1-2': -0.075, '0-2': -0.095,
+    '3-0': 0.155,
+    '3-1': 0.105,
+    '2-0': 0.085,
+    '3-2': 0.045,
+    '1-0': 0.028,
+    '2-1': 0.026,
+    '0-0': 0,
+    '1-1': -0.012,
+    '2-2': -0.03,
+    '0-1': -0.032,
+    '1-2': -0.075,
+    '0-2': -0.095,
   };
   const cd = COUNT_DELTA[count] ?? 0;
   if (cd !== 0) {
@@ -340,10 +349,18 @@ export interface MatchupPrediction {
   };
 }
 
+/**
+ * '결정적'이라고 부를 수 있는 레버리지 하한.
+ *
+ * 아래 leverageLabel 이 '중요'를 붙이는 경계와 같은 값이다. 두 곳에 따로 적어 두면
+ * 한쪽만 바뀌었을 때 화면은 '중요'라고 하는데 알림은 안 오는 식으로 어긋난다.
+ */
+export const CLUTCH_LI = 1.5;
+
 function leverageLabel(li: number): string {
   if (li >= 3) return '경기를 가르는 순간';
   if (li >= 2) return '매우 중요';
-  if (li >= 1.5) return '중요';
+  if (li >= CLUTCH_LI) return '중요';
   if (li >= 0.85) return '평범';
   return '여유 있는 국면';
 }
@@ -429,7 +446,8 @@ export function predictMatchup(
   const re = runExpectancy(s);
 
   // 실력(로그5)과 최종 결론이 서로 반대편이면 '상황이 뒤집은 승부'다
-  const skillSide = base > leagueOBP + 0.015 ? 'batter' : base < leagueOBP - 0.015 ? 'pitcher' : 'even';
+  const skillSide =
+    base > leagueOBP + 0.015 ? 'batter' : base < leagueOBP - 0.015 ? 'pitcher' : 'even';
   const flipped = skillSide !== 'even' && favors !== 'even' && skillSide !== favors;
 
   // 뒤집은 요인 - 상황 보정 중 가장 크게 기여한 것
@@ -586,11 +604,7 @@ export interface LiveAlert {
  * 상황까지 인사이트를 밀어 넣으면 사용자는 알림을 끄고, 그 순간 9회 만루도 못 보게 된다.
  * **레버리지가 기준선을 넘을 때만** 말한다.
  */
-export function liveAlerts(
-  s: GameSituation,
-  batter: Batter,
-  pitcher: Pitcher,
-): LiveAlert[] {
+export function liveAlerts(s: GameSituation, batter: Batter, pitcher: Pitcher): LiveAlert[] {
   const alerts: LiveAlert[] = [];
   const li = leverageIndex(s);
   const pred = predictMatchup(s, batter, pitcher);

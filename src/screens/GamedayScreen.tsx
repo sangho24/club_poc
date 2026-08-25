@@ -25,29 +25,35 @@ import {
   ExternalButton,
   GroupCard,
   InfoRow,
+  InfoTip,
   Label,
   Row,
   SecondaryButton,
   SectionTitle,
+  Segmented,
   TopTabs,
 } from '../components/common';
 import { PhotoHeader, stadiumPhoto } from '../components/photos';
 import {
   BRING_RULES,
   GATES,
+  PARKING_BASIS,
+  PARKING_SORTS,
   ParkingLot,
+  ParkingSort,
   SEAT_GRADES,
   TICKET_CHANNEL,
   TICKET_OPEN_AT,
   TRANSIT,
   kakaoMapUrl,
+  minutesToStart,
   naverMapUrl,
   parkingAdvice,
   telUrl,
 } from '../gameday';
 import { TODAY_GAME } from '../game';
 import { countdown } from '../goods';
-import { Partner, PARTNER_RULES, TIER_SPEC, couponCode, sortedPartners, todayPerks } from '../partners';
+import { Partner, TIER_SPEC, couponCode, sortedPartners, todayPerks } from '../partners';
 import { colors, radius, spacing, tabularFigures, typography } from '../theme';
 
 type Sub = 'go' | 'eat';
@@ -57,21 +63,29 @@ const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
 
 export function GamedayScreen() {
   const [sub, setSub] = useState<Sub>('go');
-  const [minutesLeft, setMinutesLeft] = useState(120);
+  const [sort, setSort] = useState<ParkingSort>('near');
+  // 렌더마다 new Date() 를 부르면 순수하지 않다. 화면이 열린 시각을 한 번만 잡는다
+  const [now] = useState(() => new Date());
+  const { minutes, assumed } = minutesToStart(TODAY_GAME.startTime, now);
   const [won, setWon] = useState(true);
   const [openLot, setOpenLot] = useState<ParkingLot | null>(null);
   const [openPartner, setOpenPartner] = useState<Partner | null>(null);
   const [ticketAlert, setTicketAlert] = useState(false);
   const [coupons, setCoupons] = useState<Record<string, boolean>>({});
 
-  const advice = parkingAdvice(minutesLeft);
+  const advice = parkingAdvice(minutes, sort);
+  // 전부 만차면 목록은 순위가 아니라 '다 늦었다'는 사실을 말하는 것이다
+  const allFull = advice.every((a) => a.status === 'late');
   const perks = todayPerks(won);
   const partners = sortedPartners();
   const openIn = countdown(TICKET_OPEN_AT, DEMO_NOW);
 
   return (
     <>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.scrollBottom }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: spacing.scrollBottom }}
+      >
         <View style={st.tabsWrap}>
           <TopTabs
             tabs={[
@@ -148,18 +162,42 @@ export function GamedayScreen() {
                 />
               </Card>
 
-              {/* ── 주차 ─────────────────────────────────────── */}
-              <SectionTitle title="주차" right={<Text style={st.headNote}>경기 시작까지</Text>} />
-              <View style={st.chipRow}>
-                {[180, 120, 90, 60].map((m) => (
-                  <Chip
-                    key={m}
-                    label={`${m}분`}
-                    selected={minutesLeft === m}
-                    onPress={() => setMinutesLeft(m)}
-                  />
-                ))}
-              </View>
+              {/* ── 주차 ───────────────────────────────────────
+                  남은 시간은 앱이 안다. 팬이 고르는 것은 **무엇을 아쉬워할 것인가**다 */}
+              <SectionTitle title="주차" right={<Text style={st.headNote}>{PARKING_BASIS}</Text>} />
+              <Card style={{ gap: spacing.md }}>
+                <View style={st.countdownRow}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={st.countdown}>
+                      {/* '0시간 38분'은 사람이 쓰지 않는 말이다 */}
+                      경기까지{' '}
+                      {minutes >= 60
+                        ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
+                        : `${minutes}분`}
+                    </Text>
+                    <Text style={st.countdownSub}>
+                      {TODAY_GAME.startTime} · {TODAY_GAME.opponent.name}전
+                    </Text>
+                  </View>
+                  {/* 시연 시각이 경기 시각과 동떨어졌을 때 조용히 바꿔치기하지 않는다 */}
+                  <Badge text={assumed ? '시연 기준' : '지금 출발 기준'} tone="brand" />
+                </View>
+
+                {/* 늦게 열면 전부 만차다. 그때 정렬 기준을 내밀면 고를 수 없는 것을 고르라는 말이 된다.
+                    이 시간대에 팬이 실제로 필요한 답은 "주차 말고 다른 방법"이다 */}
+                {allFull ? (
+                  <View style={st.fullNote}>
+                    <Text style={st.fullTitle}>지금 출발하면 주차는 어렵습니다</Text>
+                    <Text style={st.fullBody}>
+                      네 곳 모두 경기 {Math.min(...advice.map((a) => a.lot.fullBeforeMinutes))}분
+                      전에는 찹니다. 아래 대중교통 안내를 보시거나, 다음 경기에는 조금 일찍
+                      출발하세요.
+                    </Text>
+                  </View>
+                ) : (
+                  <Segmented options={PARKING_SORTS} value={sort} onChange={(k) => setSort(k)} />
+                )}
+              </Card>
 
               <GroupCard style={{ marginTop: spacing.md }}>
                 {advice.map(({ lot, status, summary }, i) => (
@@ -169,29 +207,19 @@ export function GamedayScreen() {
                     style={st.lotRow}
                     onPress={() => setOpenLot(lot)}
                   >
-                    <View style={{ flex: 1, gap: 6 }}>
+                    <View style={{ flex: 1, gap: 5 }}>
                       <Text style={st.lotName}>{lot.name}</Text>
+                      {/* 막대와 긴 문장은 상세 시트의 몫이다. 목록 행이 카드만큼 커지면
+                          그룹이 "따로 노는 카드 더미"로 읽힌다 (2차 리뷰의 회귀 지점) */}
                       <Text style={st.lotMeta}>
                         도보 {lot.walkMinutes}분 · {lot.fee} · 출차 {lot.exitMinutes}분
                       </Text>
-                      {/* 막대와 긴 문장은 상세 시트의 몫이다. 목록 행이 카드만큼 커지면
-                          그룹이 "따로 노는 카드 더미"로 읽힌다 (2차 리뷰의 회귀 지점) */}
-                      <Text
-                        style={[
-                          st.lotStatus,
-                          {
-                            color:
-                              status === 'open'
-                                ? colors.win
-                                : status === 'tight'
-                                  ? colors.warn
-                                  : colors.mutedText,
-                          },
-                        ]}
-                      >
-                        {summary}
-                      </Text>
                     </View>
+                    {/* 상태는 문장이 아니라 값이다. 행 오른쪽 끝에서 한눈에 훑힌다 */}
+                    <Badge
+                      text={summary}
+                      tone={status === 'open' ? 'win' : status === 'tight' ? 'warn' : 'muted'}
+                    />
                     <Text style={st.chevron}>›</Text>
                   </Row>
                 ))}
@@ -264,14 +292,24 @@ export function GamedayScreen() {
                   </Row>
                 ))}
               </GroupCard>
-              <Text style={st.footNote}>
-                {won ? '승리한 날 열리는 혜택' : '당일 티켓 인증 시'}
-              </Text>
+              <Text style={st.footNote}>{won ? '승리한 날 열리는 혜택' : '당일 티켓 인증 시'}</Text>
 
-              {/* ── 제휴 가게 ─────────────────────────────────── */}
+              {/* ── 제휴 가게 ───────────────────────────────────
+                  설명은 지면을 차지하지 않고 물음표 뒤에 있다 - 묻는 사람에게만 답한다 */}
               <SectionTitle
                 title="제휴 가게"
-                right={<Text style={st.headNote}>{partners.length}곳</Text>}
+                right={
+                  <View style={st.headRight}>
+                    <Text style={st.headNote}>{partners.length}곳</Text>
+                    <InfoTip
+                      title="이글스 후원의 집이란"
+                      lines={[
+                        '팬이 운영하거나 팬이 모이는 가게가 구단과 제휴한 곳입니다. **구단이 직접 방문해 심사**합니다.',
+                        '경기가 있는 날, 그리고 **한화가 이긴 날**에 팬에게 혜택을 줍니다. 가게마다 조건이 다르니 상세에서 확인하세요.',
+                      ]}
+                    />
+                  </View>
+                }
               />
               <GroupCard>
                 {partners.map((p, i) => (
@@ -287,7 +325,11 @@ export function GamedayScreen() {
                         <Badge
                           text={TIER_SPEC[p.tier].label}
                           tone={
-                            p.tier === 'flagship' ? 'brand' : p.tier === 'official' ? 'win' : 'muted'
+                            p.tier === 'flagship'
+                              ? 'brand'
+                              : p.tier === 'official'
+                                ? 'win'
+                                : 'muted'
                           }
                         />
                       </View>
@@ -304,41 +346,14 @@ export function GamedayScreen() {
                 ))}
               </GroupCard>
 
-              {/* ── 구조 ─────────────────────────────────────── */}
-              <SectionTitle title="어떤 구조인가" />
-              <Card>
-                <CardHeading label="모델" title="협찬금을 받고 홍보 지면을 제공합니다" />
-                <Text style={st.bodyText}>
-                  팬이 운영하거나 팬이 모이는 가게만 받고, 구단이 직접 방문해 심사합니다. 전북
-                  현대의 &apos;후원의 집&apos;이 같은 구조로 운영되고 있습니다.
-                </Text>
+              {/* ── 어떤 구조인가 · 운영 원칙 · 배분 구조 섹션을 걷어냈다 ──
+                  팬은 협찬금 구조를 궁금해하지 않는다. 팬의 질문은 "우리 동네에 이글스
+                  후원 가게가 있나, 가면 뭘 주나" 하나다. 벤치마크(전북 현대)와 배분 구조는
+                  우리가 파트너·구단에게 설명할 내용이지 팬 화면의 콘텐츠가 아니라서
+                  제안서(docs/)로 옮겼다.
 
-                <Divider />
-
-                <Label>등급별 노출</Label>
-                {(['flagship', 'official', 'listed'] as const).map((t) => (
-                  <View key={t} style={{ gap: 4 }}>
-                    <View style={st.tierRow}>
-                      <Text style={st.tierName}>{TIER_SPEC[t].label}</Text>
-                      <Text style={st.tierSlot}>{TIER_SPEC[t].slotLimit}</Text>
-                    </View>
-                    <Text style={st.tierBenefit}>{TIER_SPEC[t].benefit.join(' · ')}</Text>
-                  </View>
-                ))}
-              </Card>
-
-              <SectionTitle title="운영 원칙" />
-              <GroupCard>
-                {PARTNER_RULES.map((r, i) => (
-                  <Row key={i} last={i === PARTNER_RULES.length - 1} style={st.lotRow}>
-                    <Text style={st.ruleText}>{r}</Text>
-                  </Row>
-                ))}
-              </GroupCard>
-
-              <Text style={st.footNote}>
-                협찬금 규모와 구단·선수 간 배분 구조는 커머스 파트의 설계를 따릅니다.
-              </Text>
+                  다만 처음 보는 이름이라 한 번은 물어본다. 그래서 목록 머리글의
+                  물음표가 그 질문만 받는다. */}
             </>
           )}
         </View>
@@ -433,7 +448,9 @@ export function GamedayScreen() {
       <DetailSheet
         visible={!!openPartner}
         title={openPartner?.name ?? ''}
-        subtitle={openPartner ? `${TIER_SPEC[openPartner.tier].label} · ${openPartner.category}` : ''}
+        subtitle={
+          openPartner ? `${TIER_SPEC[openPartner.tier].label} · ${openPartner.category}` : ''
+        }
         onClose={() => setOpenPartner(null)}
         actions={
           openPartner ? (
@@ -464,14 +481,15 @@ export function GamedayScreen() {
             {openPartner.ticketPerk || openPartner.winPerk ? (
               <View style={{ marginTop: spacing.cardGap }}>
                 <Card>
-                  <CardHeading label="제휴 혜택" title={openPartner.winPerk ?? openPartner.ticketPerk!} />
+                  <CardHeading
+                    label="제휴 혜택"
+                    title={openPartner.winPerk ?? openPartner.ticketPerk!}
+                  />
 
                   {coupons[openPartner.id] ? (
                     <View style={st.coupon}>
                       <Text style={st.couponLabel}>쿠폰 번호</Text>
-                      <Text style={st.couponCode}>
-                        {couponCode(openPartner.id, TODAY_GAME.id)}
-                      </Text>
+                      <Text style={st.couponCode}>{couponCode(openPartner.id, TODAY_GAME.id)}</Text>
                       <Text style={st.couponNote}>
                         가게에서 이 화면을 보여 주세요 · 오늘 경기일에만 유효
                       </Text>
@@ -513,7 +531,10 @@ export function GamedayScreen() {
                 <InfoRow label="영업시간" value={openPartner.openHours} />
                 <InfoRow label="붐비는 때" value={openPartner.peak} />
                 <InfoRow label="예약" value={openPartner.reservable ? '가능' : '불가'} />
-                <InfoRow label="위치" value={`${openPartner.address} · 도보 ${openPartner.walkMinutes}분`} />
+                <InfoRow
+                  label="위치"
+                  value={`${openPartner.address} · 도보 ${openPartner.walkMinutes}분`}
+                />
                 <InfoRow label="전화" value={openPartner.phone} />
                 <InfoRow
                   label="누적 방문"
@@ -538,7 +559,12 @@ const st = StyleSheet.create({
 
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
 
-  seatRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  seatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
   seatName: { ...typography.bodyStrong, fontSize: 14 },
   seatNote: { ...typography.micro, marginTop: 2 },
   seatRight: { alignItems: 'flex-end', gap: 2 },
@@ -549,6 +575,19 @@ const st = StyleSheet.create({
 
   chipRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
 
+  headRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  countdownRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  countdown: { ...typography.cardTitle, fontSize: 16 },
+  countdownSub: { ...typography.micro, ...tabularFigures },
+  fullNote: {
+    backgroundColor: colors.warnSoft,
+    borderRadius: radius.tile,
+    padding: spacing.md,
+    gap: 4,
+  },
+  fullTitle: { ...typography.bodyStrong, color: colors.warn },
+  fullBody: { ...typography.caption, lineHeight: 19 },
+
   lotRow: { alignItems: 'flex-start', paddingVertical: spacing.lg },
   lotHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   lotName: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
@@ -556,7 +595,12 @@ const st = StyleSheet.create({
   lotStatus: { ...typography.caption, color: colors.text, fontWeight: '600' },
   chevron: { fontSize: 18, color: colors.mutedText, marginTop: 2 },
 
-  occTrack: { height: 5, borderRadius: radius.bar, backgroundColor: colors.dim, overflow: 'hidden' },
+  occTrack: {
+    height: 5,
+    borderRadius: radius.bar,
+    backgroundColor: colors.dim,
+    overflow: 'hidden',
+  },
   occFill: { height: 5, borderRadius: radius.bar },
   occBig: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
   occValue: { ...typography.metric, ...tabularFigures, color: colors.text },

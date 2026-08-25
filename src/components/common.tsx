@@ -10,7 +10,7 @@
 //   ② **목록의 항목마다 카드를 하나씩 띄웠다.** 같은 라운드·같은 패딩의 흰 상자가
 //      끝없이 반복되면 어디가 묶음이고 어디가 낱개인지 구분이 사라진다.
 //      묶이는 것은 카드 하나 안의 행으로 넣는다
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -181,7 +181,11 @@ export function Segmented<T extends string>({
           <Pressable
             key={o.key}
             onPress={() => onChange(o.key)}
-            style={({ pressed }) => [s.segItem, on && s.segItemOn, pressed && !on && pressHighlight]}
+            style={({ pressed }) => [
+              s.segItem,
+              on && s.segItemOn,
+              pressed && !on && pressHighlight,
+            ]}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
           >
@@ -237,7 +241,11 @@ export function Chip({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [s.chip, selected && s.chipOn, pressed && !selected && pressHighlight]}
+      style={({ pressed }) => [
+        s.chip,
+        selected && s.chipOn,
+        pressed && !selected && pressHighlight,
+      ]}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
     >
@@ -366,10 +374,7 @@ export function RangeGauge({ value, bands }: { value: number; bands: Band[] }) {
       <View style={s.bandLabels}>
         {bands.map((b, i) => (
           <View key={b.label} style={{ flex: seg[i], alignItems: 'center' }}>
-            <Text
-              style={[s.bandLabel, i === here && s.bandLabelOn]}
-              numberOfLines={1}
-            >
+            <Text style={[s.bandLabel, i === here && s.bandLabelOn]} numberOfLines={1}>
               {b.label}
             </Text>
           </View>
@@ -649,6 +654,115 @@ export function Divider() {
   return <View style={s.divider} />;
 }
 
+/**
+ * 물음표 툴팁 - 궁금할 때만 열리는 설명.
+ *
+ * 지면을 차지하는 설명 섹션을 대신한다. 후원의 집에 "어떤 구조인가 / 운영 원칙"이
+ * 통째로 펼쳐져 있었는데, **팬은 협찬금 구조를 궁금해하지 않는다.** 팬의 질문은
+ * "우리 동네에 이글스 후원 가게가 있나, 가면 뭘 주나" 하나다.
+ *
+ * 그렇다고 설명이 필요 없는 건 아니다 - 처음 보는 이름이라 한 번은 물어본다.
+ * 그래서 **묻는 사람에게만** 답한다.
+ */
+export function InfoTip({ title, lines }: { title: string; lines: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel={`${title} 설명`}
+        style={({ pressed }) => [s.tipBtn, pressed && pressHighlight]}
+      >
+        <Text style={s.tipMark}>?</Text>
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        {/* 바깥을 눌러도 닫힌다 - 작은 설명에 닫기 버튼만 두면 갇힌 느낌이 난다 */}
+        <Pressable style={s.tipBackdrop} onPress={() => setOpen(false)}>
+          <Pressable style={s.tipCard} onPress={() => {}}>
+            <Text style={[s.tipTitle, keepAll]}>{title}</Text>
+            {lines.map((l, i) => (
+              <RichText key={i} text={l} style={s.tipLine} />
+            ))}
+            <Pressable onPress={() => setOpen(false)} hitSlop={8} style={s.tipClose}>
+              <Text style={s.tipCloseText}>닫기</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+/**
+ * 결정적 순간 - 문자중계 피드 **안에** 끼어드는 스폰서 카드.
+ *
+ * ── 왜 피드 안인가 ──────────────────────────────────────────
+ * 해석을 별도 섹션으로 아래에 두면 "왜 지금 이 말을 하는지"가 붙지 않는다.
+ * 중계가 흐르다가 레버리지가 치솟은 그 타석 자리에 끼어들어야, 팬이 방금 읽은 줄과
+ * 해석이 이어진다.
+ *
+ * ── 왜 여기가 광고 자리인가 ─────────────────────────────────
+ * 팬덤 앱에서 화면을 가로막는 전면 광고는 구단에 대한 감정까지 깎는다.
+ * 지면을 파는 대신 **순간을 판다** - 콘텐츠 자체가 팬에게 가치가 있으므로 방해가 되지
+ * 않고, 스폰서에게는 "우리가 이 순간을 후원했다"가 명확해 단가도 그쪽이 높다.
+ *
+ * 브랜드는 면적이 아니라 자리로만 드러낸다. 로고를 크게 넣지 않고 머리글 한 줄에 둔다.
+ */
+export function SponsorMoment({
+  presenter,
+  title,
+  body,
+  last,
+}: {
+  presenter: string;
+  title: string;
+  body: string;
+  last?: boolean;
+}) {
+  return (
+    <View style={[s.momentWrap, !last && s.rowDivider]}>
+      <View style={s.momentHead}>
+        <View style={s.momentDot} />
+        <Text style={s.momentKind}>결정적 순간</Text>
+        <Text style={s.momentBy}>presented by</Text>
+        <Text style={s.momentBrand}>{presenter}</Text>
+      </View>
+      <Text style={[s.momentTitle, keepAll]}>{title}</Text>
+      <RichText text={body} style={s.momentBody} />
+    </View>
+  );
+}
+
+/**
+ * 알림 벨 - 상단바 오른쪽.
+ *
+ * 아이콘 라이브러리를 쓰지 않는 저장소라(RN 코어만) 종 모양을 View 세 개로 그린다.
+ * 위는 둥글고 아래는 각진 몸통 + 받침 + 추. 22px 에서 종으로 읽히는 최소 형태다.
+ *
+ * 안 읽은 알림이 있으면 빨간 점을 얹는다. 숫자는 넣지 않는다 - 팬덤 앱에서 숫자 배지는
+ * "밀린 일"처럼 읽혀서, 소식을 반갑게 만드는 목적과 어긋난다.
+ */
+export function BellButton({ count, onPress }: { count: number; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={count > 0 ? `알림 ${count}건` : '알림'}
+      style={({ pressed }) => [s.bellWrap, pressed && pressHighlight]}
+    >
+      <View style={s.bellDome} />
+      <View style={s.bellSkirt} />
+      <View style={s.bellBase} />
+      <View style={s.bellClapper} />
+      {count > 0 ? <View style={s.bellDot} /> : null}
+    </Pressable>
+  );
+}
+
 const s = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
@@ -761,7 +875,13 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   gaugeFill: { height: 4, borderRadius: radius.bar },
-  gaugeMarker: { position: 'absolute', width: 2, height: 10, backgroundColor: colors.text, top: -3 },
+  gaugeMarker: {
+    position: 'absolute',
+    width: 2,
+    height: 10,
+    backgroundColor: colors.text,
+    top: -3,
+  },
 
   // 구간 게이지. 구간 사이에 2px 틈을 둬야 '하나의 막대'가 아니라 '나뉜 구간'으로 읽힌다
   bandTrack: { flexDirection: 'row', gap: 2, height: 6 },
@@ -779,6 +899,103 @@ const s = StyleSheet.create({
   btnLabel: { fontWeight: '600', letterSpacing: -0.2 },
 
   skeleton: { backgroundColor: skeleton.base, borderRadius: 7 },
+
+  // 물음표 - 본문을 밀어내지 않도록 작게. 터치 영역은 hitSlop 이 벌린다
+  tipBtn: {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+    backgroundColor: colors.raised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tipMark: { ...typography.micro, fontSize: 11, lineHeight: 14, color: colors.subText },
+  tipBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(9,22,45,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  tipCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    padding: spacing.cardPad,
+    gap: spacing.sm,
+    maxWidth: 340,
+    width: '100%',
+  },
+  tipTitle: typography.cardTitle,
+  tipLine: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
+  tipClose: { alignSelf: 'flex-end', paddingTop: spacing.xs },
+  tipCloseText: { ...typography.bodyStrong, color: colors.brandText },
+
+  // 결정적 순간 - 피드의 다른 행과 같은 카드 안에 있으면서 면으로 구분된다.
+  // 카드를 따로 띄우면 '피드에 끼어든 것'이 아니라 '피드 밖의 광고'로 읽힌다
+  momentWrap: {
+    backgroundColor: colors.brandSoft,
+    paddingHorizontal: spacing.cardPad,
+    paddingVertical: spacing.md,
+    gap: 5,
+  },
+  momentHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  momentDot: { width: 5, height: 5, borderRadius: 999, backgroundColor: colors.brand },
+  momentKind: { ...typography.micro, color: colors.brandText },
+  momentBy: { ...typography.micro, fontWeight: '400', marginLeft: 2 },
+  momentBrand: { ...typography.micro, color: colors.text },
+  momentTitle: { ...typography.cardTitle, fontSize: 15.5, lineHeight: 22 },
+  momentBody: { ...typography.caption, lineHeight: 19, color: colors.subText },
+
+  // 종 - 위 반원 + 아래로 벌어지는 몸통 + 받침 + 추.
+  // 처음에는 둥근 사각형 하나로 뒀는데 확대해 보니 종이 아니라 눌린 상자로 읽혔다.
+  // **종의 실루엣은 아래가 벌어지는 데서 나온다.** 사다리꼴은 RN 에 도형이 없어
+  // 테두리 트릭으로 만든다 - 아래 테두리만 색을 주고 좌우를 투명하게 두면
+  // 위쪽이 좁고 아래가 넓은 사다리꼴이 된다.
+  bellWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  bellDome: {
+    width: 10,
+    height: 5,
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+    backgroundColor: colors.subText,
+    marginTop: -3,
+  },
+  bellSkirt: {
+    width: 10,
+    height: 0,
+    borderBottomWidth: 7,
+    borderLeftWidth: 3,
+    borderRightWidth: 3,
+    borderBottomColor: colors.subText,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  bellBase: {
+    width: 17,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.subText,
+    marginTop: 1.5,
+  },
+  bellClapper: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.subText,
+    marginTop: 1.5,
+  },
+  // 안 읽은 표시. 흰 테두리를 둘러야 종 위에 얹혀도 형태가 안 뭉갠다
+  bellDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: colors.live,
+    borderWidth: 1.5,
+    borderColor: colors.card,
+  },
 
   reasonRow: { paddingVertical: spacing.md },
   reasonText: { ...typography.body, fontSize: 13.5, lineHeight: 21 },

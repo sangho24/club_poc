@@ -22,10 +22,20 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { PlayersScreen } from './src/screens/PlayersScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
 import { ClubWordmark } from './src/components/photos';
-import { Skeleton, SkeletonCard } from './src/components/common';
+import {
+  BellButton,
+  GroupCard,
+  DetailSheet,
+  Row,
+  SectionTitle,
+  Skeleton,
+  SkeletonCard,
+} from './src/components/common';
 import { DEFAULT_PROFILE, KnowledgeLevel, UserProfile, normalizeProfile } from './src/profile';
+import { ATTENDANCE, attendanceSummary, membershipOf } from './src/my';
+import { NOTICE_LABEL, noticesFor, unreadCount } from './src/notifications';
 import { STORAGE_KEYS, loadValue, saveValue } from './src/storage';
-import { colors, radius, spacing, tabCapsule, typography } from './src/theme';
+import { colors, pressHighlight, radius, spacing, tabCapsule, typography } from './src/theme';
 
 type TabKey = 'home' | 'live' | 'players' | 'gameday' | 'store' | 'my';
 
@@ -43,6 +53,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   // 저장소를 읽기 전에 온보딩이 번쩍이면 안 된다 - 읽기가 끝날 때까지 자리표시자를 그린다
   const [boot, setBoot] = useState<'loading' | 'onboarding' | 'ready'>('loading');
+  const [noticeOpen, setNoticeOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -76,6 +87,12 @@ export default function App() {
     setBoot('ready');
   };
 
+  // 등급은 저장하지 않고 직관 기록에서 매번 집계한다 (my.ts 의 원칙)
+  const { tier } = membershipOf(attendanceSummary(ATTENDANCE).games);
+  // 프로필에서 끈 종류는 애초에 도착하지 않는다 - 설정이 실제로 작동한다는 증거가 된다
+  const notices = noticesFor(profile);
+  const unread = unreadCount(profile);
+
   // 프로필을 읽는 동안. 전에는 빈 화면을 그렸는데, 빈 화면은 '오는 중'이 아니라
   // '아무것도 없음'으로 읽혀서 앱이 죽은 것처럼 보인다. 뼈대를 먼저 세워 두면
   // 같은 대기 시간이 '곧 채워질 자리'가 된다.
@@ -108,12 +125,26 @@ export default function App() {
     <SafeAreaView style={s.root}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
 
-      {/* ── 상단 브랜드 바 ─────────────────────────────────── */}
+      {/* ── 상단 브랜드 바 ───────────────────────────────────
+          전에는 오른쪽에 "대전 한화생명 볼파크" 가 박혀 있었다. 홈구장은 바뀌지 않으므로
+          매 화면 같은 값을 반복하면서 가장 비싼 자리를 쓰고 있었고, 로고와 텍스트가
+          양끝으로 벌어져 있어 로고가 브랜드가 아니라 **레이블**처럼 읽혔다.
+          그 자리는 변하는 것이 가져간다 - 등급과 안 읽은 알림. */}
       <View style={s.brandBar}>
         {/* 26px 에서는 워드마크 위쪽의 'Hanwha' 가 뭉개져 읽히지 않는다.
             두 줄로 짜인 로고라 작은 쪽 글자가 판독 하한을 정한다 */}
         <ClubWordmark height={32} />
-        <Text style={s.brandMeta}>대전 한화생명 볼파크</Text>
+        <View style={s.barRight}>
+          <Pressable
+            onPress={() => setTab('my')}
+            style={({ pressed }) => [s.tierPill, pressed && pressHighlight]}
+            accessibilityRole="button"
+            accessibilityLabel={`멤버십 ${tier.label}`}
+          >
+            <Text style={s.tierText}>{tier.label}</Text>
+          </Pressable>
+          <BellButton count={unread} onPress={() => setNoticeOpen(true)} />
+        </View>
       </View>
 
       {/* ── 본문 ───────────────────────────────────────────── */}
@@ -166,6 +197,46 @@ export default function App() {
           );
         })}
       </View>
+
+      {/* ── 알림함 ─────────────────────────────────────────
+          온보딩에서 켠 스위치가 닿는 곳. 여기가 없으면 그 온보딩은 묻기만 하고
+          지키지 않은 약속이 된다. */}
+      <DetailSheet
+        visible={noticeOpen}
+        title="알림"
+        subtitle={unread > 0 ? `안 읽은 소식 ${unread}건` : '새 소식 없음'}
+        onClose={() => setNoticeOpen(false)}
+      >
+        {notices.length === 0 ? (
+          <>
+            <SectionTitle title="받는 알림이 없습니다" />
+            <GroupCard>
+              <Row last>
+                <Text style={s.noticeEmpty}>
+                  MY 에서 알림을 켜면 결정적 순간·굿즈 발매·예매 오픈 소식이 여기로 옵니다.
+                </Text>
+              </Row>
+            </GroupCard>
+          </>
+        ) : (
+          <GroupCard>
+            {notices.map((n, i) => (
+              <Row key={n.id} last={i === notices.length - 1} style={s.noticeRow}>
+                {/* 안 읽은 것만 점을 단다. 읽은 것도 목록에 남아야 "왔었다"가 남는다 */}
+                <View style={[s.noticeDot, !n.unread && { backgroundColor: 'transparent' }]} />
+                <View style={{ flex: 1, gap: 3 }}>
+                  <View style={s.noticeHead}>
+                    <Text style={s.noticeKind}>{NOTICE_LABEL[n.kind]}</Text>
+                    <Text style={s.noticeAt}>{n.at}</Text>
+                  </View>
+                  <Text style={s.noticeTitle}>{n.title}</Text>
+                  <Text style={s.noticeBody}>{n.body}</Text>
+                </View>
+              </Row>
+            ))}
+          </GroupCard>
+        )}
+      </DetailSheet>
     </SafeAreaView>
   );
 }
@@ -187,7 +258,30 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  brandMeta: typography.micro,
+  // 로고 반대편 - 변하는 값만 온다
+  barRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  tierPill: {
+    backgroundColor: colors.brandSoft,
+    borderRadius: radius.chip,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  tierText: { ...typography.micro, color: colors.brandText, letterSpacing: 0.6 },
+
+  noticeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  noticeDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: colors.brand,
+    marginTop: 7,
+  },
+  noticeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  noticeKind: { ...typography.micro, color: colors.brandText },
+  noticeAt: typography.micro,
+  noticeTitle: { ...typography.bodyStrong, lineHeight: 20 },
+  noticeBody: { ...typography.caption, lineHeight: 18 },
+  noticeEmpty: { ...typography.body, flex: 1 },
 
   // 화면 가장자리에 붙지 않고 떠 있는 캡슐. 선택 탭만 흰 버블
   tabBar: {

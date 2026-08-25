@@ -53,9 +53,14 @@ export function normalizeProfile(value: unknown): UserProfile {
   if (typeof value !== 'object' || value === null) return DEFAULT_PROFILE;
   const v = value as Record<string, unknown>;
   const level: KnowledgeLevel =
-    v.level === 'rookie' || v.level === 'fan' || v.level === 'nerd' ? v.level : DEFAULT_PROFILE.level;
+    v.level === 'rookie' || v.level === 'fan' || v.level === 'nerd'
+      ? v.level
+      : DEFAULT_PROFILE.level;
   const favoritePlayerId = typeof v.favoritePlayerId === 'string' ? v.favoritePlayerId : undefined;
-  const a = (typeof v.alerts === 'object' && v.alerts !== null ? v.alerts : {}) as Record<string, unknown>;
+  const a = (typeof v.alerts === 'object' && v.alerts !== null ? v.alerts : {}) as Record<
+    string,
+    unknown
+  >;
   const flag = (x: unknown, d: boolean) => (typeof x === 'boolean' ? x : d);
   return {
     level,

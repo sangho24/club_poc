@@ -27,7 +27,7 @@ import {
   TopTabs,
 } from '../components/common';
 import type { Band } from '../components/common';
-import { PlayerAvatar } from '../components/photos';
+import { PlayerAvatar, PlayerFormLoop } from '../components/photos';
 import { KNOWLEDGE_OPTIONS, KnowledgeLevel, UserProfile } from '../profile';
 import { BATTERS, Batter, PITCHERS, Pitcher } from '../roster';
 import {
@@ -67,16 +67,15 @@ export function PlayersScreen({
   const [openId, setOpenId] = useState<string | null>('nsh');
   const [glossaryKey, setGlossaryKey] = useState<string | null>(null);
 
-  const batters = BATTERS.slice().sort((a, b) => batterWarOf(b.stat, PARK) - batterWarOf(a.stat, PARK));
+  const batters = BATTERS.slice().sort(
+    (a, b) => batterWarOf(b.stat, PARK) - batterWarOf(a.stat, PARK),
+  );
   const pitchers = PITCHERS.slice().sort(
     (a, b) => pitcherWarOf(b.stat, PARK) - pitcherWarOf(a.stat, PARK),
   );
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ paddingBottom: spacing.scrollBottom }}
-    >
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.scrollBottom }}>
       <View style={st.tabsWrap}>
         <TopTabs
           tabs={[
@@ -190,10 +189,30 @@ function BatterRow({
 
       {open ? (
         <View style={[st.detail, !last && st.rowDivider]}>
+          {/* 지표만 있으면 좋아하는 마음이 생길 자리가 없다. 팬덤 미디어의 몫 */}
+          <PlayerFormLoop playerId={batter.id} label="타격 준비" height={190} />
           <View style={st.metricRow}>
-            <MetricTile label="wRC+" value={String(wrc)} statKey="wrcPlus" sample={b.pa} onGlossary={onGlossary} />
-            <MetricTile label="wOBA" value={woba.toFixed(3)} statKey="woba" sample={b.pa} onGlossary={onGlossary} />
-            <MetricTile label="BABIP" value={babip.toFixed(3)} statKey="babip" sample={b.pa} onGlossary={onGlossary} />
+            <MetricTile
+              label="wRC+"
+              value={String(wrc)}
+              statKey="wrcPlus"
+              sample={b.pa}
+              onGlossary={onGlossary}
+            />
+            <MetricTile
+              label="wOBA"
+              value={woba.toFixed(3)}
+              statKey="woba"
+              sample={b.pa}
+              onGlossary={onGlossary}
+            />
+            <MetricTile
+              label="BABIP"
+              value={babip.toFixed(3)}
+              statKey="babip"
+              sample={b.pa}
+              onGlossary={onGlossary}
+            />
           </View>
 
           <View style={{ gap: spacing.md }}>
@@ -213,7 +232,9 @@ function BatterRow({
             <WarRow label="대체 수준" value={bd.replacement} />
             <View style={st.warSum}>
               <Text style={st.warSumLabel}>
-                {(bd.batting + bd.baserunning + bd.fielding + bd.position + bd.replacement).toFixed(1)}
+                {(bd.batting + bd.baserunning + bd.fielding + bd.position + bd.replacement).toFixed(
+                  1,
+                )}
                 런 ÷ {LEAGUE.runsPerWin}
               </Text>
               <Text style={st.warSumValue}>{war} WAR</Text>
@@ -282,6 +303,7 @@ function PitcherRow({
 
       {open ? (
         <View style={[st.detail, !last && st.rowDivider]}>
+          <PlayerFormLoop playerId={pitcher.id} label="와인드업" height={190} />
           <View style={st.metricRow}>
             <StatTile label="ERA" value={era.toFixed(2)} />
             <StatTile label="FIP" value={fip.toFixed(2)} tone="brand" />
@@ -325,7 +347,8 @@ function PitcherRow({
 
           {profile.level !== 'rookie' ? (
             <Text style={st.note}>
-              피BABIP {bab.toFixed(3)} · 리그 평균 {LEAGUE.babipPitcher.toFixed(3)} · {ipLabel(p.ipOuts)}이닝
+              피BABIP {bab.toFixed(3)} · 리그 평균 {LEAGUE.babipPitcher.toFixed(3)} ·{' '}
+              {ipLabel(p.ipOuts)}이닝
             </Text>
           ) : null}
 

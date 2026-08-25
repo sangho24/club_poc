@@ -52,176 +52,176 @@ export function HomeScreen({
 
   return (
     <>
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{
-        paddingHorizontal: spacing.screenX,
-        paddingBottom: spacing.scrollBottom,
-      }}
-    >
-      {/* ── 오늘 경기 ─────────────────────────────────────── */}
-      <View style={st.heroWrap}>
-        {stadiumPhoto(TODAY_GAME.stadium) ? (
-          <PhotoHeader source={stadiumPhoto(TODAY_GAME.stadium)!} height={148}>
-            <Text style={st.heroTitle}>대전 한화생명 볼파크</Text>
-            <Text style={st.heroSub}>
-              {TODAY_GAME.startTime} · {TODAY_GAME.opponent.name}전
-            </Text>
-          </PhotoHeader>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: spacing.screenX,
+          paddingBottom: spacing.scrollBottom,
+        }}
+      >
+        {/* ── 오늘 경기 ─────────────────────────────────────── */}
+        <View style={st.heroWrap}>
+          {stadiumPhoto(TODAY_GAME.stadium) ? (
+            <PhotoHeader source={stadiumPhoto(TODAY_GAME.stadium)!} height={148}>
+              <Text style={st.heroTitle}>대전 한화생명 볼파크</Text>
+              <Text style={st.heroSub}>
+                {TODAY_GAME.startTime} · {TODAY_GAME.opponent.name}전
+              </Text>
+            </PhotoHeader>
+          ) : null}
+        </View>
+
+        <SectionTitle title="오늘 경기" />
+        <Card onPress={onGoLive}>
+          <View style={st.scoreRow}>
+            <View style={st.teamCol}>
+              <TeamEmblem team="LG" size={34} />
+              <Text style={st.teamName}>{TODAY_GAME.opponent.short}</Text>
+              <Text style={st.score}>{TODAY_GAME.theirScore}</Text>
+            </View>
+            <View style={st.scoreMid}>
+              <Badge text="LIVE" tone="live" />
+              <Text style={st.inning}>
+                {pa.situation.inning}회{pa.situation.half === 'bottom' ? '말' : '초'}
+              </Text>
+            </View>
+            <View style={st.teamCol}>
+              <TeamEmblem team="HH" size={34} />
+              <Text style={[st.teamName, { color: colors.brandText }]}>한화</Text>
+              <Text style={[st.score, { color: colors.brandText }]}>{TODAY_GAME.ourScore}</Text>
+            </View>
+          </View>
+
+          <Divider />
+
+          <CardHeading label="지금 이 승부" title={pred.headline} />
+          <Text style={st.reason}>{pred.reasons[0]}</Text>
+          <Text style={st.more}>근거 보기 ›</Text>
+        </Card>
+
+        {/* ── 감지 ───────────────────────────────────────────── */}
+        {alerts.length > 0 ? (
+          <>
+            <SectionTitle title="지금 눈여겨볼 것" />
+            <GroupCard>
+              {alerts.slice(0, 2).map((a, i, arr) => (
+                <Row key={i} last={i === arr.length - 1} style={st.alertRow}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={st.alertTitle}>{a.title}</Text>
+                    <Text style={st.alertBody}>{a.body}</Text>
+                  </View>
+                </Row>
+              ))}
+            </GroupCard>
+          </>
         ) : null}
-      </View>
 
-      <SectionTitle title="오늘 경기" />
-      <Card onPress={onGoLive}>
-        <View style={st.scoreRow}>
-          <View style={st.teamCol}>
-            <TeamEmblem team="LG" size={34} />
-            <Text style={st.teamName}>{TODAY_GAME.opponent.short}</Text>
-            <Text style={st.score}>{TODAY_GAME.theirScore}</Text>
-          </View>
-          <View style={st.scoreMid}>
-            <Badge text="LIVE" tone="live" />
-            <Text style={st.inning}>
-              {pa.situation.inning}회{pa.situation.half === 'bottom' ? '말' : '초'}
-            </Text>
-          </View>
-          <View style={st.teamCol}>
-            <TeamEmblem team="HH" size={34} />
-            <Text style={[st.teamName, { color: colors.brandText }]}>한화</Text>
-            <Text style={[st.score, { color: colors.brandText }]}>{TODAY_GAME.ourScore}</Text>
-          </View>
-        </View>
-
-        <Divider />
-
-        <CardHeading label="지금 이 승부" title={pred.headline} />
-        <Text style={st.reason}>{pred.reasons[0]}</Text>
-        <Text style={st.more}>근거 보기 ›</Text>
-      </Card>
-
-      {/* ── 감지 ───────────────────────────────────────────── */}
-      {alerts.length > 0 ? (
-        <>
-          <SectionTitle title="지금 눈여겨볼 것" />
-          <GroupCard>
-            {alerts.slice(0, 2).map((a, i, arr) => (
-              <Row key={i} last={i === arr.length - 1} style={st.alertRow}>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={st.alertTitle}>{a.title}</Text>
-                  <Text style={st.alertBody}>{a.body}</Text>
-                </View>
-              </Row>
-            ))}
-          </GroupCard>
-        </>
-      ) : null}
-
-      {/* ── 순위 ───────────────────────────────────────────── */}
-      <SectionTitle title="2026 정규시즌" />
-      <Card>
-        <View style={st.tileRow}>
-          <StatTile
-            label="순위"
-            value={`${STANDING.rank}위`}
-            sub={`4위와 ${STANDING.gapUp}경기`}
-            tone="brand"
-          />
-          <StatTile
-            label="전적"
-            value={`${STANDING.w}-${STANDING.l}`}
-            sub={`${STANDING.d}무`}
-          />
-          <StatTile
-            label="승률"
-            value={STANDING.winRate.toFixed(3)}
-            sub={`${STANDING.w + STANDING.l + STANDING.d}경기`}
-          />
-        </View>
-
-        <Divider />
-
-        <View style={st.recentRow}>
-          {RECENT.map((g) => {
-            const won = g.result === 'W';
-            return (
-              <View key={g.date} style={st.recentItem}>
-                <View style={[st.resultDot, won ? st.resultWin : st.resultLose]}>
-                  <Text style={[st.resultText, won ? st.resultTextWin : st.resultTextLose]}>
-                    {g.result}
-                  </Text>
-                </View>
-                <Text style={st.recentOpp}>{g.opponent}</Text>
-                <Text style={st.recentScore}>{g.score}</Text>
-              </View>
-            );
-          })}
-        </View>
-      </Card>
-
-      {/* ── 최애 선수 ─────────────────────────────────────── */}
-      <SectionTitle
-        title="최애 선수"
-        right={
-          <Pressable onPress={() => setPickerOpen(true)} hitSlop={8}>
-            <Text style={st.changeBtn}>변경</Text>
-          </Pressable>
-        }
-      />
-      {favBatter ? (
+        {/* ── 순위 ───────────────────────────────────────────── */}
+        <SectionTitle title="2026 정규시즌" />
         <Card>
-          <CardHeading
-            label={`${favBatter.back} · ${favBatter.pos}`}
-            title={favBatter.name}
-            right={<PlayerAvatar playerId={favBatter.id} size={52} />}
-          />
-          <Text style={st.favNote}>{favBatter.note}</Text>
           <View style={st.tileRow}>
-            <StatTile label="wRC+" value={String(wrcPlusOf(favBatter.stat, '대전'))} tone="brand" />
-            <StatTile label="WAR" value={String(batterWarOf(favBatter.stat, '대전'))} />
-            <StatTile label="OPS" value={opsOf(favBatter.stat).toFixed(3)} />
+            <StatTile
+              label="순위"
+              value={`${STANDING.rank}위`}
+              sub={`4위와 ${STANDING.gapUp}경기`}
+              tone="brand"
+            />
+            <StatTile label="전적" value={`${STANDING.w}-${STANDING.l}`} sub={`${STANDING.d}무`} />
+            <StatTile
+              label="승률"
+              value={STANDING.winRate.toFixed(3)}
+              sub={`${STANDING.w + STANDING.l + STANDING.d}경기`}
+            />
           </View>
-        </Card>
-      ) : favPitcher ? (
-        <Card>
-          <CardHeading
-            label={`${favPitcher.back} · ${favPitcher.role}`}
-            title={favPitcher.name}
-            right={<PlayerAvatar playerId={favPitcher.id} size={52} />}
-          />
-          <Text style={st.favNote}>{favPitcher.note}</Text>
-          <View style={st.tileRow}>
-            <StatTile label="ERA" value={eraOf(favPitcher.stat).toFixed(2)} tone="brand" />
-            <StatTile label="FIP" value={fipOf(favPitcher.stat).toFixed(2)} />
-            <StatTile label="WAR" value={String(pitcherWarOf(favPitcher.stat, '대전'))} />
-          </View>
-        </Card>
-      ) : (
-        <Card onPress={() => setPickerOpen(true)}>
-          <View style={st.favEmptyRow}>
-            <Text style={st.favEmptyText}>최애 선수 고르기</Text>
-            <Text style={st.chevron}>›</Text>
-          </View>
-        </Card>
-      )}
 
-      {/* ── 굿즈 ───────────────────────────────────────────── */}
-      {profile.alerts.goodsDrop && goods.length > 0 ? (
-        <>
-          <SectionTitle title="발매 소식" />
-          <GroupCard>
-            {goods.slice(0, 2).map((g, i, arr) => (
-              <Row key={i} last={i === arr.length - 1} onPress={onGoStore}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={st.goodsText}>{g.message}</Text>
-                  <Text style={st.goodsNote}>{g.note}</Text>
+          <Divider />
+
+          <View style={st.recentRow}>
+            {RECENT.map((g) => {
+              const won = g.result === 'W';
+              return (
+                <View key={g.date} style={st.recentItem}>
+                  <View style={[st.resultDot, won ? st.resultWin : st.resultLose]}>
+                    <Text style={[st.resultText, won ? st.resultTextWin : st.resultTextLose]}>
+                      {g.result}
+                    </Text>
+                  </View>
+                  <Text style={st.recentOpp}>{g.opponent}</Text>
+                  <Text style={st.recentScore}>{g.score}</Text>
                 </View>
-                <Text style={st.chevron}>›</Text>
-              </Row>
-            ))}
-          </GroupCard>
-        </>
-      ) : null}
-    </ScrollView>
+              );
+            })}
+          </View>
+        </Card>
+
+        {/* ── 최애 선수 ─────────────────────────────────────── */}
+        <SectionTitle
+          title="최애 선수"
+          right={
+            <Pressable onPress={() => setPickerOpen(true)} hitSlop={8}>
+              <Text style={st.changeBtn}>변경</Text>
+            </Pressable>
+          }
+        />
+        {favBatter ? (
+          <Card>
+            <CardHeading
+              label={`${favBatter.back} · ${favBatter.pos}`}
+              title={favBatter.name}
+              right={<PlayerAvatar playerId={favBatter.id} size={52} />}
+            />
+            <Text style={st.favNote}>{favBatter.note}</Text>
+            <View style={st.tileRow}>
+              <StatTile
+                label="wRC+"
+                value={String(wrcPlusOf(favBatter.stat, '대전'))}
+                tone="brand"
+              />
+              <StatTile label="WAR" value={String(batterWarOf(favBatter.stat, '대전'))} />
+              <StatTile label="OPS" value={opsOf(favBatter.stat).toFixed(3)} />
+            </View>
+          </Card>
+        ) : favPitcher ? (
+          <Card>
+            <CardHeading
+              label={`${favPitcher.back} · ${favPitcher.role}`}
+              title={favPitcher.name}
+              right={<PlayerAvatar playerId={favPitcher.id} size={52} />}
+            />
+            <Text style={st.favNote}>{favPitcher.note}</Text>
+            <View style={st.tileRow}>
+              <StatTile label="ERA" value={eraOf(favPitcher.stat).toFixed(2)} tone="brand" />
+              <StatTile label="FIP" value={fipOf(favPitcher.stat).toFixed(2)} />
+              <StatTile label="WAR" value={String(pitcherWarOf(favPitcher.stat, '대전'))} />
+            </View>
+          </Card>
+        ) : (
+          <Card onPress={() => setPickerOpen(true)}>
+            <View style={st.favEmptyRow}>
+              <Text style={st.favEmptyText}>최애 선수 고르기</Text>
+              <Text style={st.chevron}>›</Text>
+            </View>
+          </Card>
+        )}
+
+        {/* ── 굿즈 ───────────────────────────────────────────── */}
+        {profile.alerts.goodsDrop && goods.length > 0 ? (
+          <>
+            <SectionTitle title="발매 소식" />
+            <GroupCard>
+              {goods.slice(0, 2).map((g, i, arr) => (
+                <Row key={i} last={i === arr.length - 1} onPress={onGoStore}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={st.goodsText}>{g.message}</Text>
+                    <Text style={st.goodsNote}>{g.note}</Text>
+                  </View>
+                  <Text style={st.chevron}>›</Text>
+                </Row>
+              ))}
+            </GroupCard>
+          </>
+        ) : null}
+      </ScrollView>
 
       {/* ── 최애 선수 선택 시트 - MY 탭과 공용 ─────────────── */}
       <FavoritePicker
@@ -257,7 +257,13 @@ const st = StyleSheet.create({
 
   recentRow: { flexDirection: 'row', gap: spacing.sm },
   recentItem: { flex: 1, alignItems: 'center', gap: 4 },
-  resultDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  resultDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   resultWin: { backgroundColor: colors.win },
   resultLose: { backgroundColor: colors.surface },
   resultText: { fontSize: 11, fontWeight: '700' },

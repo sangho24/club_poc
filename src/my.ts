@@ -31,3 +31,41 @@ export function attendanceSummary(records: AttendanceRecord[]) {
   const winRate = games === 0 ? 0 : wins / games;
   return { games, wins, losses, winRate };
 }
+
+// ─────────────────────────────────────────────────────────────
+// 멤버십 등급 - 상단바가 들고 있을 '변하는 값'
+// ─────────────────────────────────────────────────────────────
+//
+// 상단바에 홈구장 이름("대전 한화생명 볼파크")이 박혀 있었다. 홈구장은 바뀌지 않으므로
+// 매 화면 같은 값을 반복하면서 가장 비싼 자리를 쓰고 있었다. 그 자리는 **변하는 것**이
+// 가져가야 한다.
+//
+// 등급은 저장하지 않고 직관 기록에서 매번 집계한다 - 이 파일 맨 위의 원칙과 같다.
+// 집계값을 따로 저장하면 기록과 어긋날 여지가 생긴다.
+
+export interface MemberTier {
+  label: string;
+  /** 이 등급에 들어가는 최소 직관 횟수 */
+  from: number;
+}
+
+/** 구단 멤버십은 보통 시즌 단위 누적 직관/구매로 나뉜다 */
+export const MEMBER_TIERS: MemberTier[] = [
+  { label: 'ROOKIE', from: 0 },
+  { label: 'BLUE', from: 3 },
+  { label: 'GOLD', from: 5 },
+  { label: 'LEGEND', from: 10 },
+];
+
+export function membershipOf(games: number) {
+  // 뒤에서부터 훑어 조건을 만족하는 첫 등급이 현재 등급이다
+  const idx = [...MEMBER_TIERS].reverse().findIndex((t) => games >= t.from);
+  const current = MEMBER_TIERS[MEMBER_TIERS.length - 1 - idx];
+  const next = MEMBER_TIERS[MEMBER_TIERS.length - idx];
+  return {
+    tier: current,
+    next,
+    /** 다음 등급까지 남은 직관 수 - 없으면 최고 등급 */
+    toNext: next ? next.from - games : 0,
+  };
+}

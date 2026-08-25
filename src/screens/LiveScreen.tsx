@@ -23,10 +23,19 @@ import {
   Row,
   SectionTitle,
   Segmented,
+  SponsorMoment,
 } from '../components/common';
 import { PhotoHeader, PlayerAvatar, stadiumPhoto } from '../components/photos';
 import { PLATE_SEQUENCE, TODAY_GAME } from '../game';
-import { basesLabel, bullpenAdvice, liveAlerts, predictMatchup } from '../liveEngine';
+import {
+  CLUTCH_LI,
+  basesLabel,
+  bullpenAdvice,
+  leverageIndex,
+  liveAlerts,
+  predictMatchup,
+  runExpectancy,
+} from '../liveEngine';
 import { KNOWLEDGE_OPTIONS, KnowledgeLevel, UserProfile } from '../profile';
 import { BATTERS, OPPONENT_PITCHERS } from '../roster';
 import { colors, radius, spacing, tabularFigures, typography } from '../theme';
@@ -67,9 +76,17 @@ export function LiveScreen({
 
   // 문자중계 - 이번 이닝에서 끝난 타석들. 최신이 위로 온다
   const pastLog = PLATE_SEQUENCE.slice(0, step)
-    .map((p, i) => ({ ...p, i }))
+    .map((p, i) => ({ ...p, i, li: leverageIndex(p.situation) }))
     .filter((p) => p.situation.inning === s.inning && p.situation.half === s.half)
     .reverse();
+
+  // 스폰서가 후원하는 '결정적 순간'. 지면을 파는 게 아니라 **순간을 판다**.
+  // 지나간 타석 중 레버리지가 가장 높았던 자리에 한 번만 끼어든다 - 매 행마다 붙으면
+  // 그건 광고 지면이지 순간이 아니고, 팬은 피드를 못 읽는다.
+  const peak = pastLog.reduce<(typeof pastLog)[number] | null>(
+    (best, p) => (p.li >= CLUTCH_LI && (!best || p.li > best.li) ? p : best),
+    null,
+  );
 
   return (
     <>
@@ -187,11 +204,23 @@ export function LiveScreen({
           </Row>
           {pastLog.map((p, idx) => {
             const name = BATTERS.find((b) => b.id === p.batterId)?.name ?? '';
+            const isLast = idx === pastLog.length - 1;
             return (
-              <Row key={p.i} style={st.logRow} last={idx === pastLog.length - 1}>
-                <Text style={st.logName}>{name}</Text>
-                <Text style={st.logText}>{p.logLine}</Text>
-              </Row>
+              <View key={p.i}>
+                <Row style={st.logRow} last={isLast && p.i !== peak?.i}>
+                  <Text style={st.logName}>{name}</Text>
+                  <Text style={st.logText}>{p.logLine}</Text>
+                </Row>
+                {/* 그 타석 바로 아래에 붙어야 방금 읽은 줄과 해석이 이어진다 */}
+                {p.i === peak?.i ? (
+                  <SponsorMoment
+                    presenter="한화생명"
+                    title={`${p.situation.inning}회${p.situation.half === 'bottom' ? '말' : '초'} ${basesLabel(p.situation.bases)}, 승패가 갈린 타석`}
+                    body={`이 타석 하나가 평균 타석의 **${p.li.toFixed(1)}배**만큼 승패를 흔들었습니다. 당시 기대득점은 ${runExpectancy(p.situation).toFixed(2)}점이었습니다.`}
+                    last={isLast}
+                  />
+                ) : null}
+              </View>
             );
           })}
         </GroupCard>
@@ -275,7 +304,10 @@ export function LiveScreen({
 
         <SectionTitle title="계산" />
         <GroupCard>
-          <KeyValueRow label={`${batter.name} 출루율`} value={pred.breakdown.batterOBP.toFixed(3)} />
+          <KeyValueRow
+            label={`${batter.name} 출루율`}
+            value={pred.breakdown.batterOBP.toFixed(3)}
+          />
           <KeyValueRow
             label={`${pitcher.name} 피출루율`}
             value={pred.breakdown.pitcherOBPAllowed.toFixed(3)}
@@ -297,7 +329,15 @@ export function LiveScreen({
 }
 
 /** 주자 다이아몬드 */
-function BaseDiamond({ first, second, third }: { first: boolean; second: boolean; third: boolean }) {
+function BaseDiamond({
+  first,
+  second,
+  third,
+}: {
+  first: boolean;
+  second: boolean;
+  third: boolean;
+}) {
   const on = (v: boolean) => ({ backgroundColor: v ? colors.brand : colors.dim });
   return (
     <View style={st.diamond}>
