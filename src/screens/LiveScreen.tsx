@@ -22,7 +22,6 @@ import {
   ReasonList,
   Row,
   SectionTitle,
-  Segmented,
   SponsorMoment,
 } from '../components/common';
 import { PhotoHeader, PlayerAvatar, stadiumPhoto } from '../components/photos';
@@ -36,17 +35,11 @@ import {
   predictMatchup,
   runExpectancy,
 } from '../liveEngine';
-import { KNOWLEDGE_OPTIONS, KnowledgeLevel, UserProfile } from '../profile';
+import { UserProfile } from '../profile';
 import { BATTERS, OPPONENT_PITCHERS } from '../roster';
 import { colors, radius, spacing, tabularFigures, typography } from '../theme';
 
-export function LiveScreen({
-  profile,
-  onLevel,
-}: {
-  profile: UserProfile;
-  onLevel: (l: KnowledgeLevel) => void;
-}) {
+export function LiveScreen({ profile }: { profile: UserProfile }) {
   const [step, setStep] = useState(3); // 만루 직전부터 - 시연에서 바로 핵심을 보여준다
   const [showWhy, setShowWhy] = useState(false);
 
@@ -252,19 +245,6 @@ export function LiveScreen({
           </>
         ) : null}
 
-        {/* ── 설명 깊이 ──────────────────────────────────────── */}
-        <SectionTitle title="설명 깊이" />
-        <Card>
-          <Segmented
-            options={KNOWLEDGE_OPTIONS.map((o) => ({ key: o.key, label: o.short }))}
-            value={profile.level}
-            onChange={onLevel}
-          />
-          <Text style={st.levelNote}>
-            {KNOWLEDGE_OPTIONS.find((o) => o.key === profile.level)?.desc}
-          </Text>
-        </Card>
-
         {/* ── 시연용 ─────────────────────────────────────────── */}
         <SectionTitle title="타석 이동" right={<Text style={st.sectionCount}>시연용</Text>} />
         <Card>
@@ -416,8 +396,6 @@ const st = StyleSheet.create({
   alertRow: { alignItems: 'flex-start', paddingVertical: spacing.lg },
   alertTitle: { ...typography.bodyStrong, lineHeight: 21 },
   alertBody: { ...typography.caption, lineHeight: 19 },
-
-  levelNote: typography.caption,
 
   seqOutcome: typography.body,
   seqRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

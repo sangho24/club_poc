@@ -158,7 +158,7 @@ export default function App() {
             onGoStore={() => setTab('store')}
           />
         ) : null}
-        {tab === 'live' ? <LiveScreen profile={profile} onLevel={setLevel} /> : null}
+        {tab === 'live' ? <LiveScreen profile={profile} /> : null}
         {tab === 'players' ? <PlayersScreen profile={profile} /> : null}
         {tab === 'gameday' ? <GamedayScreen /> : null}
         {tab === 'store' ? <StoreScreen profile={profile} /> : null}
