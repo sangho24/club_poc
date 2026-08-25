@@ -288,15 +288,28 @@ export function StatTile({
   value,
   sub,
   tone,
+  category,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: 'brand' | 'plain';
+  /**
+   * SplitBar 와 짝을 이룰 때. 라벨 앞에 같은 구간 색 막대가 붙어 **타일과 막대가
+   * 같은 것을 가리킨다**는 사실이 색으로 이어진다. Gauge 와 같이 순번만 받는다
+   */
+  category?: number;
 }) {
   return (
     <View style={s.tile}>
-      <Text style={s.tileLabel}>{label}</Text>
+      <View style={s.tileHead}>
+        {category !== undefined ? (
+          <View style={[s.tileAccent, { backgroundColor: categoryColor(category) }]} />
+        ) : null}
+        <Text style={[s.tileLabel, { flex: 1 }]} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
       <Text style={[s.tileValue, tone === 'brand' && { color: colors.brandText }]}>{value}</Text>
       {sub ? <Text style={s.tileSub}>{sub}</Text> : null}
     </View>
@@ -561,8 +574,29 @@ export function DetailSheet({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={s.sheetBackdrop}>
+        {/* 시트 바깥의 어두운 면. **여기를 누르면 닫힌다** - 시트가 화면을 덮었을 때
+            덮인 쪽을 누르면 돌아간다는 것은 배워서 아는 게 아니라 그냥 해보는 동작이다.
+            오른쪽 위 '닫기'까지 엄지를 옮기게 두지 않는다 */}
+        <Pressable
+          onPress={onClose}
+          style={s.sheetDim}
+          accessibilityRole="button"
+          accessibilityLabel="닫기"
+        />
+
         <View style={s.sheet}>
-          <View style={s.sheetHandle} />
+          {/* 손잡이는 장식이 아니라 눌러서 닫는 표적이다. 막대 자체는 4px 이라
+              손가락으로 맞출 수 없어서 폭은 시트 전체를 쓰고 hitSlop 으로 위아래를
+              넓혀 실제 표적을 30px 남짓으로 만든다 */}
+          <Pressable
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 14 }}
+            style={({ pressed }) => [s.sheetGrab, pressed && states.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="닫기"
+          >
+            <View style={s.sheetHandle} />
+          </Pressable>
           <View style={s.sheetHead}>
             <View style={{ flex: 1 }}>
               {subtitle ? <Text style={s.sheetSub}>{subtitle}</Text> : null}
@@ -763,7 +797,150 @@ export function BellButton({ count, onPress }: { count: number; onPress: () => v
   );
 }
 
+/**
+ * 틴트 알림 카드 - "지금 이걸 보라"고 말하는 자리.
+ *
+ * 흰 카드가 줄줄이 선 지면에서 **면 색 하나만 다르면 그것이 곧 시선의 순서**가 된다.
+ * 그래서 알림은 카드가 아니라 틴트 면이고, 한 화면에 여러 개 세우지 않는다 -
+ * 틴트 상자가 연달아 서면 경고가 배경이 된다.
+ *
+ * ⚠ 틴트는 `soft()` 규칙(10%)을 따르는 `*Soft` 토큰만 쓴다. 알파는 뒤에 무엇이
+ * 있는지를 타므로 **회색 지면이 아니라 카드 안이거나 카드 자리**에 둔다.
+ */
+export function NoticeCard({
+  tone = 'muted',
+  title,
+  children,
+  footer,
+  onFooterPress,
+}: {
+  tone?: 'brand' | 'live' | 'win' | 'warn' | 'muted';
+  title: string;
+  children?: ReactNode;
+  footer?: string;
+  onFooterPress?: () => void;
+}) {
+  const t = {
+    brand: { fg: colors.brandText, bg: colors.brandSoft },
+    live: { fg: colors.live, bg: colors.liveSoft },
+    win: { fg: colors.win, bg: colors.winSoft },
+    warn: { fg: colors.warn, bg: colors.warnSoft },
+    muted: { fg: colors.subText, bg: colors.surface },
+  }[tone];
+  return (
+    <View style={[s.notice, { backgroundColor: t.bg, borderColor: t.fg + '33' }]}>
+      <View style={s.noticeHead}>
+        <View style={[s.noticeDot, { backgroundColor: t.fg }]} />
+        <Text style={[s.noticeTitle, { color: t.fg }, keepAll]}>{title}</Text>
+      </View>
+      {children}
+      {footer ? (
+        <Pressable
+          onPress={onFooterPress}
+          disabled={!onFooterPress}
+          style={({ pressed }) => (pressed && onFooterPress ? pressHighlight : undefined)}
+        >
+          <Text style={s.noticeFooter}>
+            {footer}
+            {onFooterPress ? ' ›' : ''}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** 알림 카드 안의 한 줄. 카드 색은 하나뿐이라 행끼리의 차이는 배지가 말한다 */
+export function NoticeRow({
+  label,
+  text,
+  first,
+  badge,
+  onPress,
+}: {
+  label?: string;
+  text: string;
+  first?: boolean;
+  badge?: ReactNode;
+  onPress?: () => void;
+}) {
+  const inner = (
+    <View style={[s.noticeRow, !first && s.noticeRowDivider]}>
+      {badge}
+      <View style={s.noticeRowBody}>
+        <View style={{ flex: 1, gap: 2 }}>
+          {label ? <Text style={[s.noticeRowLabel, keepAll]}>{label}</Text> : null}
+          <Text style={[s.noticeRowText, keepAll]}>{text}</Text>
+        </View>
+        {onPress ? <Text style={s.noticeRowChevron}>{'›'}</Text> : null}
+      </View>
+    </View>
+  );
+  if (!onPress) return inner;
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => (pressed ? pressHighlight : undefined)}>
+      {inner}
+    </Pressable>
+  );
+}
+
+/**
+ * 100% 를 나눠 갖는 막대 - 땅볼·뜬공·라인드라이브처럼 **합이 정해진** 비율에.
+ *
+ * 게이지 세 개를 세로로 쌓으면 각각이 독립된 값처럼 보인다. 하나의 막대를 쪼개야
+ * "셋이 합쳐 전부"라는 사실이 그림에 들어온다.
+ *
+ * 색은 `category` 순번으로만 받는다 - 화면이 원시 색을 넘기기 시작하면 토큰을 새로
+ * 만들어도 화면이 그냥 우회한다(Gauge 와 같은 규칙).
+ */
+export function SplitBar({
+  segments,
+}: {
+  segments: { value: number; category: number; label?: string }[];
+}) {
+  const total = segments.reduce((a, x) => a + x.value, 0);
+  if (total <= 0) return null;
+  return (
+    <View style={s.splitBar}>
+      {segments.map((x, i) => (
+        <View
+          key={i}
+          style={[
+            s.splitSeg,
+            { flexGrow: x.value / total, backgroundColor: categoryColor(x.category) },
+          ]}
+          accessibilityLabel={
+            x.label ? `${x.label} ${Math.round((x.value / total) * 100)}%` : undefined
+          }
+        />
+      ))}
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  notice: {
+    gap: spacing.sm,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    padding: spacing.lg,
+  },
+  noticeHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  noticeDot: { width: 6, height: 6, borderRadius: 3 },
+  noticeTitle: { ...typography.cardTitle, flex: 1 },
+  noticeFooter: typography.micro,
+
+  noticeRow: { gap: 4, paddingVertical: spacing.sm },
+  // 틴트 면 위에서는 카드용 border 색이 사라져 보인다. 면 위에 얹는 검정 알파로
+  noticeRowDivider: { borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.07)' },
+  noticeRowBody: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  noticeRowLabel: { ...typography.bodyStrong, fontSize: 13, lineHeight: 18 },
+  noticeRowText: { ...typography.caption, lineHeight: 19 },
+  noticeRowChevron: { ...typography.caption, fontWeight: '700', fontSize: 16, lineHeight: 19 },
+
+  splitBar: { height: 6, flexDirection: 'row', gap: 2 },
+  splitSeg: { height: 6, flexBasis: 0, borderRadius: radius.bar },
+
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.card,
@@ -863,6 +1040,8 @@ const s = StyleSheet.create({
     gap: 2,
     flex: 1,
   },
+  tileHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tileAccent: { width: 3, height: 12, borderRadius: 2 },
   tileLabel: typography.micro,
   tileValue: { ...typography.metric, ...tabularFigures, fontSize: 22, lineHeight: 26 },
   tileSub: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
@@ -1027,7 +1206,17 @@ const s = StyleSheet.create({
 
   divider: { height: 1, backgroundColor: colors.border },
 
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(7,17,31,0.35)', justifyContent: 'flex-end' },
+  sheetBackdrop: { flex: 1, justifyContent: 'flex-end' },
+  // 시트 뒤를 통째로 덮는 누를 수 있는 면. 시트 본체는 형제로 그 위에 올라간다
+  sheetDim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(7,17,31,0.35)',
+  },
+  sheetGrab: { alignItems: 'center' },
   sheet: {
     backgroundColor: colors.bg,
     borderTopLeftRadius: 28,
@@ -1041,7 +1230,6 @@ const s = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.dim,
-    alignSelf: 'center',
     marginTop: spacing.md,
   },
   sheetHead: {

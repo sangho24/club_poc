@@ -53,9 +53,7 @@ if (errs.length === 0) {
 }
 
 console.log('\n═══ 2. 타자 지표 ═══');
-console.log(
-  '  이름     타율   출루   장타   OPS    wOBA   wRC+  WAR   BABIP',
-);
+console.log('  이름     타율   출루   장타   OPS    wOBA   wRC+  WAR   BABIP');
 for (const b of BATTERS) {
   const war = batterWarOf(b.stat, '대전');
   const wrc = wrcPlusOf(b.stat, '대전');
@@ -79,7 +77,9 @@ const bd = batterWarBreakdown(nsh.stat, '대전');
 console.log(`  타격 ${bd.batting} + 주루 ${bd.baserunning} + 수비 ${bd.fielding}`);
 console.log(`  + 포지션 ${bd.position} + 대체수준 ${bd.replacement}`);
 const sum = bd.batting + bd.baserunning + bd.fielding + bd.position + bd.replacement;
-console.log(`  = ${sum.toFixed(1)}런 ÷ ${LEAGUE.runsPerWin}(1승의 값어치) = ${batterWarOf(nsh.stat, '대전')} WAR`);
+console.log(
+  `  = ${sum.toFixed(1)}런 ÷ ${LEAGUE.runsPerWin}(1승의 값어치) = ${batterWarOf(nsh.stat, '대전')} WAR`,
+);
 if (Math.abs(sum / LEAGUE.runsPerWin - batterWarOf(nsh.stat, '대전')) > 0.15) {
   bad('WAR 분해 합계가 WAR 과 어긋난다');
 }
@@ -109,9 +109,14 @@ for (const p of PITCHERS) {
 console.log('\n═══ 5. 기대득점표 단조성 ═══');
 // 아웃이 늘면 기대득점은 반드시 줄어야 한다. 주자가 늘면 반드시 커져야 한다
 const noRunner: GameSituation = {
-  inning: 1, half: 'top', outs: 0,
+  inning: 1,
+  half: 'top',
+  outs: 0,
   bases: { first: false, second: false, third: false },
-  scoreDiff: 0, balls: 0, strikes: 0, park: '대전',
+  scoreDiff: 0,
+  balls: 0,
+  strikes: 0,
+  park: '대전',
 };
 const loaded: GameSituation = { ...noRunner, bases: { first: true, second: true, third: true } };
 for (const outs of [0, 1, 2] as const) {
@@ -129,22 +134,33 @@ if (
 
 console.log('\n═══ 6. 창희쌤 시나리오: 9회말 만루, 상대 마무리 vs 우리 4번 ═══');
 const clutch: GameSituation = {
-  inning: 9, half: 'bottom', outs: 2,
+  inning: 9,
+  half: 'bottom',
+  outs: 2,
   bases: { first: true, second: true, third: true },
-  scoreDiff: -1, balls: 3, strikes: 2, park: '대전',
+  scoreDiff: -1,
+  balls: 3,
+  strikes: 2,
+  park: '대전',
 };
 // 마운드는 상대팀 마무리다 (우리 투수를 세우면 한화 공격에 한화 투수가 던지는 꼴이 된다)
 const closer = OPPONENT_PITCHERS.find((p) => p.role === '마무리') ?? OPPONENT_PITCHERS[0];
 const pred = predictMatchup(clutch, BATTERS[0], closer);
 console.log(`  ▶ ${pred.headline}`);
-console.log(`  레버리지 ${pred.context.leverageIndex} (${pred.context.leverageLabel}) · 기대득점 ${pred.context.runExpectancy}점`);
+console.log(
+  `  레버리지 ${pred.context.leverageIndex} (${pred.context.leverageLabel}) · 기대득점 ${pred.context.runExpectancy}점`,
+);
 console.log('  근거:');
 pred.reasons.forEach((r, i) => console.log(`    ${i + 1}. ${r}`));
 console.log('  계산 과정:');
-console.log(`    타자 출루율 ${pred.breakdown.batterOBP} vs 투수 피출루율 ${pred.breakdown.pitcherOBPAllowed}`);
+console.log(
+  `    타자 출루율 ${pred.breakdown.batterOBP} vs 투수 피출루율 ${pred.breakdown.pitcherOBPAllowed}`,
+);
 console.log(`    → 로그5 기본값 ${pred.breakdown.log5Base}`);
 console.log(`    → 좌우 상성 ${pred.breakdown.platoon >= 0 ? '+' : ''}${pred.breakdown.platoon}`);
-console.log(`    → 상황 보정 ${pred.breakdown.situational >= 0 ? '+' : ''}${pred.breakdown.situational}`);
+console.log(
+  `    → 상황 보정 ${pred.breakdown.situational >= 0 ? '+' : ''}${pred.breakdown.situational}`,
+);
 console.log(`    = 최종 ${pred.breakdown.final}`);
 if (pred.reasons.length < 3) bad('근거가 3개 미만이다 - 확률만 띄우는 화면이 된다');
 if (pred.onBaseProb <= 0 || pred.onBaseProb >= 1) bad('확률이 범위를 벗어났다');
@@ -152,10 +168,17 @@ if (pred.onBaseProb <= 0 || pred.onBaseProb >= 1) bad('확률이 범위를 벗�
 console.log('\n═══ 7. 레버리지 - 상황에 따라 실제로 달라지는가 ═══');
 const cases: [string, GameSituation][] = [
   ['3회초 무사 주자없음 5점차', { ...noRunner, inning: 3, scoreDiff: 5 }],
-  ['7회말 1사 1·2루 1점차', {
-    ...noRunner, inning: 7, half: 'bottom', outs: 1,
-    bases: { first: true, second: true, third: false }, scoreDiff: -1,
-  }],
+  [
+    '7회말 1사 1·2루 1점차',
+    {
+      ...noRunner,
+      inning: 7,
+      half: 'bottom',
+      outs: 1,
+      bases: { first: true, second: true, third: false },
+      scoreDiff: -1,
+    },
+  ],
   ['9회말 2사 만루 1점차', clutch],
 ];
 for (const [label, s] of cases) {
@@ -166,7 +189,11 @@ if (leverageIndex(cases[0][1]) >= leverageIndex(clutch)) {
 }
 
 console.log('\n═══ 8. 알림은 아무 때나 뜨지 않는가 ═══');
-const quiet = liveAlerts({ ...noRunner, inning: 3, scoreDiff: 6 }, BATTERS[6], OPPONENT_PITCHERS[0]);
+const quiet = liveAlerts(
+  { ...noRunner, inning: 3, scoreDiff: 6 },
+  BATTERS[6],
+  OPPONENT_PITCHERS[0],
+);
 const loud = liveAlerts(clutch, BATTERS[0], closer);
 console.log(`  3회 6점차 여유 국면: 알림 ${quiet.length}건`);
 console.log(`  9회말 2사 만루 1점차: 알림 ${loud.length}건`);
@@ -198,8 +225,21 @@ console.log('\n═══ 11. 생성 문장에 부호 오류가 없는가 ══�
 // 자기모순 문장이 된다. 여러 상황을 돌려 문장을 실제로 훑는다
 const sentenceCases: GameSituation[] = [
   clutch,
-  { ...noRunner, inning: 7, half: 'bottom', outs: 1, bases: { first: true, second: true, third: false }, scoreDiff: -1 },
-  { ...noRunner, inning: 5, outs: 2, bases: { first: false, second: true, third: false }, scoreDiff: 3 },
+  {
+    ...noRunner,
+    inning: 7,
+    half: 'bottom',
+    outs: 1,
+    bases: { first: true, second: true, third: false },
+    scoreDiff: -1,
+  },
+  {
+    ...noRunner,
+    inning: 5,
+    outs: 2,
+    bases: { first: false, second: true, third: false },
+    scoreDiff: 3,
+  },
   { ...loaded, inning: 9, half: 'bottom', outs: 0, scoreDiff: -2 },
 ];
 for (const sit of sentenceCases) {
@@ -207,7 +247,11 @@ for (const sit of sentenceCases) {
     for (const p of OPPONENT_PITCHERS) {
       const a = bullpenAdvice(sit, b, p, OPPONENT_PITCHERS);
       if (/-\d/.test(a.sentence)) bad(`음수 부호가 문장에 샜다: ${a.sentence}`);
-      if (a.sentence.includes('으로 바꾸') && !a.sentence.includes('찬으로') && !a.sentence.includes('규으로')) {
+      if (
+        a.sentence.includes('으로 바꾸') &&
+        !a.sentence.includes('찬으로') &&
+        !a.sentence.includes('규으로')
+      ) {
         // '으로/로' 선택이 정상인지 대략 확인 - 받침 없는 이름에 '으로'가 붙으면 잡힌다
         const m = a.sentence.match(/(\S+?)으로 바꾸/);
         if (m && !/[가-힣]$/.test(m[1])) bad(`조사 처리 이상: ${m[0]}`);
@@ -233,7 +277,9 @@ for (const sit of sentenceCases) {
     }
   }
 }
-console.log(`  ${sentenceCases.length}개 상황 × 타자 4명 × 투수 ${OPPONENT_PITCHERS.length}명 문장 검사 완료`);
+console.log(
+  `  ${sentenceCases.length}개 상황 × 타자 4명 × 투수 ${OPPONENT_PITCHERS.length}명 문장 검사 완료`,
+);
 
 console.log('\n═══ 12. 신뢰도 경고 ═══');
 for (const b of [BATTERS[0], BATTERS[6]]) {
