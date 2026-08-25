@@ -2,16 +2,29 @@
   "expo": {
     "name": "이글스 (구단앱 PoC)",
     "slug": "club-sample",
+    "owner": "sangho24s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F2F2F7",
+    "icon": "./assets/icon.png",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sangho24.clubpoc"
     },
     "android": {
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sangho24.clubpoc",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#07111F"
+      }
     },
-    "web": {}
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "d303bd1a-d0d6-4192-9fe1-9eb53a650e2a"
+      }
+    }
   }
 }

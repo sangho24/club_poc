@@ -1,0 +1,43 @@
+// EAS 빌드 프로파일.
+//
+// 이 저장소가 EAS 를 쓰는 이유는 하나다. Expo Go 가 SDK 54 에서 멈춰 있어
+// SDK 57 인 이 프로젝트를 열 수 없기 때문이다 (iOS Expo Go 54.0.2 / 2025-09-24,
+// Android 도 SDK 54). 폰에서 확인하려면 우리 SDK 로 빌드한 앱을 직접 설치해야 한다.
+//
+// 시연용은 preview 다. production 은 스토어 제출용이라 AAB 를 뱉는데
+// AAB 는 폰에 직접 설치가 안 된다. 그래서 preview 에서 buildType 을 apk 로 못박는다.
+{
+  "cli": {
+    "version": ">= 21.0.0",
+    "appVersionSource": "remote"
+  },
+
+  "build": {
+    // 개발용 - expo-dev-client 가 들어간 빌드. 지금은 쓰지 않는다
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+
+    // 시연용. JS 번들이 APK 안에 들어가므로 노트북도 네트워크도 필요 없다.
+    // distribution:internal 은 스토어를 거치지 않고 링크로 바로 받게 한다.
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+
+    // 스토어 제출용 (AAB). 현재 PoC 단계에서는 쓸 일이 없다
+    "production": {
+      "autoIncrement": true
+    }
+  },
+
+  "submit": {
+    "production": {}
+  }
+}
