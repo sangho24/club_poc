@@ -83,7 +83,7 @@ import {
   wrcPlusOf,
 } from '../sabermetrics';
 import { GLOSSARY, explainFor, gaugePosition } from '../statGlossary';
-import { colors, spacing, tabularFigures, typography } from '../theme';
+import { colors, radius, spacing, states, tabularFigures, typography } from '../theme';
 
 const PARK = '대전';
 
@@ -1665,12 +1665,6 @@ function MetricTile({
         <Text style={[st.metricLabel, active && { color: colors.brandText }]}>{label}</Text>
         {/* 표본이 이 값을 믿을 만한지 - 심화 지표에서 가장 자주 생략되는 정보다 */}
         <View style={[st.trustDot, { backgroundColor: dot }]} />
-        {/* 상자를 걷으니 눌린다는 신호가 사라져 꺾쇠를 남긴다 */}
-        {explained ? (
-          <Text style={[st.metricChevron, active && { color: colors.brandText }]}>
-            {active ? '⌄' : '›'}
-          </Text>
-        ) : null}
       </View>
       <Text style={[st.metricValue, active && { color: colors.brandText }]} numberOfLines={1}>
         {value}
@@ -1684,7 +1678,7 @@ function MetricTile({
     <Pressable
       // 같은 타일을 다시 누르면 닫힌다 - 닫기 버튼을 따로 찾지 않아도 된다
       onPress={() => onGlossary(active ? null : statKey)}
-      style={({ pressed }) => [st.metricTile, pressed && { opacity: 0.6 }]}
+      style={({ pressed }) => [st.metricTile, active && st.metricTileOn, pressed && states.pressed]}
       accessibilityRole="button"
       accessibilityState={{ expanded: !!active }}
       accessibilityLabel={`${label} ${value} 설명 보기`}
@@ -1974,19 +1968,22 @@ const st = StyleSheet.create({
   featuredWrap: { borderBottomWidth: 1, borderBottomColor: colors.border },
 
   // 공용 StatTile 과 같은 문법 - 상자를 걷고 숫자를 키운다
-  metricTile: { flex: 1, gap: 4 },
-  metricHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metricLabel: { fontSize: 12, fontWeight: '600', lineHeight: 16, color: colors.text },
-  trustDot: { width: 6, height: 6, borderRadius: 3 },
-  metricChevron: { fontSize: 13, fontWeight: '700', color: colors.mutedText, marginLeft: -1 },
-  metricValue: {
-    ...typography.metric,
-    ...tabularFigures,
-    fontSize: 27,
-    lineHeight: 31,
-    letterSpacing: -1,
-    fontWeight: '600',
+  // 지표 타일은 **카드 안의 한 단계 낮은 면**이다. 상자를 걷어냈던 판이 있었는데
+  // 그러면 셋이 그냥 나란한 글자 덩어리가 되어 어디까지가 한 지표인지 경계가 없고,
+  // 눌러서 설명이 열린다는 신호도 사라진다. 면이 곧 그 두 가지를 다 말한다
+  metricTile: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.tile,
+    padding: spacing.md,
+    gap: 2,
   },
+  // 열려 있는 타일은 면째로 틴트가 된다 - 어느 것을 눌러 이 설명이 떴는지
+  metricTileOn: { backgroundColor: colors.brandSoft },
+  metricHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metricLabel: typography.micro,
+  trustDot: { width: 6, height: 6, borderRadius: 3 },
+  metricValue: { ...typography.metric, ...tabularFigures, fontSize: 19, lineHeight: 24 },
 
   gaugeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   gaugeLabel: { ...typography.caption, color: colors.subText, fontWeight: '600', width: 52 },
