@@ -12,7 +12,7 @@
 // 프로필(지식수준·최애 선수·알림)은 저장소(src/storage.ts)에 영속된다. 온보딩은
 // 최초 1회만 탭 앞에 놓이고, 이후의 개별 변경(설명 깊이·최애 변경)은 각 화면이 갖는다.
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Pressable, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
 
 import { GamedayScreen } from './src/screens/GamedayScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -22,6 +22,7 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { PlayersScreen } from './src/screens/PlayersScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
 import { ClubWordmark } from './src/components/photos';
+import { TabBar } from './src/components/TabBar';
 import {
   BellButton,
   GroupCard,
@@ -35,7 +36,7 @@ import { DEFAULT_PROFILE, KnowledgeLevel, UserProfile, normalizeProfile } from '
 import { ATTENDANCE, attendanceSummary, membershipOf } from './src/my';
 import { NOTICE_LABEL, noticesFor, unreadCount } from './src/notifications';
 import { STORAGE_KEYS, loadValue, saveValue } from './src/storage';
-import { colors, pressHighlight, radius, spacing, tabCapsule, typography } from './src/theme';
+import { colors, pressHighlight, radius, spacing, typography } from './src/theme';
 
 type TabKey = 'home' | 'live' | 'players' | 'gameday' | 'store' | 'my';
 
@@ -172,31 +173,8 @@ export default function App() {
         ) : null}
       </View>
 
-      {/* ── 하단 탭 - 떠 있는 캡슐 ─────────────────────────── */}
-      <View style={s.tabBar}>
-        {TABS.map((t) => {
-          const on = tab === t.key;
-          return (
-            <Pressable
-              key={t.key}
-              onPress={() => setTab(t.key)}
-              style={({ pressed }) => [
-                s.tabBtn,
-                on && s.tabBtnOn,
-                pressed && !on && { opacity: 0.6 },
-              ]}
-              accessibilityRole="tab"
-              accessibilityLabel={t.label}
-              accessibilityState={{ selected: on }}
-              aria-selected={on}
-            >
-              <Text style={[s.tabLabel, on && s.tabLabelOn]} numberOfLines={1}>
-                {t.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {/* ── 하단 탭 - 떠 있는 캡슐. 누르거나, 옆으로 끌어서 옮긴다 ─── */}
+      <TabBar tabs={TABS} value={tab} onChange={setTab} />
 
       {/* ── 알림함 ─────────────────────────────────────────
           온보딩에서 켠 스위치가 닿는 곳. 여기가 없으면 그 온보딩은 묻기만 하고
@@ -282,42 +260,4 @@ const s = StyleSheet.create({
   noticeTitle: { ...typography.bodyStrong, lineHeight: 20 },
   noticeBody: { ...typography.caption, lineHeight: 18 },
   noticeEmpty: { ...typography.body, flex: 1 },
-
-  // 화면 가장자리에 붙지 않고 떠 있는 캡슐. 선택 탭만 흰 버블
-  tabBar: {
-    position: 'absolute',
-    bottom: tabCapsule.offset,
-    left: spacing.lg,
-    right: spacing.lg,
-    height: tabCapsule.height,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: tabCapsule.pad,
-    borderRadius: radius.chip,
-    backgroundColor: 'rgba(244,245,247,0.82)',
-    borderWidth: 1,
-    borderColor: colors.border,
-    // 유리는 내비게이션 층에만 (kbo_poc design.md §1). 본문이 캡슐 아래로 흐를 때
-    // 비쳐 보여야 "떠 있다"가 성립한다 - 불투명하면 그냥 회색 바다
-    ...(Platform.OS === 'web'
-      ? {
-          boxShadow: '0 4px 20px rgba(9, 22, 45, 0.10)',
-          backdropFilter: 'saturate(180%) blur(16px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(16px)',
-        }
-      : null),
-  },
-  tabBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: spacing.touchMin,
-    borderRadius: radius.chip,
-  },
-  tabBtnOn: {
-    backgroundColor: colors.card,
-    ...(Platform.OS === 'web' ? { boxShadow: '0 1px 8px rgba(9, 22, 45, 0.16)' } : null),
-  },
-  tabLabel: { fontSize: 12, fontWeight: '600', color: colors.subText, letterSpacing: -0.2 },
-  tabLabelOn: { color: colors.brandText, fontWeight: '700' },
 });
