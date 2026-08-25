@@ -94,8 +94,14 @@ for (const p of PITCHERS) {
       `${fip.toFixed(2)}  ${whipOf(p.stat).toFixed(2)}  ` +
       `${String(pitcherWarOf(p.stat, '대전')).padStart(4, ' ')}  ${babipAllowedOf(p.stat).toFixed(3)}`,
   );
-  if (era < 0.5 || era > 8) bad(`${p.name} ERA 가 비현실적`);
-  if (fip < 1 || fip > 8) bad(`${p.name} FIP 가 비현실적`);
+  // 상한은 표본을 탄다. 30이닝을 못 채운 투수는 한 경기가 방어율을 통째로 흔들어
+  // ERA 9 대가 실제로 나온다(엄상백 - 4월 토미 존 전 17이닝). 그 값을 '비현실적'으로
+  // 잡으면 검사가 **현실이 아니라 표본 크기를 탓하는** 것이 된다. 규정이닝 근처부터
+  // 조인다 - 120이닝 던진 투수의 ERA 9 는 그때야 진짜 이상한 값이다
+  const settled = p.stat.ipOuts >= 90; // 30이닝
+  const eraCap = settled ? 8 : 12;
+  if (era < 0.5 || era > eraCap) bad(`${p.name} ERA ${era.toFixed(2)} 가 비현실적`);
+  if (fip < 1 || fip > (settled ? 8 : 10)) bad(`${p.name} FIP ${fip.toFixed(2)} 가 비현실적`);
   const bab = babipAllowedOf(p.stat);
   if (bab < 0.2 || bab > 0.42) bad(`${p.name} 피BABIP ${bab} 가 비현실적`);
 }

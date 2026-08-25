@@ -85,6 +85,8 @@ export const PARK_FACTORS: Record<string, number> = {
 
 /** 타자 원자료. 파생 지표는 하나도 들어 있지 않다 */
 export interface BatterStatLine {
+  /** 출장 경기. 타석과 함께 봐야 "매일 나왔나 띄엄띄엄 나왔나"가 잡힌다 */
+  g: number;
   pa: number; // 타석
   ab: number; // 타수
   h: number; // 안타
@@ -167,13 +169,22 @@ export const slgOf = (b: BatterStatLine) =>
 export const opsOf = (b: BatterStatLine) => r3(obpOf(b) + slgOf(b));
 
 /**
+ * IsoP(순장타율) - 장타율에서 타율을 뺀다.
+ *
+ * 장타율은 단타도 1루타로 세기 때문에 **똑딱이 타자도 장타율이 오른다.** 타율을 빼면
+ * 안타 하나당 몇 루를 더 갔는지만 남아 순수한 장타력이 된다.
+ */
+export const isoOf = (b: BatterStatLine) => r3(slgOf(b) - avgOf(b));
+
+/**
  * BABIP - 인플레이 타구 타율.
  *
  * 분모에서 **삼진과 홈런을 뺀다**는 것이 이 지표의 전부다. 삼진은 타구가 없고,
  * 홈런은 야수가 손댈 수 없으므로 둘 다 "수비가 개입할 여지"가 없다.
  * 남은 것이 인플레이 타구이고, 그중 몇 개가 안타가 됐는지를 세는 값이다.
  */
-export const babipOf = (b: BatterStatLine) => r3(safe(b.h - b.hr, b.ab - b.so - b.hr + b.sf));
+export const babipOf = (b: BatterStatLine) =>
+  r3(safe(b.h - b.hr, b.ab - b.so - b.hr + b.sf));
 
 /** 피BABIP - 투수판. 계산 구조는 같다 */
 export function babipAllowedOf(p: PitcherStatLine): number {
@@ -342,3 +353,82 @@ export function trustSentence(metric: string, sample: number): string {
     return `표본 ${sample}타석 - 안정 기준 ${need}타석의 절반은 넘겼지만 아직 흔들립니다.`;
   return `표본 ${sample}타석 - 안정 기준 ${need}타석에 한참 못 미칩니다. 이 값으로 선수를 판단하면 안 됩니다.`;
 }
+
+// ─────────────────────────────────────────────────────────────
+// 5. 합계 - 선수단 전체를 한 줄로 접는다
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 스탯 라인 여럿을 하나로 더한다.
+ *
+ * 팀 타율·팀 ERA 를 따로 계산하지 않고 **합계 라인을 만들어 기존 공식을 그대로 태운다.**
+ * 팀 타율을 선수 타율의 평균으로 내면 타석 수가 무시되어 200타석 백업이 500타석 주전과
+ * 같은 무게를 갖는다 - 그건 팀 타율이 아니다.
+ *
+ * 타구 유형 비율만은 더할 수 없으므로 타석(투수는 상대타자) 수로 가중 평균한다.
+ */
+export function sumBatterLines(lines: BatterStatLine[]): BatterStatLine {
+  const z: BatterStatLine = {
+    g: 0,
+    pa: 0, ab: 0, h: 0, double: 0, triple: 0, hr: 0,
+    bb: 0, ibb: 0, hbp: 0, so: 0, sf: 0, sh: 0,
+    sb: 0, cs: 0, r: 0, rbi: 0, gdp: 0,
+    gbRate: 0, fbRate: 0, ldRate: 0,
+    fieldingRuns: 0, positionAdj: 0,
+  };
+  const out = lines.reduce((a, s) => ({
+    ...a,
+    // 경기 수는 팀 경기 수를 넘을 수 있다 - 같은 날 여러 선수가 나오기 때문이다.
+    // 합계 화면에서 이 값을 팀 경기 수로 읽지 않도록 주의
+    g: a.g + s.g,
+    pa: a.pa + s.pa, ab: a.ab + s.ab, h: a.h + s.h,
+    double: a.double + s.double, triple: a.triple + s.triple, hr: a.hr + s.hr,
+    bb: a.bb + s.bb, ibb: a.ibb + s.ibb, hbp: a.hbp + s.hbp,
+    so: a.so + s.so, sf: a.sf + s.sf, sh: a.sh + s.sh,
+    sb: a.sb + s.sb, cs: a.cs + s.cs, r: a.r + s.r, rbi: a.rbi + s.rbi, gdp: a.gdp + s.gdp,
+    fieldingRuns: a.fieldingRuns + s.fieldingRuns,
+    // 비율과 포지션 조정은 아래에서 가중 평균한다
+    gbRate: a.gbRate + s.gbRate * s.pa,
+    fbRate: a.fbRate + s.fbRate * s.pa,
+    ldRate: a.ldRate + s.ldRate * s.pa,
+    positionAdj: a.positionAdj + s.positionAdj * s.pa,
+  }), z);
+  const w = out.pa || 1;
+  return {
+    ...out,
+    gbRate: out.gbRate / w,
+    fbRate: out.fbRate / w,
+    ldRate: out.ldRate / w,
+    positionAdj: out.positionAdj / w,
+  };
+}
+
+/** 투수판 - 가중치는 상대한 타자 수 */
+export function sumPitcherLines(lines: PitcherStatLine[]): PitcherStatLine {
+  const z: PitcherStatLine = {
+    g: 0, gs: 0, ipOuts: 0, h: 0, hr: 0, bb: 0, ibb: 0, hbp: 0,
+    so: 0, r: 0, er: 0, w: 0, l: 0, sv: 0, hld: 0, bf: 0,
+    gbRate: 0, fbRate: 0, ldRate: 0,
+  };
+  const out = lines.reduce((a, s) => ({
+    ...a,
+    g: a.g + s.g, gs: a.gs + s.gs, ipOuts: a.ipOuts + s.ipOuts,
+    h: a.h + s.h, hr: a.hr + s.hr, bb: a.bb + s.bb, ibb: a.ibb + s.ibb, hbp: a.hbp + s.hbp,
+    so: a.so + s.so, r: a.r + s.r, er: a.er + s.er,
+    w: a.w + s.w, l: a.l + s.l, sv: a.sv + s.sv, hld: a.hld + s.hld, bf: a.bf + s.bf,
+    gbRate: a.gbRate + s.gbRate * s.bf,
+    fbRate: a.fbRate + s.fbRate * s.bf,
+    ldRate: a.ldRate + s.ldRate * s.bf,
+  }), z);
+  const w = out.bf || 1;
+  return { ...out, gbRate: out.gbRate / w, fbRate: out.fbRate / w, ldRate: out.ldRate / w };
+}
+
+/**
+ * 규정 타석·이닝 - 비율 지표 순위표의 자격 기준.
+ *
+ * 이걸 안 두면 10타석에 4안타 친 선수가 타율 1위로 올라간다. KBO 규정을 그대로 쓴다
+ * (타자는 경기수 × 3.1, 투수는 경기수 × 1.0).
+ */
+export const qualifiedPA = (teamGames: number) => Math.ceil(teamGames * 3.1);
+export const qualifiedIPOuts = (teamGames: number) => teamGames * 3;
