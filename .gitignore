@@ -6,3 +6,6 @@ web-build/
 *.log
 .DS_Store
 .playwright-mcp/
+
+# 로컬 작업 규칙 - 저장소에 남기지 않는다
+CLAUDE.md
