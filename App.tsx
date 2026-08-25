@@ -22,7 +22,7 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { PlayersScreen } from './src/screens/PlayersScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
 import { ClubWordmark } from './src/components/photos';
-import { TabBar } from './src/components/TabBar';
+import { TabBar, TabIconName } from './src/components/TabBar';
 import {
   BellButton,
   GroupCard,
@@ -40,13 +40,16 @@ import { colors, pressHighlight, radius, spacing, typography } from './src/theme
 
 type TabKey = 'home' | 'live' | 'players' | 'gameday' | 'store' | 'my';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'home', label: '홈' },
-  { key: 'live', label: '라이브' },
-  { key: 'players', label: '선수' },
-  { key: 'gameday', label: '직관' },
-  { key: 'store', label: '굿즈' },
-  { key: 'my', label: 'MY' },
+// 픽토그램은 글자를 그림으로 되풀이하는 것이 아니라 **그 탭이 무엇을 하는 곳인지**를
+// 가리킨다. 그래서 선수는 사람이 아니라 배트다 - 사람을 쓰면 MY 와 겹치고, 이 탭은
+// '나'가 아니라 '선수단'이기 때문이다.
+const TABS: { key: TabKey; label: string; icon: TabIconName }[] = [
+  { key: 'home', label: '홈', icon: 'home' },
+  { key: 'live', label: '라이브', icon: 'live' },
+  { key: 'players', label: '선수', icon: 'bat' },
+  { key: 'gameday', label: '직관', icon: 'diamond' },
+  { key: 'store', label: '굿즈', icon: 'bag' },
+  { key: 'my', label: 'MY', icon: 'person' },
 ];
 
 export default function App() {

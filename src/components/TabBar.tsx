@@ -25,7 +25,7 @@
 // 제스처가 필요로 하는 '시작 위치'는 저장하지 않고 index·slot 에서 다시 계산한다
 // (드래그 도중에는 확정 탭이 바뀌지 않으므로 같은 값이다).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, PanResponder, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, tabCapsule } from '../theme';
 
@@ -36,9 +36,9 @@ const FLICK_VELOCITY = 0.35;
 /** 양 끝을 넘어갔을 때 남는 저항 - 벽에 딱 걸리는 대신 고무줄처럼 늘어난다 */
 const RUBBER = 0.35;
 
-const BUBBLE_H = spacing.touchMin;
-/** 캡슐(56) 안에서 버블(44)이 세로 가운데에 놓이는 자리 */
-const BUBBLE_TOP = (tabCapsule.height - BUBBLE_H) / 2;
+/** 버블은 캡슐 안쪽 여백을 뺀 만큼 - 두 층(아이콘·라벨)을 다 덮어야 한 칸으로 읽힌다 */
+const BUBBLE_H = tabCapsule.height - tabCapsule.pad * 2;
+const BUBBLE_TOP = tabCapsule.pad;
 
 /**
  * 버블이 앉는 방식. 감쇠비 ζ = damping / 2√(stiffness·mass) ≈ 0.83.
@@ -56,12 +56,142 @@ const SPRING = {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+// ─────────────────────────────────────────────────────────────
+// 픽토그램
+//
+// 아이콘 라이브러리를 넣지 않았다. 여섯 개를 위해 SVG 런타임을 붙이면 번들이
+// 그만큼 무거워지고, 이 저장소는 이미 View 로 마크를 그리는 관용구를 갖고 있다
+// (common.tsx 의 BellButton, photos.tsx 의 CapMark). 같은 방식으로 그린다.
+//
+// 전부 **선(획) 문법**으로 통일했다 - 굵기 1.8 하나. 채운 것과 선인 것이 섞이면
+// 한 줄에 놓였을 때 무게가 들쭉날쭉해 어느 탭이 선택된 것인지가 흐려진다.
+// (지붕만은 삼각형이라 채운다 - 1.8px 선 두 개로 꺾인 각을 만들면 이 크기에서
+//  이음매가 뭉개진다)
+//
+// 색은 넘겨받는다. 선택/비선택 두 벌을 겹쳐 놓고 투명도로 교차시키기 때문에
+// 아이콘 자신은 자기가 선택됐는지 모른다.
+// ─────────────────────────────────────────────────────────────
+
+export type TabIconName = 'home' | 'live' | 'bat' | 'diamond' | 'bag' | 'person';
+
+const STROKE = 1.8;
+
+function TabIcon({ name, color }: { name: TabIconName; color: string }) {
+  switch (name) {
+    // 집 - 지붕은 채우고 몸통은 선
+    case 'home':
+      return (
+        <View style={ic.box}>
+          <View style={[ic.roof, { borderBottomColor: color }]} />
+          <View style={[ic.houseBody, { borderColor: color }]} />
+        </View>
+      );
+
+    // 방송 중 - 가운데 점과 그것을 둘러싼 링. 녹화·생중계의 관용 기호다
+    case 'live':
+      return (
+        <View style={ic.box}>
+          <View style={[ic.ring, { borderColor: color }]} />
+          <View style={[ic.ringDot, { backgroundColor: color }]} />
+        </View>
+      );
+
+    // 배트 - 사람 모양을 쓰면 MY 와 겹친다. 이 탭은 '선수단'이지 '나'가 아니다
+    case 'bat':
+      return (
+        <View style={ic.box}>
+          <View style={ic.batWrap}>
+            <View style={[ic.batBarrel, { backgroundColor: color }]} />
+            <View style={[ic.batHandle, { backgroundColor: color }]} />
+            <View style={[ic.batKnob, { backgroundColor: color }]} />
+          </View>
+        </View>
+      );
+
+    // 내야 다이아몬드 - 야구장을 한 획으로 말하는 형태
+    case 'diamond':
+      return (
+        <View style={ic.box}>
+          <View style={[ic.diamond, { borderColor: color }]} />
+        </View>
+      );
+
+    // 쇼핑백 - 손잡이는 위쪽만 둥근 'ㄇ' 로 만든다. 원의 한쪽 테두리만 남기는
+    // 방식은 플랫폼마다 이음매가 달라 이 크기에서 지저분해진다
+    case 'bag':
+      return (
+        <View style={ic.box}>
+          <View style={[ic.bagHandle, { borderColor: color }]} />
+          <View style={[ic.bagBody, { borderColor: color }]} />
+        </View>
+      );
+
+    // 사람 - 머리와 어깨. 어깨는 아래가 열린 반원이라 '상반신'으로 읽힌다
+    case 'person':
+      return (
+        <View style={ic.box}>
+          <View style={[ic.head, { borderColor: color }]} />
+          <View style={[ic.shoulders, { borderColor: color }]} />
+        </View>
+      );
+  }
+}
+
+const ic = StyleSheet.create({
+  box: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+
+  roof: {
+    width: 0,
+    height: 0,
+    borderBottomWidth: 8,
+    borderLeftWidth: 9,
+    borderRightWidth: 9,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  houseBody: { width: 12, height: 8, borderWidth: STROKE, borderTopWidth: 0 },
+
+  ring: { width: 18, height: 18, borderRadius: 999, borderWidth: STROKE },
+  ringDot: { position: 'absolute', width: 7, height: 7, borderRadius: 999 },
+
+  // 손잡이 끝(knob)이 아래로 오게 세운 뒤 통째로 기울인다
+  batWrap: { alignItems: 'center', transform: [{ rotate: '38deg' }] },
+  batBarrel: { width: 5, height: 10, borderRadius: 2.5 },
+  batHandle: { width: 2.4, height: 6, marginTop: -0.5 },
+  batKnob: { width: 4.4, height: 2.2, borderRadius: 1.1 },
+
+  diamond: { width: 13, height: 13, borderWidth: STROKE, transform: [{ rotate: '45deg' }] },
+
+  bagHandle: {
+    width: 9,
+    height: 5,
+    borderWidth: STROKE,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 4.5,
+    borderTopRightRadius: 4.5,
+    // 몸통 테두리와 겹쳐 두 선이 이어져 보이게 한다
+    marginBottom: -STROKE,
+  },
+  bagBody: { width: 15, height: 11, borderWidth: STROKE, borderRadius: 3 },
+
+  head: { width: 7.5, height: 7.5, borderRadius: 999, borderWidth: STROKE },
+  shoulders: {
+    width: 15,
+    height: 7,
+    borderWidth: STROKE,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 7.5,
+    borderTopRightRadius: 7.5,
+    marginTop: 2,
+  },
+});
+
 export function TabBar<T extends string>({
   tabs,
   value,
   onChange,
 }: {
-  tabs: { key: T; label: string }[];
+  tabs: { key: T; label: string; icon: TabIconName }[];
   value: T;
   onChange: (key: T) => void;
 }) {
@@ -164,9 +294,10 @@ export function TabBar<T extends string>({
       ) : null}
 
       {tabs.map((t, i) => {
-        // 버블이 이 칸에 얼마나 걸쳐 있는지(0~1). 라벨의 진하기는 '선택됐다/아니다'가
-        // 아니라 이 연속값이 정한다 - 그래서 끄는 동안 글자가 툭 바뀌지 않고 건너간다.
-        // 굵기는 애니메이션할 수 없으니 두 벌을 겹쳐 두고 서로 교차시킨다
+        // 버블이 이 칸에 얼마나 걸쳐 있는지(0~1). 진하기는 '선택됐다/아니다'가 아니라
+        // 이 연속값이 정한다 - 그래서 끄는 동안 툭 바뀌지 않고 건너간다.
+        // 글자 굵기도 아이콘 색도 애니메이션할 수 없으니, **아이콘과 라벨을 묶은 한
+        // 벌을 두 개** 겹쳐 두고 서로 교차시킨다
         const span = slot > 0 ? [(i - 1) * slot, i * slot, (i + 1) * slot] : null;
         const onAlpha = span
           ? x.interpolate({ inputRange: span, outputRange: [0, 1, 0], extrapolate: 'clamp' })
@@ -189,15 +320,18 @@ export function TabBar<T extends string>({
             accessibilityState={{ selected: i === index }}
             aria-selected={i === index}
           >
-            <Animated.Text style={[s.tabLabel, { opacity: offAlpha }]} numberOfLines={1}>
-              {t.label}
-            </Animated.Text>
-            <Animated.Text
-              style={[s.tabLabel, s.tabLabelOn, s.tabLabelOver, { opacity: onAlpha }]}
-              numberOfLines={1}
-            >
-              {t.label}
-            </Animated.Text>
+            <Animated.View style={[s.tabStack, { opacity: offAlpha }]}>
+              <TabIcon name={t.icon} color={colors.subText} />
+              <Text style={s.tabLabel} numberOfLines={1}>
+                {t.label}
+              </Text>
+            </Animated.View>
+            <Animated.View style={[s.tabStack, s.tabStackOver, { opacity: onAlpha }]}>
+              <TabIcon name={t.icon} color={colors.brandText} />
+              <Text style={[s.tabLabel, s.tabLabelOn]} numberOfLines={1}>
+                {t.label}
+              </Text>
+            </Animated.View>
           </Pressable>
         );
       })}
@@ -250,8 +384,11 @@ const s = StyleSheet.create({
     minHeight: spacing.touchMin,
     borderRadius: radius.chip,
   },
-  tabLabel: { fontSize: 12, fontWeight: '600', color: colors.subText, letterSpacing: -0.2 },
+  // 아이콘 위 · 라벨 아래. 사이는 3px - 더 벌리면 둘이 한 덩어리로 안 읽힌다
+  tabStack: { alignItems: 'center', gap: 3 },
+  // 선택된 벌은 흐린 벌 위에 겹친다. inset 을 주지 않으면 부모의 정렬(가운데)을 따른다
+  tabStackOver: { position: 'absolute' },
+  // 아이콘이 위에 서면서 라벨은 이름표로 물러난다. 12 그대로 두면 두 층이 대결한다
+  tabLabel: { fontSize: 11, fontWeight: '600', color: colors.subText, letterSpacing: -0.2 },
   tabLabelOn: { color: colors.brandText, fontWeight: '700' },
-  // 굵은 쪽은 흐린 쪽 위에 겹쳐 둔다. inset 을 주지 않으면 부모의 정렬(가운데)을 따른다
-  tabLabelOver: { position: 'absolute' },
 });
