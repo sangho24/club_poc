@@ -159,7 +159,7 @@ export default function App() {
           />
         ) : null}
         {tab === 'live' ? <LiveScreen profile={profile} onLevel={setLevel} /> : null}
-        {tab === 'players' ? <PlayersScreen profile={profile} onLevel={setLevel} /> : null}
+        {tab === 'players' ? <PlayersScreen profile={profile} /> : null}
         {tab === 'gameday' ? <GamedayScreen /> : null}
         {tab === 'store' ? <StoreScreen profile={profile} /> : null}
         {tab === 'my' ? (
