@@ -66,6 +66,16 @@ jobs:
       - name: 웹 정적 빌드
         run: npx expo export --platform web
 
+      # 폰에서 이 PoC 를 보여줄 경로가 웹밖에 없다. Expo Go 는 SDK 54 에서 멈춰
+      # SDK 57 인 이 프로젝트를 못 열고, EAS APK 는 사내 Intune 정책에 막혀
+      # 다운로드조차 되지 않는다. 보고 대상자의 폰도 같은 정책이다.
+      # expo export 가 뱉는 index.html 에는 manifest 도 아이콘도 theme-color 도 없어서
+      # 그대로 두면 주소창이 보이는 웹페이지다. 아래 단계가 '홈 화면에 추가' 를 성립시킨다.
+      - name: PWA 후처리 (manifest·아이콘·theme-color)
+        env:
+          BASE_URL: /${{ github.event.repository.name }}
+        run: node tools/postexport-pwa.js
+
       # upload-pages-artifact 는 v3 를 유지한다 (composite 액션이라 Node 런타임 이슈 없음).
       # v4+ 는 숨김 파일을 기본 제외하므로 별도 옵션이 필요해진다.
       - name: Pages 아티팩트 업로드
