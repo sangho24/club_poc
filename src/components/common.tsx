@@ -10,9 +10,12 @@
 //   ② **목록의 항목마다 카드를 하나씩 띄웠다.** 같은 라운드·같은 패딩의 흰 상자가
 //      끝없이 반복되면 어디가 묶음이고 어디가 낱개인지 구분이 사라진다.
 //      묶이는 것은 카드 하나 안의 행으로 넣는다
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import {
+  Animated,
+  Dimensions,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -556,6 +559,23 @@ export function SkeletonCard() {
  *
  * 하단에 액션 바를 고정한다 - 상세를 끝까지 읽지 않아도 행동할 수 있어야 한다.
  */
+/** 시트가 닫힌 자리 - 재기 전에는 화면 높이만큼 아래에 둔다 */
+const SHEET_FALLBACK_H = Dimensions.get('window').height;
+
+/** 이만큼 끌어내리면 놓는 순간 닫힌다 (시트 높이 대비) */
+const SHEET_DISMISS_RATIO = 0.25;
+/** 조금만 끌었어도 이 속도로 튕기면 닫는다 (px/ms) */
+const SHEET_FLING = 0.5;
+
+const SHEET_SPRING = {
+  useNativeDriver: Platform.OS !== 'web',
+  stiffness: 220,
+  damping: 26,
+  mass: 1,
+  restDisplacementThreshold: 0.4,
+  restSpeedThreshold: 0.4,
+};
+
 export function DetailSheet({
   visible,
   title,
@@ -571,23 +591,121 @@ export function DetailSheet({
   children: ReactNode;
   actions?: ReactNode;
 }) {
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={s.sheetBackdrop}>
-        {/* 시트 바깥의 어두운 면. **여기를 누르면 닫힌다** - 시트가 화면을 덮었을 때
-            덮인 쪽을 누르면 돌아간다는 것은 배워서 아는 게 아니라 그냥 해보는 동작이다.
-            오른쪽 위 '닫기'까지 엄지를 옮기게 두지 않는다 */}
-        <Pressable
-          onPress={onClose}
-          style={s.sheetDim}
-          accessibilityRole="button"
-          accessibilityLabel="닫기"
-        />
+  // 닫는 애니메이션이 끝날 때까지 Modal 을 붙들고 있는다. visible 을 그대로 넘기면
+  // 시트가 내려가기도 전에 통째로 사라져 '닫히는 동작'이 아예 안 보인다
+  const [mounted, setMounted] = useState(visible);
+  const [sheetH, setSheetH] = useState(0);
 
-        <View style={s.sheet}>
-          {/* 손잡이는 장식이 아니라 눌러서 닫는 표적이다. 막대 자체는 4px 이라
-              손가락으로 맞출 수 없어서 폭은 시트 전체를 쓰고 hitSlop 으로 위아래를
-              넓혀 실제 표적을 30px 남짓으로 만든다 */}
+  /**
+   * 시트의 세로 위치 하나가 전부를 만든다 - 0 이 완전히 열린 자리, sheetH 가 닫힌 자리.
+   *
+   * 손으로 끄는 것과 스프링으로 여닫는 것이 **같은 값**을 움직이므로, 끌던 손을 놓는
+   * 순간 이어받는 것이 저절로 된다. 딤의 짙기도 여기서 보간해 만든다.
+   */
+  const [y] = useState(() => new Animated.Value(SHEET_FALLBACK_H));
+  /**
+   * ScrollView 가 맨 위에 있는가 - 제스처가 스크롤과 싸우지 않게 하는 판단 재료.
+   *
+   * 프레임마다 갱신하지 않는다. **맨 위인지 아닌지가 뒤집힐 때만** 상태를 건드리므로
+   * 한 번 훑는 동안 재렌더는 많아야 두 번이다
+   */
+  const [atTop, setAtTop] = useState(true);
+
+  const H = sheetH || SHEET_FALLBACK_H;
+
+  // 열릴 때는 **렌더 중에** 올린다. 이펙트로 미루면 한 프레임 늦어 시트가 한 박자
+  // 끊겨 들어오고, setState-in-effect 로 렌더가 한 번 더 돈다. 내릴 때는 반대로
+  // 애니메이션이 끝난 뒤에야 내려야 하므로 그건 아래 완료 콜백이 맡는다
+  if (visible && !mounted) setMounted(true);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (visible) {
+      Animated.spring(y, { ...SHEET_SPRING, toValue: 0 }).start();
+      return;
+    }
+    Animated.spring(y, { ...SHEET_SPRING, toValue: H }).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+  }, [visible, mounted, y, H]);
+
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        // 시작에는 양보한다 - 손잡이·닫기 버튼의 눌림이 먼저다
+        onStartShouldSetPanResponder: () => false,
+        // **아래로**, 세로로, 그리고 스크롤이 맨 위일 때만 가로챈다. 이 셋을 다 걸지
+        // 않으면 본문을 위로 훑는 손짓마다 시트가 따라 내려간다
+        onMoveShouldSetPanResponder: (_e, g) => g.dy > 6 && g.dy > Math.abs(g.dx) && atTop,
+        onPanResponderTerminationRequest: () => false,
+
+        onPanResponderMove: (_e, g) => {
+          // 위로는 안 늘어난다 - 시트가 천장을 뚫고 올라갈 자리가 없다
+          y.setValue(Math.max(0, g.dy));
+        },
+
+        onPanResponderRelease: (_e, g) => {
+          const far = g.dy > H * SHEET_DISMISS_RATIO;
+          const flung = g.vy > SHEET_FLING;
+          if (far || flung) {
+            // 닫기로 정했으면 손이 남긴 속도를 그대로 물려 끝까지 내려보낸다.
+            // onClose 가 visible 을 내리면 위 useEffect 가 같은 값을 이어 맡는다
+            Animated.spring(y, {
+              ...SHEET_SPRING,
+              toValue: H,
+              velocity: g.vy * 1000,
+            }).start();
+            onClose();
+          } else {
+            Animated.spring(y, { ...SHEET_SPRING, toValue: 0, velocity: g.vy * 1000 }).start();
+          }
+        },
+
+        onPanResponderTerminate: () => {
+          Animated.spring(y, { ...SHEET_SPRING, toValue: 0 }).start();
+        },
+      }),
+    [y, H, onClose, atTop],
+  );
+
+  if (!mounted) return null;
+
+  return (
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
+      <View style={s.sheetBackdrop}>
+        {/* 시트 바깥의 어두운 면.
+            ① **서서히 차오른다.** Modal 의 slide 는 딤까지 통째로 밀어 올려서 어두운
+               판이 턱 나타났다. 딤은 밀려 오는 것이 아니라 **짙어지는** 것이다
+            ② **누르면 닫힌다.** 시트가 화면을 덮었을 때 덮인 쪽을 누르면 돌아간다는
+               것은 배워서 아는 게 아니라 그냥 해보는 동작이다 */}
+        <Animated.View
+          style={[
+            s.sheetDim,
+            {
+              opacity: y.interpolate({
+                inputRange: [0, H],
+                outputRange: [1, 0],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        >
+          <Pressable
+            onPress={onClose}
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel="닫기"
+          />
+        </Animated.View>
+
+        <Animated.View
+          style={[s.sheet, { transform: [{ translateY: y }] }]}
+          onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}
+          {...pan.panHandlers}
+        >
+          {/* 손잡이는 장식이 아니다. **끌어내리면 시트가 따라오고, 눌러도 닫힌다.**
+              막대 자체는 4px 이라 손가락으로 맞출 수 없어서 폭은 시트 전체를 쓰고
+              hitSlop 으로 위아래를 넓혀 실제 표적을 30px 남짓으로 만든다 */}
           <Pressable
             onPress={onClose}
             hitSlop={{ top: 8, bottom: 14 }}
@@ -610,12 +728,19 @@ export function DetailSheet({
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: spacing.screenX, paddingBottom: spacing.xxl }}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              // 맨 위에서 한 번 더 내리려 할 때만 시트가 따라 내려간다.
+              // 여백 2px 은 관성 스크롤이 0 을 살짝 넘나드는 것을 흡수한다
+              const top = e.nativeEvent.contentOffset.y <= 2;
+              if (top !== atTop) setAtTop(top);
+            }}
           >
             {children}
           </ScrollView>
 
           {actions ? <View style={s.sheetActions}>{actions}</View> : null}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
