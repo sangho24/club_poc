@@ -58,6 +58,21 @@ import { colors, radius, spacing, tabularFigures, typography } from '../theme';
 
 type Sub = 'go' | 'eat';
 
+/**
+ * 눌러서 여는 참고 지면.
+ *
+ * 이 화면이 실제로 답하는 것은 "어디 대고 어느 문으로 들어가나"다. 게이트 다섯 개와
+ * 반입 목록과 교통편을 전부 펼쳐 두면 그 답이 스크롤 아래로 밀린다. **필요한 사람이
+ * 눌러서 보게** 하고 지면에는 한 줄씩만 남긴다
+ */
+type InfoKey = 'gate' | 'bring' | 'transit';
+
+const INFO_META: Record<InfoKey, { title: string; hint: string }> = {
+  gate: { title: '입장 게이트', hint: '어느 문이 덜 붐비나' },
+  bring: { title: '반입 규정', hint: '가지고 들어갈 수 있는 것 · 없는 것' },
+  transit: { title: '대중교통', hint: '기차 · 버스 · 도보' },
+};
+
 /** 시연 기준 시각 - Date.now() 를 쓰면 실행할 때마다 카운트다운이 달라진다 */
 const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
 
@@ -71,6 +86,7 @@ export function GamedayScreen() {
   const [openLot, setOpenLot] = useState<ParkingLot | null>(null);
   const [openPartner, setOpenPartner] = useState<Partner | null>(null);
   const [ticketAlert, setTicketAlert] = useState(false);
+  const [info, setInfo] = useState<InfoKey | null>(null);
   const [coupons, setCoupons] = useState<Record<string, boolean>>({});
 
   const advice = parkingAdvice(minutes, sort);
@@ -232,47 +248,26 @@ export function GamedayScreen() {
                 ))}
               </GroupCard>
 
-              {/* ── 입장 ─────────────────────────────────────── */}
-              <SectionTitle title="입장 게이트" />
+              {/* ── 가기 전에 ─────────────────────────────────
+                  게이트 · 반입 · 교통은 필요한 정보지만 **매번 읽는 것은 아니다.**
+                  펼쳐 두면 이 화면이 실제로 답해야 하는 것(어디 대나)이 그만큼
+                  아래로 밀린다. 한 줄로 접고 눌러서 연다 */}
+              <SectionTitle title="가기 전에" />
               <GroupCard>
-                {GATES.map((g, i) => (
-                  <Row key={g.name} last={i === GATES.length - 1} style={st.gateRow}>
+                {(['gate', 'bring', 'transit'] as InfoKey[]).map((k, i, arr) => (
+                  <Row
+                    key={k}
+                    last={i === arr.length - 1}
+                    style={st.lotRow}
+                    onPress={() => setInfo(k)}
+                  >
                     <View style={{ flex: 1, gap: 3 }}>
-                      <View style={st.lotHead}>
-                        <Text style={st.gateName}>{g.name}</Text>
-                        <Badge
-                          text={{ low: '한산', mid: '보통', high: '혼잡' }[g.crowd]}
-                          tone={g.crowd === 'low' ? 'win' : g.crowd === 'mid' ? 'muted' : 'live'}
-                        />
-                      </View>
-                      <Text style={st.gateServes}>{g.serves}</Text>
-                      <Text style={st.gateNote}>{g.note}</Text>
+                      <Text style={st.lotName}>{INFO_META[k].title}</Text>
+                      {/* 눌러서 무엇이 나오는지 미리 적는다 - 제목만 있으면
+                          누를지 말지를 누른 뒤에야 알게 된다 */}
+                      <Text style={st.infoHint}>{INFO_META[k].hint}</Text>
                     </View>
-                  </Row>
-                ))}
-              </GroupCard>
-
-              {/* ── 반입 규정 ─────────────────────────────────── */}
-              <SectionTitle title="반입 규정" />
-              <Card>
-                <Label>가지고 들어갈 수 있어요</Label>
-                <Text style={st.bringText}>{BRING_RULES.allowed.join(' · ')}</Text>
-                <Divider />
-                <Label>반입할 수 없어요</Label>
-                <Text style={st.bringText}>{BRING_RULES.denied.join(' · ')}</Text>
-              </Card>
-
-              {/* ── 대중교통 ─────────────────────────────────── */}
-              <SectionTitle title="대중교통" />
-              <GroupCard>
-                {TRANSIT.map((t, i) => (
-                  <Row key={t.label} last={i === TRANSIT.length - 1} style={st.lotRow}>
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={st.transitLabel}>
-                        {t.mode} · {t.label}
-                      </Text>
-                      <Text style={st.transitDetail}>{t.detail}</Text>
-                    </View>
+                    <Text style={st.chevron}>›</Text>
                   </Row>
                 ))}
               </GroupCard>
@@ -367,6 +362,61 @@ export function GamedayScreen() {
       </ScrollView>
 
       {/* ── 주차장 상세 ────────────────────────────────────── */}
+      {/* ── 참고 지면 ─────────────────────────────────────────
+          셋이 시트 하나를 나눠 쓴다. 성격이 같은 '눌러야 나오는 참고'라 자리를
+          나눌 이유가 없다. 내용은 접기 전과 한 글자도 다르지 않다 */}
+      <DetailSheet
+        visible={info !== null}
+        title={info ? INFO_META[info].title : ''}
+        subtitle="대전 한화생명 볼파크"
+        onClose={() => setInfo(null)}
+      >
+        {info === 'gate' ? (
+          <GroupCard>
+            {GATES.map((g, i) => (
+              <Row key={g.name} last={i === GATES.length - 1} style={st.gateRow}>
+                <View style={{ flex: 1, gap: 3 }}>
+                  <View style={st.lotHead}>
+                    <Text style={st.gateName}>{g.name}</Text>
+                    <Badge
+                      text={{ low: '한산', mid: '보통', high: '혼잡' }[g.crowd]}
+                      tone={g.crowd === 'low' ? 'win' : g.crowd === 'mid' ? 'muted' : 'live'}
+                    />
+                  </View>
+                  <Text style={st.gateServes}>{g.serves}</Text>
+                  <Text style={st.gateNote}>{g.note}</Text>
+                </View>
+              </Row>
+            ))}
+          </GroupCard>
+        ) : null}
+
+        {info === 'bring' ? (
+          <Card>
+            <Label>가지고 들어갈 수 있어요</Label>
+            <Text style={st.bringText}>{BRING_RULES.allowed.join(' · ')}</Text>
+            <Divider />
+            <Label>반입할 수 없어요</Label>
+            <Text style={st.bringText}>{BRING_RULES.denied.join(' · ')}</Text>
+          </Card>
+        ) : null}
+
+        {info === 'transit' ? (
+          <GroupCard>
+            {TRANSIT.map((t, i) => (
+              <Row key={t.label} last={i === TRANSIT.length - 1} style={st.lotRow}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={st.transitLabel}>
+                    {t.mode} · {t.label}
+                  </Text>
+                  <Text style={st.transitDetail}>{t.detail}</Text>
+                </View>
+              </Row>
+            ))}
+          </GroupCard>
+        ) : null}
+      </DetailSheet>
+
       <DetailSheet
         visible={!!openLot}
         title={openLot?.name ?? ''}
@@ -602,6 +652,8 @@ const st = StyleSheet.create({
   lotMeta: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
   lotStatus: { ...typography.caption, color: colors.text, fontWeight: '600' },
   chevron: { fontSize: 18, color: colors.mutedText, marginTop: 2 },
+  // 접어 둔 지면을 여는 줄. 제목 아래 한 줄이 "눌러서 무엇이 나오는지"를 미리 말한다
+  infoHint: { ...typography.micro, fontWeight: '500', lineHeight: 17 },
 
   occTrack: {
     height: 5,
