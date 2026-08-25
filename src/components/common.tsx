@@ -24,7 +24,22 @@ import {
   ViewStyle,
 } from 'react-native';
 
-import { keepAll, colors, pressHighlight, radius, spacing, tabularFigures, typography } from '../theme';
+import {
+  keepAll,
+  colors,
+  control,
+  buttonTone,
+  categoryColor,
+  gaugeFill,
+  pressHighlight,
+  radius,
+  skeleton,
+  spacing,
+  states,
+  tabularFigures,
+  typography,
+} from '../theme';
+import type { ButtonVariant, ControlSize, GaugeTone } from '../theme';
 
 /** 평평한 흰 카드. 그림자·테두리 없이 페이지 배경과의 대비만으로 구분한다 */
 export function Card({
@@ -284,19 +299,82 @@ export function StatTile({
 export function Gauge({
   position,
   markerAt,
-  tone = colors.brand,
+  tone = 'brand',
+  category,
 }: {
   position: number;
   markerAt?: number;
-  tone?: string;
+  /**
+   * 색은 여기서만 고른다. 전에는 `string` 이라 화면이 `colors.brand` 같은 원시 값을
+   * 직접 넘겼고, 그러면 토큰을 새로 만들어도 화면이 그냥 우회한다.
+   */
+  tone?: GaugeTone;
+  /**
+   * 구종처럼 **의미 없이 구별만 되면 되는** 항목일 때 몇 번째인지만 넘긴다.
+   * 색을 직접 고르지 않으므로 여섯 번째가 '기타'로 접히는 규칙이 저절로 지켜진다.
+   */
+  category?: number;
 }) {
   const pct = Math.min(1, Math.max(0, position));
+  const fill = category === undefined ? gaugeFill[tone] : categoryColor(category);
   return (
     <View style={s.gaugeTrack}>
-      <View style={[s.gaugeFill, { width: `${pct * 100}%`, backgroundColor: tone }]} />
+      <View style={[s.gaugeFill, { width: `${pct * 100}%`, backgroundColor: fill }]} />
       {markerAt !== undefined ? (
         <View style={[s.gaugeMarker, { left: `${Math.min(99, markerAt * 100)}%` }]} />
       ) : null}
+    </View>
+  );
+}
+
+/** 구간 게이지의 한 구간. `to` 는 구간의 오른쪽 끝(0~1)이고 마지막은 1 이어야 한다 */
+export type Band = { to: number; label: string; tone?: GaugeTone };
+
+/**
+ * 구간 게이지 - 값이 **어느 구간에 있는지**를 말한다.
+ *
+ * 평범한 게이지는 막대 길이로 크기만 말한다. 그런데 심화 지표는 크기 자체보다
+ * **정상 범위 안인지 밖인지**가 곧 정보다. BABIP .342 를 막대로만 그리면 높은 건지
+ * 낮은 건지 아무 말도 못 하지만, 리그 평균 구간을 함께 그리면 그림만으로 읽힌다.
+ *
+ * 값이 든 구간만 색이 차고 나머지는 트랙 색으로 남는다. 그 구간의 라벨만 칩이 된다.
+ */
+export function RangeGauge({ value, bands }: { value: number; bands: Band[] }) {
+  const v = Math.min(1, Math.max(0, value));
+  const here = Math.max(
+    0,
+    bands.findIndex((b) => v <= b.to),
+  );
+
+  // 구간 폭 = 자기 끝 - 앞 구간의 끝. 0 이면 flex 가 사라지므로 최소치를 준다
+  const seg = bands.map((b, i) => Math.max(0.001, b.to - (i === 0 ? 0 : bands[i - 1].to)));
+
+  return (
+    <View style={{ gap: 5 }}>
+      <View style={s.bandTrack}>
+        {bands.map((b, i) => (
+          <View
+            key={b.label}
+            style={[
+              s.band,
+              { flex: seg[i] },
+              i === here && { backgroundColor: gaugeFill[b.tone ?? 'neutral'] },
+            ]}
+          />
+        ))}
+      </View>
+      <View style={s.bandLabels}>
+        {bands.map((b, i) => (
+          <View key={b.label} style={{ flex: seg[i], alignItems: 'center' }}>
+            <Text
+              style={[s.bandLabel, i === here && s.bandLabelOn]}
+              numberOfLines={1}
+            >
+              {b.label}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -361,16 +439,93 @@ export function ExternalButton({
   );
 }
 
-/** 보조 버튼 - iOS .bordered. 회색 면, 테두리 없음 */
-export function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+/**
+ * 버튼 - variant × size 두 축.
+ *
+ * 전에는 `ExternalButton`(앱 밖으로 나가는 링크)과 `SecondaryButton`(회색 보조) 둘뿐이라
+ * **가장 중요한 행동을 담을 자리가 없었다.** 그래서 그 자리를 카드 전체 터치가 대신
+ * 메우고 있었는데, 그러면 무엇이 일어나는지 눌러 봐야 안다. 버튼은 자기 할 일을 글자로 말한다.
+ *
+ * 크기는 `control` 에서 온다. md 가 44 인 것은 손가락 최소 터치 기준이다.
+ */
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  size = 'md',
+  disabled,
+  full,
+}: {
+  label: string;
+  onPress: () => void;
+  variant?: ButtonVariant;
+  size?: ControlSize;
+  disabled?: boolean;
+  /** 카드 폭을 꽉 채운다 - 화면의 주된 행동일 때 */
+  full?: boolean;
+}) {
+  const tone = buttonTone[variant];
+  const dim = control[size];
+  const border = 'border' in tone ? tone.border : undefined;
+
   return (
     <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [s.secBtn, pressed && pressHighlight]}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      style={({ pressed }) => [
+        s.btn,
+        {
+          height: dim.height,
+          paddingHorizontal: dim.padX,
+          backgroundColor: tone.bg,
+          alignSelf: full ? 'stretch' : 'flex-start',
+        },
+        border ? { borderWidth: 1, borderColor: border } : null,
+        pressed && !disabled && pressHighlight,
+        disabled && states.disabled,
+      ]}
     >
-      <Text style={s.secLabel}>{label}</Text>
+      <Text style={[s.btnLabel, { fontSize: dim.fontSize, color: tone.fg }]} numberOfLines={1}>
+        {label}
+      </Text>
     </Pressable>
+  );
+}
+
+/** 보조 버튼 - 회색 면, 테두리 없음. 화면들이 쓰던 이름이라 남겨 둔다 */
+export function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return <Button label={label} onPress={onPress} variant="secondary" full />;
+}
+
+/**
+ * 로딩 자리표시자.
+ *
+ * 전에는 프로필을 읽는 동안 **빈 화면**이 떴다. 빈 화면은 '오는 중'이 아니라
+ * '아무것도 없음'으로 읽혀서, 앱이 죽은 것처럼 보인다.
+ */
+export function Skeleton({
+  w,
+  h = 12,
+  style,
+}: {
+  /** 숫자면 px, 문자열이면 '60%' 같은 비율 */
+  w?: number | `${number}%`;
+  h?: number;
+  style?: ViewStyle;
+}) {
+  return <View style={[s.skeleton, { width: w ?? '100%', height: h }, style]} />;
+}
+
+/** 카드 한 장 분량의 자리표시자 - 부팅·목록 로딩에 쓴다 */
+export function SkeletonCard() {
+  return (
+    <Card>
+      <Skeleton w="38%" h={11} />
+      <Skeleton w="74%" h={17} />
+      <Skeleton w="56%" h={11} />
+    </Card>
   );
 }
 
@@ -562,7 +717,7 @@ const s = StyleSheet.create({
   topTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border },
   topTab: { flex: 1, alignItems: 'center', paddingTop: spacing.md, gap: spacing.sm },
   topTabText: { fontSize: 15, fontWeight: '600', color: colors.mutedText },
-  topTabTextOn: { color: colors.text, fontWeight: '800' },
+  topTabTextOn: { color: colors.text, fontWeight: '700' },
   topTabBar: { height: 2, alignSelf: 'stretch', backgroundColor: 'transparent' },
   topTabBarOn: { backgroundColor: colors.brand },
 
@@ -596,7 +751,7 @@ const s = StyleSheet.create({
   },
   tileLabel: typography.micro,
   tileValue: { ...typography.metric, ...tabularFigures, fontSize: 22, lineHeight: 26 },
-  tileSub: { ...typography.micro, ...tabularFigures, fontWeight: '500' },
+  tileSub: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
 
   gaugeTrack: {
     height: 4,
@@ -607,6 +762,23 @@ const s = StyleSheet.create({
   },
   gaugeFill: { height: 4, borderRadius: radius.bar },
   gaugeMarker: { position: 'absolute', width: 2, height: 10, backgroundColor: colors.text, top: -3 },
+
+  // 구간 게이지. 구간 사이에 2px 틈을 둬야 '하나의 막대'가 아니라 '나뉜 구간'으로 읽힌다
+  bandTrack: { flexDirection: 'row', gap: 2, height: 6 },
+  band: { borderRadius: radius.bar, backgroundColor: colors.dim },
+  bandLabels: { flexDirection: 'row', gap: 2 },
+  bandLabel: { ...typography.micro, fontSize: 10, lineHeight: 14 },
+  bandLabelOn: { color: colors.text },
+
+  btn: {
+    borderRadius: radius.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  btnLabel: { fontWeight: '600', letterSpacing: -0.2 },
+
+  skeleton: { backgroundColor: skeleton.base, borderRadius: 7 },
 
   reasonRow: { paddingVertical: spacing.md },
   reasonText: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
@@ -664,7 +836,7 @@ const s = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   sheetSub: { ...typography.label, marginBottom: 3 },
-  sheetTitle: { fontSize: 20, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
+  sheetTitle: { fontSize: 20, fontWeight: '700', color: colors.text, letterSpacing: -0.4 },
   sheetClose: { minHeight: 32, justifyContent: 'center' },
   sheetCloseText: { ...typography.caption, color: colors.brandText, fontWeight: '700' },
   sheetActions: {

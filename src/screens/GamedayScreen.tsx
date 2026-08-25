@@ -533,7 +533,7 @@ const st = StyleSheet.create({
   tabsWrap: { backgroundColor: colors.card },
   headNote: typography.micro,
 
-  heroTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
+  heroTitle: { fontSize: 17, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.3 },
   heroSub: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.86)' },
 
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -552,7 +552,7 @@ const st = StyleSheet.create({
   lotRow: { alignItems: 'flex-start', paddingVertical: spacing.lg },
   lotHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   lotName: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
-  lotMeta: { ...typography.micro, ...tabularFigures, fontWeight: '500' },
+  lotMeta: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
   lotStatus: { ...typography.caption, color: colors.text, fontWeight: '600' },
   chevron: { fontSize: 18, color: colors.mutedText, marginTop: 2 },
 
@@ -565,17 +565,17 @@ const st = StyleSheet.create({
   gateRow: { alignItems: 'flex-start', paddingVertical: spacing.lg },
   gateName: { fontSize: 15, fontWeight: '700', color: colors.text },
   gateServes: typography.caption,
-  gateNote: { ...typography.micro, fontWeight: '500' },
+  gateNote: { ...typography.micro, fontWeight: '400' },
 
   bringText: { ...typography.body, fontSize: 13.5, lineHeight: 22 },
 
   transitLabel: { ...typography.bodyStrong, fontSize: 14 },
-  transitDetail: { ...typography.micro, fontWeight: '500', lineHeight: 17 },
+  transitDetail: { ...typography.micro, fontWeight: '400', lineHeight: 17 },
 
   perkName: { ...typography.bodyStrong, fontSize: 13.5, flexShrink: 0 },
   perkText: { ...typography.caption, flex: 1, textAlign: 'right' },
 
-  fanStory: { ...typography.micro, fontWeight: '500', lineHeight: 17 },
+  fanStory: { ...typography.micro, fontWeight: '400', lineHeight: 17 },
 
   bodyText: { ...typography.caption, lineHeight: 20 },
   sheetBody: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
@@ -583,9 +583,9 @@ const st = StyleSheet.create({
   tierRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
   tierName: { ...typography.caption, color: colors.text, fontWeight: '700' },
   tierSlot: typography.micro,
-  tierBenefit: { ...typography.micro, fontWeight: '500', lineHeight: 17 },
+  tierBenefit: { ...typography.micro, fontWeight: '400', lineHeight: 17 },
 
-  ruleText: { ...typography.micro, fontWeight: '500', lineHeight: 18, flex: 1 },
+  ruleText: { ...typography.micro, fontWeight: '400', lineHeight: 18, flex: 1 },
 
   couponBtn: {
     backgroundColor: colors.brand,
@@ -594,7 +594,7 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  couponBtnText: { fontSize: 15, fontWeight: '800', color: colors.onBrand },
+  couponBtnText: { fontSize: 15, fontWeight: '700', color: colors.onBrand },
   coupon: {
     backgroundColor: colors.brandSoft,
     borderRadius: radius.tile,
@@ -605,7 +605,7 @@ const st = StyleSheet.create({
   couponLabel: typography.micro,
   couponCode: {
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.brandText,
     letterSpacing: 2,
     ...tabularFigures,

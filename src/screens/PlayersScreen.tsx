@@ -18,6 +18,7 @@ import {
   Gauge,
   GroupCard,
   Label,
+  RangeGauge,
   RichText,
   Row,
   SectionTitle,
@@ -25,6 +26,7 @@ import {
   StatTile,
   TopTabs,
 } from '../components/common';
+import type { Band } from '../components/common';
 import { PlayerAvatar } from '../components/photos';
 import { KNOWLEDGE_OPTIONS, KnowledgeLevel, UserProfile } from '../profile';
 import { BATTERS, Batter, PITCHERS, Pitcher } from '../roster';
@@ -299,11 +301,13 @@ function PitcherRow({
 
           <Label>구종</Label>
           <View style={{ gap: spacing.sm }}>
-            {pitcher.pitches.map((pt) => (
+            {pitcher.pitches.map((pt, i) => (
               <View key={pt.name} style={st.pitchRow}>
                 <Text style={st.pitchName}>{pt.name}</Text>
                 <View style={{ flex: 1 }}>
-                  <Gauge position={pt.usage} tone={colors.neutralFill} />
+                  {/* 구종은 의미가 아니라 구별이다. 전부 같은 회색이면 어느 줄이 어느
+                      구종인지 막대만 봐서는 알 수 없어 이름을 매번 다시 읽어야 했다 */}
+                  <Gauge position={pt.usage} category={i} />
                 </View>
                 <Text style={st.pitchPct}>{Math.round(pt.usage * 100)}%</Text>
                 {pt.velo ? <Text style={st.pitchVelo}>{pt.velo}</Text> : null}
@@ -366,15 +370,23 @@ function MetricGauge({ statKey, label, value }: { statKey: string; label: string
   if (pos === null || !g?.scale) return null;
   const midPos = gaugePosition(statKey, g.scale.mid) ?? 0.5;
 
-  // 게이지 셋이 모두 같은 색으로 꽉 차면 그 줄이 색 띠로 보이고 값의 차이가 안 읽힌다.
-  // 리그 평균을 넘은 것만 구단 색을 준다 - 색 자체가 "평균 이상인가"를 말하게 된다
-  const above = g.scale.better === 'low' ? value < g.scale.mid : value > g.scale.mid;
+  // 막대 길이만 그리면 이 값이 높은 건지 낮은 건지 아무 말도 못 한다. 심화 지표는
+  // 크기 자체보다 **어느 구간에 있는가**가 곧 정보라, 구간을 함께 그린다.
+  //
+  // 경계는 기존 low·mid·high 세 지점의 중간이다 - 없던 기준을 지어내지 않는다.
+  // gaugePosition 이 방향을 이미 정규화해 둬서(1 이 언제나 좋은 쪽 끝, ERA 처럼
+  // 낮을수록 좋은 지표도 마찬가지) 상위·하위로 읽을 수 있다.
+  const bands: Band[] = [
+    { to: midPos / 2, label: '하위' },
+    { to: (midPos + 1) / 2, label: '평균권' },
+    { to: 1, label: '상위', tone: 'brand' },
+  ];
 
   return (
     <View style={st.gaugeRow}>
       <Text style={st.gaugeLabel}>{label}</Text>
       <View style={{ flex: 1 }}>
-        <Gauge position={pos} markerAt={midPos} tone={above ? colors.brand : colors.neutralFill} />
+        <RangeGauge value={pos} bands={bands} />
       </View>
       <Text style={st.gaugeMid}>평균 {g.scale.mid}</Text>
     </View>
@@ -461,10 +473,10 @@ const st = StyleSheet.create({
 
   playerRow: { paddingVertical: spacing.lg },
   nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
-  back: { ...typography.micro, ...tabularFigures, color: colors.brandText, fontWeight: '800' },
-  name: { fontSize: 16, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
+  back: { ...typography.micro, ...tabularFigures, color: colors.brandText, fontWeight: '700' },
+  name: { fontSize: 16, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
   pos: typography.micro,
-  slash: { ...typography.micro, ...tabularFigures, fontWeight: '500', marginTop: 3 },
+  slash: { ...typography.micro, ...tabularFigures, fontWeight: '400', marginTop: 3 },
   rightStat: { alignItems: 'flex-end' },
   warValue: { ...typography.metric, ...tabularFigures, fontSize: 22, color: colors.brandText },
   warLabel: { ...typography.micro, fontSize: 10 },
@@ -515,8 +527,8 @@ const st = StyleSheet.create({
 
   trustBox: { gap: 3 },
   trustHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  trustTitle: { ...typography.micro, fontWeight: '800' },
-  trustText: { ...typography.micro, fontWeight: '500', lineHeight: 17 },
+  trustTitle: { ...typography.micro, fontWeight: '700' },
+  trustText: { ...typography.micro, fontWeight: '400', lineHeight: 17 },
 
   note: typography.micro,
 

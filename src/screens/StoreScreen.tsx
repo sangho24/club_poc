@@ -360,7 +360,7 @@ const st = StyleSheet.create({
   stockHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   stockLabel: typography.micro,
   stockValue: { ...typography.metric, ...tabularFigures, fontSize: 22, color: colors.text },
-  stockValueSm: { ...typography.micro, ...tabularFigures, fontWeight: '800', color: colors.text },
+  stockValueSm: { ...typography.micro, ...tabularFigures, fontWeight: '700', color: colors.text },
   stockTrack: {
     height: 6,
     borderRadius: radius.bar,
@@ -381,7 +381,7 @@ const st = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   itemName: { ...typography.caption, color: colors.text },
-  itemLimit: { ...typography.micro, ...tabularFigures, fontWeight: '500', marginTop: 2 },
+  itemLimit: { ...typography.micro, ...tabularFigures, fontWeight: '400', marginTop: 2 },
   itemPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 13.5 },
 
   sheetHeadRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },

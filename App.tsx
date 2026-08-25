@@ -22,6 +22,7 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { PlayersScreen } from './src/screens/PlayersScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
 import { ClubWordmark } from './src/components/photos';
+import { Skeleton, SkeletonCard } from './src/components/common';
 import { DEFAULT_PROFILE, KnowledgeLevel, UserProfile, normalizeProfile } from './src/profile';
 import { STORAGE_KEYS, loadValue, saveValue } from './src/storage';
 import { colors, radius, spacing, tabCapsule, typography } from './src/theme';
@@ -40,7 +41,7 @@ const TABS: { key: TabKey; label: string }[] = [
 export default function App() {
   const [tab, setTab] = useState<TabKey>('home');
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
-  // 저장소를 읽기 전에 온보딩이 번쩍이면 안 된다 - 읽기가 끝날 때까지 빈 화면
+  // 저장소를 읽기 전에 온보딩이 번쩍이면 안 된다 - 읽기가 끝날 때까지 자리표시자를 그린다
   const [boot, setBoot] = useState<'loading' | 'onboarding' | 'ready'>('loading');
 
   useEffect(() => {
@@ -75,8 +76,23 @@ export default function App() {
     setBoot('ready');
   };
 
+  // 프로필을 읽는 동안. 전에는 빈 화면을 그렸는데, 빈 화면은 '오는 중'이 아니라
+  // '아무것도 없음'으로 읽혀서 앱이 죽은 것처럼 보인다. 뼈대를 먼저 세워 두면
+  // 같은 대기 시간이 '곧 채워질 자리'가 된다.
   if (boot === 'loading') {
-    return <SafeAreaView style={s.root} />;
+    return (
+      <SafeAreaView style={s.root}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+        <View style={s.brandBar}>
+          <ClubWordmark height={22} />
+        </View>
+        <View style={s.bootBody}>
+          <Skeleton h={148} style={{ borderRadius: radius.card }} />
+          <SkeletonCard />
+          <SkeletonCard />
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (boot === 'onboarding') {
@@ -157,6 +173,9 @@ export default function App() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
 
+  // 부팅 자리표시자 - 홈 화면의 골격(히어로 + 카드 둘)과 같은 리듬으로 둔다
+  bootBody: { paddingHorizontal: spacing.screenX, paddingTop: spacing.lg, gap: spacing.cardGap },
+
   brandBar: {
     height: 56,
     flexDirection: 'row',
@@ -206,5 +225,5 @@ const s = StyleSheet.create({
     ...(Platform.OS === 'web' ? { boxShadow: '0 1px 8px rgba(9, 22, 45, 0.16)' } : null),
   },
   tabLabel: { fontSize: 12, fontWeight: '600', color: colors.subText, letterSpacing: -0.2 },
-  tabLabelOn: { color: colors.brandText, fontWeight: '800' },
+  tabLabelOn: { color: colors.brandText, fontWeight: '700' },
 });

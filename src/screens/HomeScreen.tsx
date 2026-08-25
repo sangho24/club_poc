@@ -236,7 +236,7 @@ export function HomeScreen({
 
 const st = StyleSheet.create({
   heroWrap: { marginTop: spacing.sm },
-  heroTitle: { fontSize: 17, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
+  heroTitle: { fontSize: 17, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.3 },
   heroSub: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.86)' },
 
   scoreRow: { flexDirection: 'row', alignItems: 'center' },
@@ -260,11 +260,11 @@ const st = StyleSheet.create({
   resultDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   resultWin: { backgroundColor: colors.win },
   resultLose: { backgroundColor: colors.surface },
-  resultText: { fontSize: 11, fontWeight: '800' },
+  resultText: { fontSize: 11, fontWeight: '700' },
   resultTextWin: { color: '#FFFFFF' },
   resultTextLose: { color: colors.subText },
   recentOpp: typography.micro,
-  recentScore: { ...typography.micro, ...tabularFigures, fontWeight: '500' },
+  recentScore: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
 
   changeBtn: { ...typography.caption, color: colors.brandText, fontWeight: '700' },
   favEmptyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

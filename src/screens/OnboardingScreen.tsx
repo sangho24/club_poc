@@ -257,7 +257,7 @@ const st = StyleSheet.create({
   stepLabel: { ...typography.label, color: colors.brandText },
   stepTitle: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.text,
     letterSpacing: -0.5,
     marginTop: 6,

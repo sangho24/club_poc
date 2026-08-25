@@ -197,7 +197,7 @@ const st = StyleSheet.create({
   gameDate: { ...typography.caption, ...tabularFigures, width: 40 },
   gameTitle: { ...typography.bodyStrong, fontSize: 14 },
   gameSeat: typography.micro,
-  gameResult: { fontSize: 14, fontWeight: '800' },
+  gameResult: { fontSize: 14, fontWeight: '700' },
 
   appInfo: { ...typography.micro, textAlign: 'center', marginTop: spacing.xxl },
 });

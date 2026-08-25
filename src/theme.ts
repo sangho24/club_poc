@@ -117,6 +117,14 @@ export const categorical = {
   other: '#98A0AB',
 } as const;
 
+/**
+ * 카테고리 슬롯 → 색.
+ *
+ * 화면은 색을 직접 고르지 않고 **몇 번째 항목인지만** 넘긴다. 그래야 여섯 번째가
+ * 생겼을 때 색을 새로 만드는 대신 `other` 로 접히는 규칙이 저절로 지켜진다.
+ */
+export const categoryColor = (i: number) => categorical.light[i] ?? categorical.other;
+
 export const radius = {
   card: 24, // 콘센트릭 라운드 - 카드
   chip: 999, // 칩·배지·캡슐 버튼
