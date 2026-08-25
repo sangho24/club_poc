@@ -164,7 +164,10 @@ export function GamedayScreen() {
 
               {/* ── 주차 ───────────────────────────────────────
                   남은 시간은 앱이 안다. 팬이 고르는 것은 **무엇을 아쉬워할 것인가**다 */}
-              <SectionTitle title="주차" right={<Text style={st.headNote}>{PARKING_BASIS}</Text>} />
+              {/* 스폰서를 여기 둔 이유: 자동차보험 브랜드와 주차 안내는 맥락이 맞는다.
+                  팬이 "지금 어디에 댈까"를 묻는 자리에 자동차 관련 브랜드가 있으면
+                  광고가 아니라 후원으로 읽힌다. 맥락이 안 맞는 지면에 붙이면 그때부터 소음이다. */}
+              <SectionTitle title="주차" presenter="한화손해보험" />
               <Card style={{ gap: spacing.md }}>
                 <View style={st.countdownRow}>
                   <View style={{ flex: 1, gap: 2 }}>
@@ -182,6 +185,10 @@ export function GamedayScreen() {
                   {/* 시연 시각이 경기 시각과 동떨어졌을 때 조용히 바꿔치기하지 않는다 */}
                   <Badge text={assumed ? '시연 기준' : '지금 출발 기준'} tone="brand" />
                 </View>
+
+                {/* 근거는 머리글에서 카드 안으로 내렸다. 스폰서 표기와 한 줄에 두면
+                    390px 폭에서 둘 다 안 읽힌다 */}
+                <Text style={st.basisNote}>{PARKING_BASIS}</Text>
 
                 {/* 늦게 열면 전부 만차다. 그때 정렬 기준을 내밀면 고를 수 없는 것을 고르라는 말이 된다.
                     이 시간대에 팬이 실제로 필요한 답은 "주차 말고 다른 방법"이다 */}
@@ -579,6 +586,7 @@ const st = StyleSheet.create({
   countdownRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   countdown: { ...typography.cardTitle, fontSize: 16 },
   countdownSub: { ...typography.micro, ...tabularFigures },
+  basisNote: { ...typography.micro, fontWeight: '400', marginTop: -4 },
   fullNote: {
     backgroundColor: colors.warnSoft,
     borderRadius: radius.tile,
