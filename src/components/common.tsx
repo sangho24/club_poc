@@ -1236,11 +1236,18 @@ const s = StyleSheet.create({
 
   // 결정적 순간 - 피드의 다른 행과 같은 카드 안에 있으면서 면으로 구분된다.
   // 카드를 따로 띄우면 '피드에 끼어든 것'이 아니라 '피드 밖의 광고'로 읽힌다
+  // ⚠ 여기는 **광고 자리다.** 처음에는 brandSoft 로 면을 통째로 깔았는데, 그러면
+  // 문자중계 행이 흐르다가 색 덩어리가 끼어들어 리듬이 끊기고 **광고가 중계보다
+  // 시선을 먼저 가져간다.** 팬은 중계를 읽으러 왔다.
+  // 면을 걷고 왼쪽 띠 하나로 바꿨다 - 자리는 그대로 명확한데 오렌지 면적은 1/20 이 된다.
+  // theme.ts 가 첫 줄부터 말하는 "브랜드는 면적이 아니라 자리"가 여기에도 적용된다.
   momentWrap: {
-    backgroundColor: colors.brandSoft,
-    paddingHorizontal: spacing.cardPad,
+    paddingLeft: spacing.cardPad - 3, // 띠 굵기만큼 당겨 위아래 행과 글자 시작점을 맞춘다
+    paddingRight: spacing.cardPad,
     paddingVertical: spacing.md,
     gap: 5,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.brand,
   },
   momentHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   momentDot: { width: 5, height: 5, borderRadius: 999, backgroundColor: colors.brand },

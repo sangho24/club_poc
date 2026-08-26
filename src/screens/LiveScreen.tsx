@@ -57,8 +57,25 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
     () => bullpenAdvice(pa.situation, batter, pitcher, OPPONENT_PITCHERS),
     [pa.situation, batter, pitcher],
   );
+  /**
+   * ⚠ `liveAlerts` 는 **푸시 알림용**이다. 앱 밖에서 한 줄만 보고도 상황을 알 수 있게
+   * 문장을 통째로 담는다. 그 목록을 화면에 그대로 부으면 **이미 보이는 것을 다시 말한다.**
+   *
+   * 실제로 이 화면에서 이런 일이 벌어지고 있었다.
+   *   clutch  "이 타석 하나가 평균 타석의 4.3배… 현재 기대득점은 1.47점입니다"
+   *           → 바로 위 카드가 `기대득점 1.47점 · 레버리지 4.29` 로 이미 말했다
+   *   matchup  title=pred.headline · body=pred.reasons[0]
+   *           → '이 승부' 카드의 제목과 첫 근거가 **글자 그대로 같다**
+   *
+   * 같은 수치가 화면 하나에 세 번 나오면 정보가 많은 게 아니라 읽을 것이 없어진다.
+   * 화면에는 **화면이 아직 말하지 않은 것만** 남긴다. 엔진은 손대지 않는다 -
+   * 알림으로 나갈 때는 그 문장들이 그대로 필요하다.
+   */
   const alerts = useMemo(
-    () => liveAlerts(pa.situation, batter, pitcher),
+    () =>
+      liveAlerts(pa.situation, batter, pitcher).filter(
+        (a) => a.kind !== 'clutch' && a.kind !== 'matchup',
+      ),
     [pa.situation, batter, pitcher],
   );
 
@@ -112,7 +129,12 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
           ) : null}
         </View>
 
-        {/* ── 현재 상황 ──────────────────────────────────────── */}
+        {/* ── 이 승부 ────────────────────────────────────────────
+            베이스·볼카운트·레버리지가 따로 카드를 갖고 있었다. 둘 다 **같은 한 가지**
+            (지금 이 타석)를 말하는데 카드가 갈려 있으면, 레버리지 4.29 라는 수치가
+            매치업과 떨어져서 "그래서 이게 왜 중요한가"가 보이지 않는다.
+            상황은 승부의 머리다 - 한 카드 안에서 위아래로 잇는다 ── */}
+        <SectionTitle title="이 승부" presenter="한화생명" />
         <Card style={{ marginTop: spacing.cardGap }}>
           <View style={st.situationRow}>
             <BaseDiamond first={s.bases.first} second={s.bases.second} third={s.bases.third} />
@@ -125,11 +147,9 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
               </Text>
             </View>
           </View>
-        </Card>
 
-        {/* ── 이 승부 ────────────────────────────────────────── */}
-        <SectionTitle title="이 승부" presenter="한화생명" />
-        <Card>
+          <Divider />
+
           <CardHeading
             label={pred.flipped ? '상황이 뒤집은 승부' : '매치업'}
             title={pred.headline}
@@ -245,9 +265,12 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
           </>
         ) : null}
 
-        {/* ── 시연용 ─────────────────────────────────────────── */}
+        {/* ── 시연용 ─────────────────────────────────────────────
+            앱의 콘텐츠가 아니라 **데모를 넘기는 장치**다. 흰 카드를 입고 있으면 위 카드들과
+            같은 위계로 읽혀서, 팬에게 보여줄 때 이것도 기능인 줄 안다.
+            면을 비우고 테두리만 남겨 "지면에 얹힌 것이 아니다"를 눈으로 말한다 ── */}
         <SectionTitle title="타석 이동" right={<Text style={st.sectionCount}>시연용</Text>} />
-        <Card>
+        <Card style={st.demoCard}>
           <Text style={st.seqOutcome}>{pa.outcome}</Text>
           <View style={st.seqRow}>
             <Pressable
@@ -396,6 +419,9 @@ const st = StyleSheet.create({
   alertRow: { alignItems: 'flex-start', paddingVertical: spacing.lg },
   alertTitle: { ...typography.bodyStrong, lineHeight: 21 },
   alertBody: { ...typography.caption, lineHeight: 19 },
+
+  // 면을 비우고 테두리만 - 콘텐츠 카드와 나란히 놓였을 때 한눈에 갈린다
+  demoCard: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
 
   seqOutcome: typography.body,
   seqRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
