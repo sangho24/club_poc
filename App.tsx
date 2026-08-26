@@ -38,7 +38,7 @@ import { NOTICE_LABEL, noticesFor, unreadCount } from './src/notifications';
 import { STORAGE_KEYS, loadValue, saveValue } from './src/storage';
 import { colors, pressHighlight, radius, spacing, typography } from './src/theme';
 
-type TabKey = 'home' | 'live' | 'players' | 'gameday' | 'store' | 'my';
+export type TabKey = 'home' | 'live' | 'players' | 'gameday' | 'store' | 'my';
 
 // 픽토그램은 글자를 그림으로 되풀이하는 것이 아니라 **그 탭이 무엇을 하는 곳인지**를
 // 가리킨다. 그래서 선수는 사람이 아니라 배트다 - 사람을 쓰면 MY 와 겹치고, 이 탭은
@@ -158,7 +158,7 @@ export default function App() {
             profile={profile}
             onFavorite={setFavorite}
             onGoLive={() => setTab('live')}
-            onGoStore={() => setTab('store')}
+            onGo={setTab}
           />
         ) : null}
         {tab === 'live' ? <LiveScreen profile={profile} /> : null}
