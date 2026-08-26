@@ -22,7 +22,6 @@ import {
   batterWarOf,
   isoOf,
   soRateOf,
-  trustOf,
   walkRateOf,
   wrcPlusOf,
 } from './sabermetrics';
@@ -84,7 +83,6 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   const wrc = wrcPlusOf(b, park);
   const war = batterWarOf(b, park);
   const babip = babipOf(b);
-  const trust = trustOf('babip', b.pa);
 
   const lines: string[] = [];
 
@@ -158,7 +156,13 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   );
 
   // ── ③ 무엇을 조심하나 ──────────────────────────────────────
-  // BABIP 는 이 앱이 가장 공들여 설명하는 지표다. 분석 문장에서도 같은 말을 한다
+  // BABIP 는 이 앱이 가장 공들여 설명하는 지표다. 분석 문장에서도 같은 말을 한다.
+  //
+  // ⚠ 여기에 '표본 820타석에 못 미친다'는 경고를 달았다가 뺐다. BABIP 안정화 표본
+  //   820타석은 **한 시즌에 도달할 수 없는 수**다(규정타석이 500 남짓). 그래서 그 문장은
+  //   어느 선수든, 어느 시즌이든 예외 없이 붙었고 - 늘 붙는 줄은 정보가 아니라 서식이다.
+  //   BABIP 가 한 시즌 표본으로 안정되지 않는다는 사실 자체는 지표의 성질이라
+  //   statGlossary 의 trap(타일을 누르면 열린다)과 신뢰도 카드가 이미 맡고 있다.
   const gap = babip - REF.babip;
   const regress =
     gap >= 0.03
@@ -171,13 +175,7 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
           `앞으로 오를 여지가 있습니다.`
         : `BABIP **${dec3(babip)}** - 리그 평균 ${REF.babip} 언저리입니다. ` +
           `타율 ${dec3(avgOf(b))}에 운이 크게 섞여 있지는 않다는 뜻입니다.`;
-  const trustNote =
-    trust === 'high'
-      ? ''
-      : trust === 'mid'
-        ? ` 다만 ${b.pa}타석은 BABIP가 자리를 잡는 820타석의 절반 남짓이라 이 판단 자체가 아직 흔들립니다.`
-        : ` 다만 ${b.pa}타석은 BABIP가 자리를 잡는 820타석에 한참 못 미쳐, 이 판단을 결론처럼 읽으면 안 됩니다.`;
-  lines.push(regress + trustNote);
+  lines.push(regress);
 
   // ── ④ 타구 유형이 특이하면 한 줄 더 ────────────────────────
   // 모든 선수에게 붙이지 않는다. 늘 붙는 줄은 정보가 아니라 서식이 된다
