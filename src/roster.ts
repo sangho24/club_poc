@@ -31,7 +31,13 @@ export interface Batter {
   bats: 'L' | 'R' | 'S';
   age: number;
   stat: BatterStatLine;
-  /** 선수 소개 한 줄 - 스탯이 말하지 못하는 맥락 */
+  /**
+   * 선수 소개 한 줄 - 스탯이 말하지 못하는 맥락.
+   *
+   * ⚠ **습니다체로 적는다.** 이 줄은 화면에 홀로 서지 않고 AI 분석 문단의 첫머리에
+   * 붙는다(playerAnalysis.ts). 여기만 다체로 두면 한 문단 안에서 화자가 한 번 바뀐다.
+   * '1번 타자.' 같은 머리 조각은 체를 갖지 않으므로 그대로 두어도 된다.
+   */
   note: string;
 }
 
@@ -45,6 +51,7 @@ export interface Pitcher {
   stat: PitcherStatLine;
   /** 주무기 구종 - 상황별 매치업 해설에 쓴다 */
   pitches: { name: string; usage: number; velo?: number }[];
+  /** 타자 쪽 note 와 같은 규칙 - 습니다체로 적는다 */
   note: string;
 }
 
@@ -77,7 +84,7 @@ export const BATTERS: Batter[] = [
     pos: 'CF',
     bats: 'R',
     age: 24,
-    note: '1번 타자. 출루와 주루로 밥값을 하는 유형이라 타율보다 출루율을 봐야 한다',
+    note: '1번 타자. 출루와 주루로 밥값을 하는 유형이라 타율보다 출루율을 봐야 합니다',
     stat: {
       g: 102,
       pa: 454, ab: 398, h: 108, double: 17, triple: 4, hr: 6,
@@ -94,7 +101,7 @@ export const BATTERS: Batter[] = [
     pos: 'RF',
     bats: 'L',
     age: 28,
-    note: '외국인 타자. 장타는 확실한데 삼진이 많아 타율 기복이 크다',
+    note: '외국인 타자. 장타는 확실한데 삼진이 많아 타율 기복이 큽니다',
     stat: {
       g: 104,
       pa: 475, ab: 425, h: 118, double: 24, triple: 2, hr: 21,
@@ -111,7 +118,7 @@ export const BATTERS: Batter[] = [
     pos: 'LF',
     bats: 'L',
     age: 22,
-    note: '컨택 위주 좌타자. 삼진이 적어 표본이 빨리 안정되는 편',
+    note: '컨택 위주 좌타자. 삼진이 적어 표본이 빨리 안정되는 편입니다',
     stat: {
       g: 108,
       pa: 484, ab: 434, h: 125, double: 21, triple: 3, hr: 12,
@@ -128,7 +135,7 @@ export const BATTERS: Batter[] = [
     pos: 'DH',
     bats: 'L',
     age: 27,
-    note: '4번 타자. 타점 1위 다툼을 하는 해라 주자 있는 상황의 지표가 유난히 좋다',
+    note: '4번 타자. 타점 1위 다툼을 하는 해라 주자 있는 상황의 지표가 유난히 좋습니다',
     stat: {
       g: 105,
       pa: 486, ab: 420, h: 128, double: 24, triple: 1, hr: 26,
@@ -146,7 +153,7 @@ export const BATTERS: Batter[] = [
     pos: '3B',
     bats: 'R',
     age: 26,
-    note: '팀 중심 타선. 당겨친 뜬공 비중이 높아 홈런과 병살이 같이 늘어나는 유형',
+    note: '팀 중심 타선. 당겨친 뜬공 비중이 높아 홈런과 병살이 같이 늘어납니다',
     stat: {
       g: 109,
       pa: 509, ab: 445, h: 121, double: 22, triple: 1, hr: 25,
@@ -163,7 +170,7 @@ export const BATTERS: Batter[] = [
     pos: '1B',
     bats: 'R',
     age: 36,
-    note: '부상에서 돌아온 베테랑. 결장이 있어 표본이 다른 주전보다 작다',
+    note: '부상에서 돌아온 베테랑. 결장이 있어 표본이 다른 주전보다 작습니다',
     stat: {
       g: 76,
       pa: 340, ab: 300, h: 84, double: 18, triple: 0, hr: 13,
@@ -180,7 +187,7 @@ export const BATTERS: Batter[] = [
     pos: 'C',
     bats: 'R',
     age: 23,
-    note: '올해 데뷔 첫 홈런을 친 어린 주전 포수. 타격보다 수비와 포지션 조정으로 WAR 을 번다',
+    note: '올해 데뷔 첫 홈런을 친 어린 주전 포수. 타격보다 수비와 포지션 조정에서 WAR 이 나옵니다',
     stat: {
       g: 79,
       pa: 268, ab: 236, h: 58, double: 9, triple: 0, hr: 3,
@@ -197,7 +204,7 @@ export const BATTERS: Batter[] = [
     pos: '2B',
     bats: 'R',
     age: 30,
-    note: '하위 타순 2루수. 번트와 진루타가 많아 타석 대비 타수가 적다',
+    note: '하위 타순 2루수. 번트와 진루타가 많아 타석 대비 타수가 적습니다',
     stat: {
       g: 94,
       pa: 352, ab: 312, h: 82, double: 13, triple: 2, hr: 4,
@@ -214,7 +221,7 @@ export const BATTERS: Batter[] = [
     pos: 'SS',
     bats: 'R',
     age: 31,
-    note: '수비로 자리를 지키는 유격수. 타격 지표는 평범해도 포지션 조정이 크게 붙는다',
+    note: '수비로 자리를 지키는 유격수. 타격 지표는 평범해도 포지션 조정이 크게 붙습니다',
     stat: {
       g: 98,
       pa: 399, ab: 356, h: 92, double: 14, triple: 3, hr: 7,
@@ -231,7 +238,7 @@ export const BATTERS: Batter[] = [
     pos: 'C',
     bats: 'R',
     age: 37,
-    note: '허인서에게 주전을 넘긴 베테랑 포수. 표본이 줄어 지표가 크게 흔들린다',
+    note: '허인서에게 주전을 넘긴 베테랑 포수. 표본이 줄어 지표가 크게 흔들립니다',
     stat: {
       g: 66,
       pa: 210, ab: 178, h: 44, double: 8, triple: 0, hr: 2,
@@ -248,7 +255,7 @@ export const BATTERS: Batter[] = [
     pos: 'RF',
     bats: 'R',
     age: 29,
-    note: '좌투수 상대로 먼저 나오는 대타 자원. 플래툰 스플릿이 뚜렷한 케이스',
+    note: '좌투수 상대로 먼저 나오는 대타 자원. 플래툰 스플릿이 뚜렷합니다',
     stat: {
       g: 72,
       pa: 238, ab: 214, h: 57, double: 11, triple: 0, hr: 6,
@@ -291,7 +298,7 @@ export const PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'L',
     age: 39,
-    note: '구속이 아니라 제구와 완급으로 던진다. 볼넷이 극단적으로 적다',
+    note: '구속이 아니라 제구와 완급으로 던집니다. 볼넷이 극단적으로 적습니다',
     pitches: [
       { name: '체인지업', usage: 0.31, velo: 132 },
       { name: '포심', usage: 0.29, velo: 145 },
@@ -311,7 +318,7 @@ export const PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'R',
     age: 23,
-    note: '5월 어깨 수술 이후 등판 기록이 없다. 7경기 표본이라 어떤 지표도 판단 근거가 되지 못한다',
+    note: '5월 어깨 수술 이후 등판 기록이 없습니다. 7경기 표본이라 어떤 지표도 판단 근거가 되지 못합니다',
     pitches: [
       { name: '포심', usage: 0.51, velo: 155 },
       { name: '커브', usage: 0.22, velo: 128 },
@@ -331,7 +338,7 @@ export const PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'R',
     age: 30,
-    note: 'FA 첫 해에 4월 토미 존 수술을 받았다. 4경기뿐이라 지표를 읽는 것 자체가 무의미하다',
+    note: 'FA 첫 해에 4월 토미 존 수술을 받았습니다. 4경기뿐이라 지표를 읽는 것 자체가 무의미합니다',
     pitches: [
       { name: '포심', usage: 0.43, velo: 147 },
       { name: '체인지업', usage: 0.24, velo: 133 },
@@ -351,7 +358,7 @@ export const PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'L',
     age: 31,
-    note: '7월에 합류한 대체 외국인. 표본이 짧아 로테이션 동료와 같은 잣대로 보면 안 된다',
+    note: '7월에 합류한 대체 외국인. 표본이 짧아 로테이션 동료와 같은 잣대로 보면 안 됩니다',
     pitches: [
       { name: '포심', usage: 0.38, velo: 145 },
       { name: '슬라이더', usage: 0.26, velo: 134 },
@@ -371,7 +378,7 @@ export const PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'R',
     age: 31,
-    note: '이닝을 길게 끌고 가는 우완. 삼진과 이닝을 같이 가져가 WAR 이 가장 높게 잡힌다',
+    note: '이닝을 길게 끌고 가는 우완. 삼진과 이닝을 같이 가져가 WAR 이 가장 높게 잡힙니다',
     pitches: [
       { name: '포심', usage: 0.45, velo: 150 },
       { name: '슬라이더', usage: 0.27, velo: 137 },
@@ -393,7 +400,7 @@ export const PITCHERS: Pitcher[] = [
     role: '마무리',
     throws: 'R',
     age: 22,
-    note: '시즌 중 2군에 다녀와 9회 자리가 오래 비었다. 표본이 작아 어떤 지표든 크게 흔들린다',
+    note: '시즌 중 2군에 다녀와 9회 자리가 오래 비었습니다. 표본이 작아 어떤 지표든 크게 흔들립니다',
     pitches: [
       { name: '포심', usage: 0.58, velo: 157 },
       { name: '슬라이더', usage: 0.34, velo: 142 },
@@ -414,7 +421,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 25,
-    note: '중간 계투. 포심 구사율이 절반을 넘어 변화구 의존도가 낮다',
+    note: '중간 계투. 포심 구사율이 절반을 넘어 변화구 의존도가 낮습니다',
     pitches: [
       { name: '포심', usage: 0.52, velo: 146 },
       { name: '슬라이더', usage: 0.31, velo: 134 },
@@ -433,7 +440,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 32,
-    note: '싱커로 땅볼을 받아내는 베테랑. 주자 있고 병살이 필요한 자리에 올라온다',
+    note: '싱커로 땅볼을 받아내는 베테랑. 주자 있고 병살이 필요한 자리에 올라옵니다',
     pitches: [
       { name: '싱커', usage: 0.41, velo: 141 },
       { name: '슬라이더', usage: 0.33, velo: 128 },
@@ -453,7 +460,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 30,
-    note: '커브 비중이 높은 우완. 피홈런이 이닝 대비 많아 실점이 한 번에 몰린다',
+    note: '커브 비중이 높은 우완. 피홈런이 이닝 대비 많아 실점이 한 번에 몰립니다',
     pitches: [
       { name: '포심', usage: 0.49, velo: 145 },
       { name: '슬라이더', usage: 0.29, velo: 133 },
@@ -472,7 +479,7 @@ export const PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'L',
     age: 24,
-    note: '아시아쿼터로 온 좌완 선발. 로테이션을 한 바퀴 도는 동안 기복이 컸다',
+    note: '아시아쿼터로 온 좌완 선발. 로테이션을 한 바퀴 도는 동안 기복이 컸습니다',
     pitches: [
       { name: '포심', usage: 0.47, velo: 146 },
       { name: '슬라이더', usage: 0.24, velo: 135 },
@@ -492,7 +499,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 33,
-    note: '롱릴리프. 선발이 일찍 내려간 날 이닝을 먹는 자리라 실점이 쌓이기 쉽다',
+    note: '롱릴리프. 선발이 일찍 내려간 날 이닝을 먹는 자리라 실점이 쌓이기 쉽습니다',
     pitches: [
       { name: '포심', usage: 0.44, velo: 143 },
       { name: '슬라이더', usage: 0.27, velo: 131 },
@@ -512,7 +519,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 23,
-    note: '10이닝 표본. 볼넷 비율이 높아 먼저 제구가 잡혀야 보직이 올라간다',
+    note: '10이닝 표본. 볼넷 비율이 높아 먼저 제구가 잡혀야 보직이 올라갑니다',
     pitches: [
       { name: '포심', usage: 0.56, velo: 145 },
       { name: '커브', usage: 0.26, velo: 121 },
@@ -531,7 +538,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'L',
     age: 21,
-    note: '선발과 불펜을 오가는 어린 좌완. 등판 간격이 일정하지 않아 지표가 튄다',
+    note: '선발과 불펜을 오가는 어린 좌완. 등판 간격이 일정하지 않아 지표가 튑니다',
     pitches: [
       { name: '포심', usage: 0.47, velo: 144 },
       { name: '커브', usage: 0.22, velo: 118 },
@@ -551,7 +558,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'L',
     age: 26,
-    note: '좌타자를 잡으러 나오는 원포인트. 한 타자만 상대하고 내려가는 등판이 많다',
+    note: '좌타자를 잡으러 나오는 원포인트. 한 타자만 상대하고 내려가는 등판이 많습니다',
     pitches: [
       { name: '포심', usage: 0.43, velo: 142 },
       { name: '슬라이더', usage: 0.35, velo: 129 },
@@ -570,7 +577,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 27,
-    note: '포크로 헛스윙을 받아내는 유형. 낮은 공이 빠지면 그대로 볼넷이 된다',
+    note: '포크로 헛스윙을 받아냅니다. 낮은 공이 빠지면 그대로 볼넷이 됩니다',
     pitches: [
       { name: '포심', usage: 0.5, velo: 146 },
       { name: '포크', usage: 0.28, velo: 134 },
@@ -589,7 +596,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'L',
     age: 29,
-    note: '좌완 필승조. 이닝당 주자를 적게 내보내 연투 부담이 덜하다',
+    note: '좌완 필승조. 이닝당 주자를 적게 내보내 연투 부담이 덜합니다',
     pitches: [
       { name: '포심', usage: 0.45, velo: 144 },
       { name: '슬라이더', usage: 0.32, velo: 131 },
@@ -608,7 +615,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 26,
-    note: '추격조. 21이닝 표본이라 ERA 한 경기로 0.5 씩 움직인다',
+    note: '추격조. 21이닝 표본이라 ERA 한 경기로 0.5 씩 움직입니다',
     pitches: [
       { name: '포심', usage: 0.51, velo: 145 },
       { name: '슬라이더', usage: 0.3, velo: 132 },
@@ -627,7 +634,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 28,
-    note: '셋업. 볼넷을 거의 주지 않아 주자 있는 상황에 먼저 올라온다',
+    note: '셋업. 볼넷을 거의 주지 않아 주자 있는 상황에 먼저 올라옵니다',
     pitches: [
       { name: '포심', usage: 0.48, velo: 149 },
       { name: '슬라이더', usage: 0.33, velo: 137 },
@@ -646,7 +653,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 24,
-    note: '18이닝 표본. 삼진율은 볼 만한데 볼넷이 같이 늘어 아직 위쪽 보직이 아니다',
+    note: '18이닝 표본. 삼진율은 볼 만한데 볼넷이 같이 늘어 아직 위쪽 보직이 아닙니다',
     pitches: [
       { name: '포심', usage: 0.53, velo: 146 },
       { name: '커브', usage: 0.25, velo: 120 },
@@ -665,7 +672,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 22,
-    note: '8이닝 표본. 이 정도면 어떤 지표든 값을 읽는 것 자체가 무의미하다',
+    note: '8이닝 표본. 이 정도면 어떤 지표든 값을 읽는 것 자체가 무의미합니다',
     pitches: [
       { name: '포심', usage: 0.57, velo: 147 },
       { name: '슬라이더', usage: 0.27, velo: 134 },
@@ -684,7 +691,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 23,
-    note: '150 가까운 공을 던지지만 아직 15이닝. 구속과 성적은 별개라는 사례로 쓰인다',
+    note: '150 가까운 공을 던지지만 아직 15이닝. 구속과 성적은 별개라는 사례로 쓰입니다',
     pitches: [
       { name: '포심', usage: 0.52, velo: 148 },
       { name: '슬라이더', usage: 0.29, velo: 136 },
@@ -703,7 +710,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 25,
-    note: '싱커·슬라이더 조합의 땅볼 투수. 내야 수비에 성적이 크게 좌우된다',
+    note: '싱커·슬라이더 조합의 땅볼 투수. 내야 수비에 성적이 크게 좌우됩니다',
     pitches: [
       { name: '싱커', usage: 0.38, velo: 143 },
       { name: '슬라이더', usage: 0.32, velo: 130 },
@@ -722,7 +729,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 24,
-    note: '스팟 선발도 한 번 맡았다. 22이닝이라 선발 적성은 아직 판단할 표본이 아니다',
+    note: '스팟 선발도 한 번 맡았습니다. 22이닝이라 선발 적성은 아직 판단할 표본이 아닙니다',
     pitches: [
       { name: '포심', usage: 0.5, velo: 147 },
       { name: '슬라이더', usage: 0.28, velo: 135 },
@@ -741,7 +748,7 @@ export const PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'R',
     age: 31,
-    note: '선발 경험이 있는 스윙맨. 이닝은 먹어 주지만 삼진이 적어 실점 억제력이 낮다',
+    note: '선발 경험이 있는 스윙맨. 이닝은 먹어 주지만 삼진이 적어 실점 억제력이 낮습니다',
     pitches: [
       { name: '포심', usage: 0.42, velo: 144 },
       { name: '슬라이더', usage: 0.26, velo: 132 },
@@ -774,7 +781,7 @@ export const OPPONENT_PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'R',
     age: 34,
-    note: '구속보다 완급으로 던지는 유형. 뜬공 비율이 높아 잠실을 홈으로 쓰는 이점이 크다',
+    note: '구속보다 완급으로 던집니다. 뜬공 비율이 높아 잠실을 홈으로 쓰는 이점이 큽니다',
     pitches: [
       { name: '포심', usage: 0.42, velo: 143 },
       { name: '체인지업', usage: 0.26, velo: 128 },
@@ -794,7 +801,7 @@ export const OPPONENT_PITCHERS: Pitcher[] = [
     role: '선발',
     throws: 'L',
     age: 28,
-    note: '좌완 땅볼 투수. 좌타자 상대로 특히 강해 플래툰 교체를 부르는 유형',
+    note: '좌완 땅볼 투수. 좌타자 상대로 특히 강해 플래툰 교체를 부릅니다',
     pitches: [
       { name: '싱커', usage: 0.36, velo: 145 },
       { name: '슬라이더', usage: 0.31, velo: 133 },
@@ -814,7 +821,7 @@ export const OPPONENT_PITCHERS: Pitcher[] = [
     role: '마무리',
     throws: 'R',
     age: 29,
-    note: '9회 전담. 포심 구사율이 6할에 가까워 변화구 의존도가 낮다',
+    note: '9회 전담. 포심 구사율이 6할에 가까워 변화구 의존도가 낮습니다',
     pitches: [
       { name: '포심', usage: 0.59, velo: 151 },
       { name: '슬라이더', usage: 0.29, velo: 138 },
@@ -833,7 +840,7 @@ export const OPPONENT_PITCHERS: Pitcher[] = [
     role: '불펜',
     throws: 'L',
     age: 32,
-    note: '좌완 원포인트로도 쓰인다. 좌타자를 잡으러 올라오는 자리',
+    note: '좌완 원포인트로도 쓰입니다. 좌타자를 잡으러 올라오는 자리입니다',
     pitches: [
       { name: '포심', usage: 0.44, velo: 144 },
       { name: '커브', usage: 0.33, velo: 120 },
