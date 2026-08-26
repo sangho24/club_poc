@@ -25,6 +25,7 @@ import {
   TextStyle,
   View,
   ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
 
 import {
@@ -817,6 +818,20 @@ export function DetailSheet({
   const [sheetH, setSheetH] = useState(0);
 
   /**
+   * 시트의 높이 한계 - **창에서 직접 잰다.**
+   *
+   * 전에는 스타일에 `maxHeight: '92%'` 로 두었다. 백분율은 부모의 높이가 확정되어
+   * 있어야 풀리는데, Modal → 배경 → 시트로 이어지는 사슬 어디 한 곳이라도 높이를
+   * 내용에 맡기면 조용히 풀리지 않는다. 그러면 시트가 내용만큼 자라고 overflow 가
+   * 잘라 내서 **스크롤이 없는 잘린 화면**이 된다.
+   *
+   * 창 높이는 언제나 확정된 수다. 회전이나 창 크기 변경도 훅이 알아서 따라온다.
+   */
+  const { height: winH } = useWindowDimensions();
+  const maxH = Math.round(winH * 0.92);
+  const minH = Math.round(winH * 0.62);
+
+  /**
    * 시트의 세로 위치 하나가 전부를 만든다 - 0 이 완전히 열린 자리, sheetH 가 닫힌 자리.
    *
    * 손으로 끄는 것과 스프링으로 여닫는 것이 **같은 값**을 움직이므로, 끌던 손을 놓는
@@ -919,7 +934,11 @@ export function DetailSheet({
         </Animated.View>
 
         <Animated.View
-          style={[s.sheet, { transform: [{ translateY: y }] }]}
+          style={[
+            s.sheet,
+            { maxHeight: maxH, minHeight: minH },
+            { transform: [{ translateY: y }] },
+          ]}
           onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}
           {...pan.panHandlers}
         >
@@ -945,8 +964,13 @@ export function DetailSheet({
             </Pressable>
           </View>
 
+          {/* ⚠ `flex: 1` 이 아니라 `flexShrink: 1` 이다.
+              `flex: 1` 은 flexBasis 를 0 으로 만든다. 그러면 시트가 자기 내용 높이를
+              **0 으로 재고**, 높이가 minHeight 에 붙박여 maxHeight 까지 자라지 않는다.
+              flexShrink 만 두면 시트는 내용만큼 자라다가 maxHeight 에서 멈추고, 그
+              지점부터 이 ScrollView 가 줄어들며 스크롤을 넘겨받는다 */}
           <ScrollView
-            style={{ flex: 1 }}
+            style={{ flexShrink: 1 }}
             contentContainerStyle={{ padding: spacing.screenX, paddingBottom: spacing.xxl }}
             scrollEventThrottle={16}
             onScroll={(e) => {
@@ -1628,8 +1652,6 @@ const s = StyleSheet.create({
     backgroundColor: colors.bg,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '92%',
-    minHeight: '62%',
     overflow: 'hidden',
   },
   sheetHandle: {
