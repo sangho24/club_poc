@@ -57,7 +57,7 @@ import {
   Row,
   SectionTitle,
 } from '../components/common';
-import { GoodsShowcase, PlayerAvatar, TeamEmblem } from '../components/photos';
+import { GoodsShowcase, JerseyArt, PlayerAvatar, TeamEmblem } from '../components/photos';
 import {
   CATEGORIES,
   CardGate,
@@ -983,35 +983,29 @@ function MilestoneChart({ m, p }: { m: Milestone; p: MilestoneProgress }) {
 // ③ 유니폼
 // ═════════════════════════════════════════════════════════════
 
+/**
+ * 유니폼 카탈로그.
+ *
+ * ── 왜 카드 목록이 아니라 타일 격자인가 ─────────────────────
+ * 전에는 세로로 긴 카드 여섯 장이었다. 카드마다 사양(어센틱·홈 경기)·설명 두 줄·
+ * 가격·재고가 다 들어 있어 **한 화면에 한 벌 반**밖에 안 보였다. 그런데 유니폼을
+ * 고르는 일은 읽는 일이 아니라 **비교하는 일**이다. 홈과 원정과 얼트를 나란히 놓고
+ * 색을 견주는 것이 첫 단계인데, 세로 카드는 그 나란히를 못 만든다.
+ *
+ * 그래서 커머스의 기본형으로 돌아간다 - 두 칸 격자, 그림이 위, 글자는 그림 아래
+ * 최소한만. 한 화면에 네 벌이 들어오고 색이 곧바로 비교된다.
+ *
+ * 격자에 남기는 글자는 **사양 · 이름 · 가격** 셋뿐이다. 설명 문장과 사이즈 재고는
+ * 상세로 내렸다 - 고르기 전에는 필요 없고, 타일에 들어가면 그림을 밀어낸다.
+ */
 function UniformTab({ onOpen }: { onOpen: (u: Uniform) => void }) {
   return (
     <View style={{ gap: spacing.cardGap }}>
-      {UNIFORMS.map((u) => {
-        const out = u.soldOutSizes ?? [];
-        return (
-          <Card key={u.id} onPress={() => onOpen(u)}>
-            <CardHeading
-              label={`${u.kind} · ${u.wear}`}
-              title={u.name}
-              right={<Badge text={stockLabel(u.status)} tone={stockTone(u.status)} />}
-            />
-            <Text style={st.body} numberOfLines={2}>
-              {u.note}
-            </Text>
-            <Divider />
-            <View style={st.cardFoot}>
-              <Text style={st.price}>{u.price.toLocaleString()}원</Text>
-              <Text style={st.footMeta}>
-                {u.status === 'upcoming'
-                  ? (countdown(u.openAt ?? '', DEMO_NOW) ?? '곧 발매')
-                  : out.length > 0
-                    ? `${out.join('·')} 품절`
-                    : '전 사이즈 보유'}
-              </Text>
-            </View>
-          </Card>
-        );
-      })}
+      <View style={st.grid}>
+        {UNIFORMS.map((u) => (
+          <UniformTile key={u.id} u={u} onOpen={onOpen} />
+        ))}
+      </View>
 
       <ExternalButton
         label={`${OFFICIAL_SHOP_NAME}에서 전체 보기`}
@@ -1019,6 +1013,54 @@ function UniformTab({ onOpen }: { onOpen: (u: Uniform) => void }) {
         onPress={shop}
       />
     </View>
+  );
+}
+
+/**
+ * 유니폼 타일.
+ *
+ * 배지는 **판매 중이 아닐 때만** 붙는다(MerchTile 과 같은 규칙). 전부에 붙이면 그
+ * 줄이 상품보다 먼저 읽혀 카탈로그가 상태 목록이 된다.
+ */
+function UniformTile({ u, onOpen }: { u: Uniform; onOpen: (u: Uniform) => void }) {
+  const out = u.soldOutSizes ?? [];
+  const badge = u.status !== 'onsale' ? stockLabel(u.status) : null;
+  // 발매 전이면 남은 시간이, 판매 중이면 사이즈 사정이 팬이 다음에 물을 것이다
+  const meta =
+    u.status === 'upcoming'
+      ? (countdown(u.openAt ?? '', DEMO_NOW) ?? '곧 발매')
+      : out.length > 0
+        ? `${out.join('·')} 품절`
+        : '전 사이즈 보유';
+
+  return (
+    <Pressable
+      onPress={() => onOpen(u)}
+      style={({ pressed }) => [st.tileSlot, pressed && { opacity: 0.6 }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${u.name} ${u.price.toLocaleString()}원`}
+    >
+      {/* 그림 자리 - 타일 높이의 대부분을 여기에 준다. 커머스에서 글자가 그림보다
+          많아지는 순간 그 화면은 카탈로그가 아니라 목록이 된다 */}
+      <View style={st.uniStage}>
+        <JerseyArt colorway={u.colorway} height={116} />
+        {badge ? (
+          <View style={st.uniBadge}>
+            <Badge text={badge} tone={stockTone(u.status)} />
+          </View>
+        ) : null}
+      </View>
+      <Text style={st.uniKind} numberOfLines={1}>
+        {u.kind} · {u.wear}
+      </Text>
+      <Text style={st.uniName} numberOfLines={2}>
+        {u.name}
+      </Text>
+      <Text style={st.uniPrice}>{u.price.toLocaleString()}원</Text>
+      <Text style={st.uniMeta} numberOfLines={1}>
+        {meta}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1402,4 +1444,21 @@ const st = StyleSheet.create({
   tileTop: { flex: 1 },
   tileName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19 },
   tilePrice: { ...typography.micro, ...tabularFigures, color: colors.brandText },
+
+  // ── 유니폼 격자 ────────────────────────────────────────────
+  // 그림 자리. 흰 유니폼이 흰 카드에 묻히지 않게 한 단계 낮은 면을 깐다
+  uniStage: {
+    height: 132,
+    borderRadius: radius.tile,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: spacing.sm,
+  },
+  uniBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm },
+  uniKind: { ...typography.micro, fontWeight: '400', color: colors.mutedText },
+  uniName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19, marginTop: 2 },
+  uniPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 14, marginTop: 3 },
+  uniMeta: { ...typography.micro, fontWeight: '400', color: colors.mutedText, marginTop: 1 },
 });

@@ -28,8 +28,9 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, ClipPath, G, Path } from 'react-native-svg';
 
+import type { Colorway } from '../goods';
 import { BATTERS, OPPONENT_PITCHERS, PITCHERS } from '../roster';
 import { colors, palette, radius, spacing, typography } from '../theme';
 
@@ -158,41 +159,49 @@ export function stadiumPhoto(name: string): ImageSourcePropType | undefined {
 }
 
 // ── 선수 사진 ─────────────────────────────────────────────────
-// 키는 roster.ts 의 선수 id 다.
+// **파일을 넣는 것이 곧 배선이다.** assets/photo/player/ 를 통째로 읽어 파일 이름으로
+// 선수를 찾는다. 이름은 로스터의 선수 이름(`노시환.jpg`)이거나 선수 id(`cjh.jpg`)면 된다.
+// 사진을 올리고 이름만 맞추면 다음 번들부터 나온다 - 여기에 줄을 더할 일이 없다.
 //
-// **35명 중 3명뿐이고, 셋 다 한화 유니폼이다.** 커먼즈 전수를 훑은 결과이지 게으름이
-// 아니다 - 한화 선수를 자유 라이선스로 올리는 사람은 커먼즈에 사실상 한 명뿐이고
-// (User:Seohae1999, 대전 한화생명 볼파크에서 직접 찍어 CC BY-SA 로 올린다),
-// 나머지 32명은 국내 선수든 외국인 선수든 구단·언론사 보도사진밖에 없다.
+// 전에는 require 를 손으로 한 줄씩 나열했다. 정적 require 가 번들 타임에 해석되어
+// 템플릿 문자열로 경로를 만들 수 없기 때문이었는데, Metro 의 require.context 가
+// 정확히 그 구멍을 메운다(declarations.d.ts 주석 참조).
 //
-// 그래서 Record 가 아니라 Partial 이고, **폴백은 예외 처리가 아니라 기본 경로다.**
-// 다만 그 폴백도 이제 한화 유니폼이다 - JerseyAvatar 주석 참조.
-//
-// ⚠ **남의 유니폼은 여기에 올리지 않는다.** 폰세·와이스·플로리얼 사진이 파일로는
-//   남아 있지만 지도에서 뺐다. 앞의 둘은 2026 로스터에 없는 선수이고, 플로리얼은
-//   애초에 마이너리그(양키스) 시절 사진이었다. 구단 앱에서 남의 옷을 입은 얼굴은
-//   화질로 갚아지지 않는다 - 류현진 사진을 다저스에서 한화로 바꾼 것과 같은 이유다.
-//   require 가 없으면 번들에도 들어가지 않으므로 파일만 남는 값은 0 이다.
-//
-// aspect(가로/세로)를 함께 적는 이유는 아래 PlayerAvatar 주석 참조.
-interface PlayerPhoto {
-  source: ImageSourcePropType;
-  aspect: number;
-}
+// ⚠ **로스터에 없는 이름은 쓰지 않는다.** 손으로 지도를 관리하던 시절의 규칙 - "남의
+//   유니폼을 입은 얼굴은 올리지 않는다" - 을 이제 로스터가 대신 지킨다. 2026 로스터에서
+//   빠진 플로리얼(flo.jpg)은 파일이 남아 있어도 여기서 조용히 걸러진다. 지우려면
+//   로스터에서 빠지는 것으로 충분하고, 살리려면 파일 이름을 로스터 이름에 맞추면 된다.
+const PHOTO_FILES = require.context('../../assets/photo/player', false, /\.(jpg|jpeg|png|webp)$/);
 
-const PLAYER_PHOTOS: Partial<Record<string, PlayerPhoto>> = {
-  cjh: { source: require('../../assets/photo/player/cjh.jpg'), aspect: 500 / 560 }, // 최재훈
-  ryu: { source: require('../../assets/photo/player/ryu.jpg'), aspect: 500 / 556 }, // 류현진
-  mdj: { source: require('../../assets/photo/player/mdj.jpg'), aspect: 500 / 506 }, // 문동주
-};
-
-// ── 등번호 ────────────────────────────────────────────────────
-// 사진 없는 선수의 아바타에 새길 번호다. roster 를 그대로 읽는다 - 번호를 두 벌 두면
-// 트레이드나 번호 변경 때 화면이 로스터와 다른 말을 하게 된다(채은성 9 → 22 가 그랬다).
+// 파일 이름으로 선수를 찾는 열쇠, 그리고 사진 없는 선수의 아바타에 새길 등번호.
+// 로스터를 한 번만 훑어 둘 다 만든다 - 번호를 두 벌 두면 트레이드나 번호 변경 때
+// 화면이 로스터와 다른 말을 하게 된다(채은성 9 → 22 가 그랬다).
+const PLAYER_BY_KEY: Record<string, string> = {};
 const BACK_NUMBERS: Record<string, number> = {};
 for (const p of [...BATTERS, ...PITCHERS, ...OPPONENT_PITCHERS]) {
+  PLAYER_BY_KEY[p.name] = p.id;
+  PLAYER_BY_KEY[p.id] = p.id;
   BACK_NUMBERS[p.id] = p.back;
 }
+
+const PLAYER_PHOTOS: Partial<Record<string, ImageSourcePropType>> = {};
+for (const key of PHOTO_FILES.keys()) {
+  const base = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+  const id = PLAYER_BY_KEY[base];
+  if (id) PLAYER_PHOTOS[id] = PHOTO_FILES<ImageSourcePropType>(key);
+}
+
+/**
+ * 얼굴 자리 보정.
+ *
+ * 인물사진은 얼굴이 늘 위쪽에 있는데 cover 는 **가운데**를 남긴다. 원본 비율을 알면
+ * 정확히 계산할 수 있지만 그러면 사진마다 비율을 적어야 해서 "파일만 넣으면 된다"가
+ * 깨진다 - react-native-web 에는 resolveAssetSource 가 없어 번들 타임에 알 수도 없다.
+ *
+ * 대신 **상자보다 키가 큰 칸**에 cover 로 채우고 아래를 잘라 위를 남긴다. 비율을 몰라도
+ * 되고, 세로 사진이든 가로 사진이든 얼굴이 있는 위쪽이 살아남는다.
+ */
+const FACE_BIAS = 1.2;
 
 export function hasPlayerPhoto(id: string): boolean {
   return PLAYER_PHOTOS[id] !== undefined;
@@ -301,15 +310,116 @@ export function PlayerAvatar({
     );
   }
 
-  const portrait = photo.aspect <= 1;
-  const imageStyle = portrait
-    ? { width: size, height: size / photo.aspect }
-    : { width: size * photo.aspect, height: size };
-
   return (
     <View style={[s.avatar, box, s.avatarPhoto]}>
-      <Image source={photo.source} style={imageStyle} resizeMode="cover" />
+      <Image
+        source={photo}
+        style={{ width: size, height: size * FACE_BIAS }}
+        resizeMode="cover"
+      />
     </View>
+  );
+}
+
+// ── 유니폼 그림 ───────────────────────────────────────────────
+/**
+ * 유니폼 앞판.
+ *
+ * ── 왜 사진이 아니라 그림인가 ───────────────────────────────
+ * 옷을 고르는 화면인데 옷이 안 보였다. 그렇다고 아무 사진이나 주워 오면 출처가
+ * 불명확해지고(이 파일 머리의 라이선스 원칙), 구단 상품 촬영본은 PoC 에 없다.
+ *
+ * 유니폼은 **얼굴과 달리 지어내는 것이 아니다.** 원단 색과 트림은 구단 CI 가 이미
+ * 정해 둔 사실이라 그려도 거짓이 되지 않는다 - JerseyAvatar 가 등판을 그린 것과
+ * 같은 논리다. 그리고 옷을 고르는 자리에서 팬이 먼저 보는 것은 **색**이지 글자가
+ * 아니므로, 색과 트림만 정확하면 타일은 제 일을 한다.
+ *
+ * ⚠ 실서비스에서는 이 자리에 상품 촬영본이 들어간다. 그때는 colorway 대신 source 를
+ *   받게 바꾸면 되고, 타일 레이아웃은 그대로 쓴다.
+ */
+interface JerseyPaint {
+  /** 원단 */
+  body: string;
+  /** 칼라 · 소매 트림 */
+  trim: string;
+  /** 앞섶 선 - 원단 위에서 읽혀야 한다 */
+  placket: string;
+  /** 원단이 밝을 때만 외곽선을 준다. 흰 옷을 흰 타일에 두면 형태가 사라진다 */
+  edge?: string;
+  /** 핀스트라이프 (헤리티지) */
+  stripe?: string;
+}
+
+const COLORWAYS: Record<Colorway, JerseyPaint> = {
+  home: { body: '#FFFFFF', trim: colors.brand, placket: palette.navy[900], edge: palette.navy[200] },
+  // 원정은 회색이다. 네이비로 두면 얼트(오렌지)와 대비만 남고 '원정'이라는 사실이 사라진다
+  away: { body: palette.navy[300], trim: palette.navy[900], placket: '#FFFFFF' },
+  alt: { body: colors.brand, trim: palette.navy[900], placket: '#FFFFFF' },
+  // 1999 복각은 크림 원단에 네이비 핀스트라이프다
+  heritage: {
+    body: '#F3EADA',
+    trim: palette.navy[900],
+    placket: palette.navy[900],
+    edge: '#DCCDB4',
+    stripe: 'rgba(7,17,31,0.20)',
+  },
+  youth: { body: '#FFFFFF', trim: colors.brand, placket: palette.navy[900], edge: palette.navy[200] },
+};
+
+// 앞판 실루엣 - 목둘레에서 시작해 오른소매 · 밑단 · 왼소매를 돌아 닫는다.
+// 120 격자에 그려 두면 어느 크기로 놓든 같은 비율로 확대된다.
+const JERSEY_BODY =
+  'M46 20Q60 37 74 20L98 27Q106 30 108 40L112 54Q113 59 108 61L88 66L90 104' +
+  'Q90 108 86 108L34 108Q30 108 30 104L32 66L12 61Q7 59 8 54L12 40Q14 30 22 27Z';
+const JERSEY_COLLAR = 'M46 20Q60 37 74 20';
+
+export function JerseyArt({ colorway, height = 132 }: { colorway: Colorway; height?: number }) {
+  const c = COLORWAYS[colorway];
+
+  return (
+    <Svg width={height} height={height} viewBox="0 0 120 120">
+      <Path
+        d={JERSEY_BODY}
+        fill={c.body}
+        stroke={c.edge ?? 'none'}
+        strokeWidth={c.edge ? 1.5 : 0}
+        strokeLinejoin="round"
+      />
+      {/* 핀스트라이프는 옷 밖으로 나가면 안 된다 - 앞판을 클립 경로로 쓴다.
+          id 는 문서 전역이라 색 계열로 갈라 둔다 - 같은 화면에 둘이 뜨면 충돌한다 */}
+      {c.stripe ? (
+        <>
+          <ClipPath id={`jersey-${colorway}`}>
+            <Path d={JERSEY_BODY} />
+          </ClipPath>
+          <G clipPath={`url(#jersey-${colorway})`}>
+            {[38, 46, 54, 62, 70, 78].map((x) => (
+              <Path key={x} d={`M${x} 14V112`} stroke={c.stripe} strokeWidth={2} />
+            ))}
+          </G>
+        </>
+      ) : null}
+      {/* 칼라 - 목둘레를 따라 굵게 한 번 */}
+      <Path
+        d={JERSEY_COLLAR}
+        fill="none"
+        stroke={c.trim}
+        strokeWidth={7}
+        strokeLinecap="round"
+      />
+      {/* 소매 트림 - 커프스 자리에 짧게 */}
+      <Path d="M12 55L34 61" fill="none" stroke={c.trim} strokeWidth={5} strokeLinecap="round" />
+      <Path d="M108 55L86 61" fill="none" stroke={c.trim} strokeWidth={5} strokeLinecap="round" />
+      {/* 앞섶 - 목 아래 V 끝에서 밑단까지 */}
+      <Path
+        d="M60 34V104"
+        fill="none"
+        stroke={c.placket}
+        strokeWidth={2}
+        strokeLinecap="round"
+        opacity={0.55}
+      />
+    </Svg>
   );
 }
 
@@ -426,7 +536,7 @@ export function PlayerFormLoop({
 
   // 확보한 사진은 세로 인물사진이고 **얼굴은 늘 위쪽에 있다.** cover 로 채우면 세로 중앙이
   // 남아 얼굴이 잘려 나간다(PlayerAvatar 가 같은 이유로 위 기준 크롭을 쓴다).
-  // 그래서 폭을 채우고 높이는 원본 비율로 흐르게 둔 뒤 위를 기준으로 자른다.
+  // 그래서 상자보다 키가 큰 칸에 채우고 아래를 잘라 위를 남긴다 - FACE_BIAS 주석 참조.
   //
   // 그리고 **확대는 쓰지 않는다.** 이미지가 상자보다 훨씬 크므로 중심 기준 scale 은
   // 조금만 줘도 보이는 구간이 크게 밀려 얼굴이 다시 사라진다. 세로 이동만으로 충분하다.
@@ -440,9 +550,9 @@ export function PlayerFormLoop({
       style={[fl.wrap, { height }]}
     >
       <Animated.Image
-        source={photo.source}
+        source={photo}
         resizeMode="cover"
-        style={[fl.img, { aspectRatio: photo.aspect }, { transform: [{ translateY }] }]}
+        style={[fl.img, { height: height * FACE_BIAS }, { transform: [{ translateY }] }]}
       />
       {/* 위쪽을 덮어야 라벨이 사진 밝기와 무관하게 읽힌다 */}
       <View style={fl.scrim} />
@@ -457,7 +567,7 @@ export function PlayerFormLoop({
 
 const fl = StyleSheet.create({
   wrap: { borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.raised },
-  // 높이는 aspectRatio 가 정한다. 상자보다 길어진 만큼 아래가 잘리고 얼굴이 남는다
+  // 높이는 FACE_BIAS 가 정한다. 상자보다 길어진 만큼 아래가 잘리고 얼굴이 남는다
   img: { width: '100%' },
   // 위쪽 라벨이 사진 밝기와 무관하게 읽히도록 전체를 살짝 덮는다
   scrim: {

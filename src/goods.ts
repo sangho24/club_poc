@@ -552,10 +552,25 @@ export function milestoneProgress(m: Milestone, nowMs: number): MilestoneProgres
 // 다만 유니폼에는 앱이 미리 말해 줄 것이 하나 있다 - **내 사이즈가 남아 있는지**다.
 // 공식몰에 가서야 품절을 알게 되면 그건 앱이 팬을 헛걸음시킨 것이다.
 
+/**
+ * 유니폼 색 계열.
+ *
+ * 그림(JerseyArt)이 아니라 **자료**가 이 값을 갖는다. 색은 상품의 사실이지 화면의
+ * 사정이 아니고, 실서비스에서 촬영본으로 바뀌어도 "어느 색 옷인가"는 그대로 남는다.
+ */
+export type Colorway = 'home' | 'away' | 'alt' | 'heritage' | 'youth';
+
 export interface Uniform {
   id: string;
   name: string;
   kind: '어센틱' | '레플리카' | '헤리티지' | '유스';
+  /**
+   * 어느 색 옷인가.
+   *
+   * 옷을 고르는 화면에서 팬이 **가장 먼저 보는 것은 색**이다. kind(어센틱/레플리카)는
+   * 사양이지 생김새가 아니라서 홈과 원정을 가르지 못한다 - 색은 따로 들고 있어야 한다.
+   */
+  colorway: Colorway;
   /** 언제 입는 옷인가 - 유니폼을 고르는 진짜 기준이다 */
   wear: string;
   price: number;
@@ -576,6 +591,7 @@ export const UNIFORMS: Uniform[] = [
     id: 'u-home-auth',
     name: '2026 홈 어센틱',
     kind: '어센틱',
+    colorway: 'home',
     wear: '홈 경기 · 선수단 착용 사양',
     price: 189000,
     sizes: ['95', '100', '105', '110', '115'],
@@ -587,6 +603,7 @@ export const UNIFORMS: Uniform[] = [
     id: 'u-home-rep',
     name: '2026 홈 레플리카',
     kind: '레플리카',
+    colorway: 'home',
     wear: '홈 경기 · 응원용',
     price: 99000,
     sizes: ['S', 'M', 'L', 'XL', '2XL'],
@@ -598,6 +615,7 @@ export const UNIFORMS: Uniform[] = [
     id: 'u-away-auth',
     name: '2026 원정 어센틱',
     kind: '어센틱',
+    colorway: 'away',
     wear: '원정 경기',
     price: 189000,
     sizes: ['95', '100', '105', '110', '115'],
@@ -610,6 +628,7 @@ export const UNIFORMS: Uniform[] = [
     id: 'u-alt',
     name: '2026 얼트 레플리카 (오렌지)',
     kind: '레플리카',
+    colorway: 'alt',
     wear: '금요일 홈 경기',
     price: 105000,
     sizes: ['S', 'M', 'L', 'XL', '2XL'],
@@ -622,6 +641,7 @@ export const UNIFORMS: Uniform[] = [
     id: 'u-heritage-1999',
     name: '1999 우승 헤리티지 레플리카',
     kind: '헤리티지',
+    colorway: 'heritage',
     wear: '8월 15일 홈 경기 선수단 착용',
     price: 89000,
     sizes: ['S', 'M', 'L', 'XL', '2XL'],
@@ -633,6 +653,7 @@ export const UNIFORMS: Uniform[] = [
     id: 'u-youth',
     name: '2026 유스 레플리카',
     kind: '유스',
+    colorway: 'youth',
     wear: '홈 경기 · 어린이용',
     price: 59000,
     sizes: ['130', '140', '150', '160'],
