@@ -43,9 +43,10 @@ import {
 import type { Band } from '../components/common';
 import { PlayerAvatar, PlayerFormLoop } from '../components/photos';
 import {
-  BATTER_METRIC_MAX,
-  BATTER_METRIC_MIN,
   DEFAULT_BATTER_METRICS,
+  DEFAULT_PITCHER_METRICS,
+  METRIC_MAX,
+  METRIC_MIN,
   UserProfile,
 } from '../profile';
 import { analyzeBatter } from '../playerAnalysis';
@@ -62,7 +63,7 @@ import {
   PREV_PITCHER,
   Pitcher,
 } from '../roster';
-import type { BatterStatLine } from '../sabermetrics';
+import type { BatterStatLine, PitcherStatLine } from '../sabermetrics';
 import {
   LEAGUE,
   avgOf,
@@ -178,16 +179,16 @@ const ROLE_FILTERS: RoleFilter[] = ['전체', '선발', '불펜', '마무리'];
  * 신뢰도 점, 게이지 눈금이 전부 따라온다 - 여기 없는 키를 넣으면 설명도 눈금도 없는
  * 맹탕 타일이 뜬다(그래서 profile.normalizeBatterMetrics 가 저장값도 한 번 거른다).
  */
-interface MetricOpt {
+interface MetricOpt<T> {
   key: string;
   label: string;
-  value: (b: BatterStatLine) => number;
-  format: (b: BatterStatLine) => string;
+  value: (x: T) => number;
+  format: (x: T) => string;
 }
 
 const pctText = (v: number) => `${(v * 100).toFixed(1)}%`;
 
-const BATTER_METRICS: MetricOpt[] = [
+const BATTER_METRICS: MetricOpt<BatterStatLine>[] = [
   {
     key: 'wrcPlus',
     label: 'wRC+',
@@ -208,12 +209,50 @@ const BATTER_METRICS: MetricOpt[] = [
   { key: 'walkRate', label: '볼넷율', value: walkRateOf, format: (b) => pctText(walkRateOf(b)) },
 ];
 
-/** 저장된 키 목록을 그릴 수 있는 지표로 - 모르는 키는 조용히 버린다 */
-function metricsOf(keys: string[]): MetricOpt[] {
-  const picked = keys
-    .map((k) => BATTER_METRICS.find((m) => m.key === k))
-    .filter((m): m is MetricOpt => !!m);
-  return picked.length > 0 ? picked : metricsOf(DEFAULT_BATTER_METRICS);
+/**
+ * 투수 쪽 목록.
+ *
+ * 타자와 한 목록으로 합치지 않는다. 지표가 다르기도 하지만 무엇보다 **표본의 단위가
+ * 다르다** - 타자는 타석, 투수는 상대타자로 세고 규정선도 따로다(QUAL_PA vs QUAL_BF).
+ *
+ * ERA·WHIP·피BABIP 는 STABILIZATION_PA 에 값이 없다. 일부러 비워 둔 것이다 - 셋 다
+ * '몇 타자면 자리를 잡는다'고 말할 수 있는 지표가 아니라서, readableAt() 이 규정선으로
+ * 되돌린다. 즉 이 셋은 '규정이닝만큼 던졌나'로 판정된다.
+ */
+const PITCHER_METRICS: MetricOpt<PitcherStatLine>[] = [
+  { key: 'era', label: 'ERA', value: eraOf, format: (p) => eraOf(p).toFixed(2) },
+  { key: 'fip', label: 'FIP', value: fipOf, format: (p) => fipOf(p).toFixed(2) },
+  { key: 'whip', label: 'WHIP', value: whipOf, format: (p) => whipOf(p).toFixed(2) },
+  {
+    key: 'war',
+    label: 'WAR',
+    value: (p) => pitcherWarOf(p, PARK),
+    format: (p) => pitcherWarOf(p, PARK).toFixed(1),
+  },
+  { key: 'kRate', label: '삼진율', value: kRateOf, format: (p) => pctText(kRateOf(p)) },
+  { key: 'bbRate', label: '볼넷율', value: bbRateOf, format: (p) => pctText(bbRateOf(p)) },
+  {
+    key: 'babipAllowed',
+    label: '피BABIP',
+    value: babipAllowedOf,
+    format: (p) => babipAllowedOf(p).toFixed(3),
+  },
+  { key: 'gbRate', label: '땅볼 비율', value: (p) => p.gbRate, format: (p) => pctText(p.gbRate) },
+];
+
+/**
+ * 저장된 키 목록을 그릴 수 있는 지표로 - 모르는 키는 조용히 버린다.
+ *
+ * 기본값마저 목록에 없으면(카탈로그를 갈아엎은 판) 앞의 셋으로 물러선다. 재귀로 두면
+ * 그 상황에서 스택이 터지는데, 화면이 안 뜨는 것보다는 다른 지표라도 뜨는 편이 낫다.
+ */
+function metricsOf<T>(keys: string[], catalog: MetricOpt<T>[], fallback: string[]): MetricOpt<T>[] {
+  const pick = (ks: string[]) =>
+    ks.map((k) => catalog.find((m) => m.key === k)).filter((m): m is MetricOpt<T> => !!m);
+  const picked = pick(keys);
+  if (picked.length > 0) return picked;
+  const base = pick(fallback);
+  return base.length > 0 ? base : catalog.slice(0, 3);
 }
 
 /** 목록의 한 줄에 들어가는 것 - 시트를 열지 않고도 훑을 수 있어야 한다 */
@@ -233,10 +272,12 @@ interface RowData {
 export function PlayersScreen({
   profile,
   onBatterMetrics,
+  onPitcherMetrics,
 }: {
   profile: UserProfile;
   /** '지표 편집'의 결과. App 이 받아 저장소까지 보낸다 */
   onBatterMetrics: (keys: string[]) => void;
+  onPitcherMetrics: (keys: string[]) => void;
 }) {
   const [tab, setTab] = useState<Tab>('batter');
   /** 지표 편집 시트가 열려 있는가 */
@@ -248,7 +289,8 @@ export function PlayersScreen({
   const [openId, setOpenId] = useState<string | null>(null);
   const [glossaryKey, setGlossaryKey] = useState<string | null>(null);
 
-  const metrics = metricsOf(profile.batterMetrics);
+  const metrics = metricsOf(profile.batterMetrics, BATTER_METRICS, DEFAULT_BATTER_METRICS);
+  const pMetrics = metricsOf(profile.pitcherMetrics, PITCHER_METRICS, DEFAULT_PITCHER_METRICS);
 
   const openBatter = BATTERS.find((b) => b.id === openId);
   const openPitcher = PITCHERS.find((p) => p.id === openId);
@@ -317,7 +359,10 @@ export function PlayersScreen({
               { key: 'record' as const, label: '기록' },
             ]}
             value={tab}
-            onChange={setTab}
+            onChange={(t) => {
+              setTab(t);
+              setEditing(false);
+            }}
           />
         </View>
 
@@ -330,23 +375,24 @@ export function PlayersScreen({
                   명수는 목록을 보면 알 수 있는 값이라 이 자리에 있을 이유가 약했다.
                   반면 아래 카드에 뜨는 세 지표는 **바꿀 수 있다는 사실 자체가**
                   화면 어디에도 없었다. 카드 안에 편집 버튼을 넣으면 펼쳐 둔 한 명의
-                  설정처럼 보이므로, 목록 전체를 지배하는 머리글에 둔다 */}
+                  설정처럼 보이므로, 목록 전체를 지배하는 머리글에 둔다.
+
+                  타자·투수 양쪽에 둔다. 한쪽에만 있으면 탭을 옮겼을 때 기능이
+                  사라진 것처럼 보이고, 실제로 투수 카드도 고칠 것이 셋이다 */}
               <SectionTitle
                 title={`${tab === 'batter' ? '타자' : '투수'} ${sortLabel} 순`}
                 right={
-                  tab === 'batter' ? (
-                    <Pressable
-                      onPress={() => setEditing(true)}
-                      hitSlop={10}
-                      style={({ pressed }) => [st.editBtn, pressed && states.pressed]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`세부 지표 편집 · 현재 ${metrics.map((m) => m.label).join(', ')}`}
-                    >
-                      <Text style={st.editBtnText}>지표 편집</Text>
-                    </Pressable>
-                  ) : (
-                    <Text style={st.headNote}>{rows.length}명</Text>
-                  )
+                  <Pressable
+                    onPress={() => setEditing(true)}
+                    hitSlop={10}
+                    style={({ pressed }) => [st.editBtn, pressed && states.pressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`세부 지표 편집 · 현재 ${(tab === 'batter' ? metrics : pMetrics)
+                      .map((m) => m.label)
+                      .join(', ')}`}
+                  >
+                    <Text style={st.editBtnText}>지표 편집</Text>
+                  </Pressable>
                 }
               />
 
@@ -402,6 +448,7 @@ export function PlayersScreen({
                           <FeaturedDetail
                             row={r}
                             metrics={metrics}
+                            pitcherMetrics={pMetrics}
                             profile={profile}
                             glossaryKey={glossaryKey}
                             onGlossary={setGlossaryKey}
@@ -443,6 +490,7 @@ export function PlayersScreen({
         {openPitcher ? (
           <PitcherDetail
             pitcher={openPitcher}
+            metrics={pMetrics}
             profile={profile}
             glossaryKey={glossaryKey}
             onGlossary={setGlossaryKey}
@@ -450,12 +498,28 @@ export function PlayersScreen({
         ) : null}
       </DetailSheet>
 
-      <MetricPicker
-        visible={editing}
-        selected={profile.batterMetrics}
-        onChange={onBatterMetrics}
-        onClose={() => setEditing(false)}
-      />
+      {/* 두 시트를 동시에 매달지 않는다. 지금 보고 있는 탭의 것 하나만 존재한다 */}
+      {tab === 'pitcher' ? (
+        <MetricPicker
+          visible={editing}
+          title="투수 세부 지표"
+          catalog={PITCHER_METRICS}
+          defaults={DEFAULT_PITCHER_METRICS}
+          selected={profile.pitcherMetrics}
+          onChange={onPitcherMetrics}
+          onClose={() => setEditing(false)}
+        />
+      ) : (
+        <MetricPicker
+          visible={editing}
+          title="타자 세부 지표"
+          catalog={BATTER_METRICS}
+          defaults={DEFAULT_BATTER_METRICS}
+          selected={profile.batterMetrics}
+          onChange={onBatterMetrics}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </>
   );
 }
@@ -474,18 +538,25 @@ export function PlayersScreen({
  */
 function MetricPicker({
   visible,
+  title,
+  catalog,
+  defaults,
   selected,
   onChange,
   onClose,
 }: {
   visible: boolean;
+  title: string;
+  /** 고를 수 있는 것 전부. 값 계산은 필요 없으니 이름만 받는다 */
+  catalog: { key: string; label: string }[];
+  defaults: string[];
   selected: string[];
   onChange: (keys: string[]) => void;
   onClose: () => void;
 }) {
-  const picked = selected.filter((k) => BATTER_METRICS.some((m) => m.key === k));
-  const full = picked.length >= BATTER_METRIC_MAX;
-  const atMin = picked.length <= BATTER_METRIC_MIN;
+  const picked = selected.filter((k) => catalog.some((m) => m.key === k));
+  const full = picked.length >= METRIC_MAX;
+  const atMin = picked.length <= METRIC_MIN;
 
   const toggle = (key: string) => {
     if (picked.includes(key)) {
@@ -498,25 +569,24 @@ function MetricPicker({
   };
 
   const isDefault =
-    picked.length === DEFAULT_BATTER_METRICS.length &&
-    picked.every((k, i) => k === DEFAULT_BATTER_METRICS[i]);
+    picked.length === defaults.length && picked.every((k, i) => k === defaults[i]);
 
   return (
     <DetailSheet
       visible={visible}
-      title="세부 지표"
-      subtitle={`타자 카드에 띄울 지표 · ${picked.length} / ${BATTER_METRIC_MAX}`}
+      title={title}
+      subtitle={`카드에 띄울 지표 · ${picked.length} / ${METRIC_MAX}`}
       onClose={onClose}
       actions={
         isDefault ? null : (
-          <SecondaryButton label="기본값으로 되돌리기" onPress={() => onChange(DEFAULT_BATTER_METRICS)} />
+          <SecondaryButton label="기본값으로 되돌리기" onPress={() => onChange(defaults)} />
         )
       }
     >
       <View style={{ gap: spacing.cardGap }}>
         <NoticeCard
           tone={full ? 'warn' : 'muted'}
-          title={full ? '더 고르려면 하나를 빼세요' : `${BATTER_METRIC_MAX}개까지 고를 수 있습니다`}
+          title={full ? '더 고르려면 하나를 빼세요' : `${METRIC_MAX}개까지 고를 수 있습니다`}
         >
           <Text style={st.pickIntro}>
             {full
@@ -526,7 +596,7 @@ function MetricPicker({
         </NoticeCard>
 
         <GroupCard>
-          {BATTER_METRICS.map((m, i) => {
+          {catalog.map((m, i) => {
             const at = picked.indexOf(m.key);
             const on = at >= 0;
             // 더 고를 수 없어 지금은 누를 수 없는 줄. 없는 것처럼 지우지 않고 물러나게만 한다
@@ -535,7 +605,7 @@ function MetricPicker({
             return (
               <Row
                 key={m.key}
-                last={i === BATTER_METRICS.length - 1}
+                last={i === catalog.length - 1}
                 onPress={() => toggle(m.key)}
                 style={st.pickRow}
               >
@@ -1040,13 +1110,15 @@ function LeaderCard({
 function FeaturedDetail({
   row,
   metrics,
+  pitcherMetrics,
   profile,
   glossaryKey,
   onGlossary,
 }: {
   row: RowData;
-  /** '지표 편집'에서 고른 것. 타자에게만 쓴다 */
-  metrics: MetricOpt[];
+  /** '지표 편집'에서 고른 것 - 이 줄이 타자면 앞것, 투수면 뒷것을 쓴다 */
+  metrics: MetricOpt<BatterStatLine>[];
+  pitcherMetrics: MetricOpt<PitcherStatLine>[];
   profile: UserProfile;
   glossaryKey: string | null;
   onGlossary: (k: string | null) => void;
@@ -1064,6 +1136,8 @@ function FeaturedDetail({
         <PlayerFormLoop playerId={batter.id} label="타격 준비" height={170} />
         <MetricTiles
           stat={batter.stat}
+          sample={batter.stat.pa}
+          qual={QUAL_PA}
           metrics={metrics}
           glossaryKey={glossaryKey}
           onGlossary={onGlossary}
@@ -1077,16 +1151,21 @@ function FeaturedDetail({
 
   if (!pitcher) return null;
   const st1 = pitcher.stat;
-  const era = eraOf(st1);
-  const fip = fipOf(st1);
   return (
     <>
       <PlayerFormLoop playerId={pitcher.id} label="와인드업" height={170} />
-      <View style={st.metricRow}>
-        <StatTile label="ERA" value={era.toFixed(2)} />
-        <StatTile label="FIP" value={fip.toFixed(2)} tone="brand" />
-        <StatTile label="WHIP" value={whipOf(st1).toFixed(2)} />
-      </View>
+      {/* 전에는 StatTile 셋이 붙박이였다. 고를 수 없는 것은 물론이고 **누를 수도 없어**
+          ERA·FIP 가 무슨 값인지 물을 데가 없었다 - 타자 쪽에는 있던 것이 여기만 없었다 */}
+      <MetricTiles
+        stat={st1}
+        sample={st1.bf}
+        qual={QUAL_BF}
+        metrics={pitcherMetrics}
+        glossaryKey={glossaryKey}
+        onGlossary={onGlossary}
+      />
+      {glossary}
+      <MetricGauges stat={st1} metrics={pitcherMetrics} />
       <Label>구종</Label>
       <View style={{ gap: spacing.sm }}>
         {pitcher.pitches.map((pt, i) => (
@@ -1189,7 +1268,7 @@ function BatterDetail({
   onGlossary,
 }: {
   batter: Batter;
-  metrics: MetricOpt[];
+  metrics: MetricOpt<BatterStatLine>[];
   profile: UserProfile;
   glossaryKey: string | null;
   onGlossary: (k: string | null) => void;
@@ -1243,6 +1322,8 @@ function BatterDetail({
         <Label>심화 지표 · 누르면 설명이 열립니다</Label>
         <MetricTiles
           stat={b}
+          sample={b.pa}
+          qual={QUAL_PA}
           metrics={metrics}
           glossaryKey={glossaryKey}
           onGlossary={onGlossary}
@@ -1364,11 +1445,13 @@ function BatterDetail({
 
 function PitcherDetail({
   pitcher,
+  metrics,
   profile,
   glossaryKey,
   onGlossary,
 }: {
   pitcher: Pitcher;
+  metrics: MetricOpt<PitcherStatLine>[];
   profile: UserProfile;
   glossaryKey: string | null;
   onGlossary: (k: string | null) => void;
@@ -1420,36 +1503,17 @@ function PitcherDetail({
 
         <Divider />
 
+        {/* 목록에서 고른 지표가 여기에도 그대로 온다 - 타자 쪽과 같은 규칙 */}
         <Label>심화 지표 · 누르면 설명이 열립니다</Label>
-        <View style={st.metricRow}>
-          <MetricTile
-            label="FIP"
-            value={fip.toFixed(2)}
-            statKey="fip"
-            sample={p.bf}
-            qual={QUAL_BF}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'fip'}
-          />
-          <MetricTile
-            label="삼진율"
-            value={`${(kRateOf(p) * 100).toFixed(1)}%`}
-            statKey="kRate"
-            sample={p.bf}
-            qual={QUAL_BF}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'kRate'}
-          />
-          <MetricTile
-            label="볼넷율"
-            value={`${(bbRateOf(p) * 100).toFixed(1)}%`}
-            statKey="bbRate"
-            sample={p.bf}
-            qual={QUAL_BF}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'bbRate'}
-          />
-        </View>
+        <MetricTiles
+          stat={p}
+          sample={p.bf}
+          qual={QUAL_BF}
+          metrics={metrics}
+          glossaryKey={glossaryKey}
+          onGlossary={onGlossary}
+        />
+        <MetricGauges stat={p} metrics={metrics} />
       </Card>
 
       <GlossaryCard statKey={glossaryKey} profile={profile} onClose={() => onGlossary(null)} />
@@ -1844,14 +1908,20 @@ function CompareSection({ prev, rows }: { prev: unknown; rows: CompareRow[] }) {
  * 타일 폭이 70px 남짓이 되어 `0.360` 이 두 줄로 꺾이거나 `…` 로 잘린다 - 값이 안 읽히면
  * 지표를 넷 고른 의미가 없다.
  */
-function MetricTiles({
+function MetricTiles<T,>({
   stat,
+  sample,
+  qual,
   metrics,
   glossaryKey,
   onGlossary,
 }: {
-  stat: BatterStatLine;
-  metrics: MetricOpt[];
+  stat: T;
+  /** 표본 - 타자는 타석, 투수는 상대타자. 신뢰도 점이 이걸 본다 */
+  sample: number;
+  /** 표본을 견줄 규정선 */
+  qual: number;
+  metrics: MetricOpt<T>[];
   glossaryKey: string | null;
   onGlossary: (k: string | null) => void;
 }) {
@@ -1864,8 +1934,8 @@ function MetricTiles({
           label={m.label}
           value={m.format(stat)}
           statKey={m.key}
-          sample={stat.pa}
-          qual={QUAL_PA}
+          sample={sample}
+          qual={qual}
           onGlossary={onGlossary}
           active={glossaryKey === m.key}
           wide={wide}
@@ -1876,7 +1946,7 @@ function MetricTiles({
 }
 
 /** 같은 지표를 구간 게이지로 한 번 더 - 값 옆에 '어디쯤인가'가 붙는 이 화면의 규칙 */
-function MetricGauges({ stat, metrics }: { stat: BatterStatLine; metrics: MetricOpt[] }) {
+function MetricGauges<T,>({ stat, metrics }: { stat: T; metrics: MetricOpt<T>[] }) {
   return (
     <View style={{ gap: spacing.md }}>
       {metrics.map((m) => (
@@ -2058,7 +2128,7 @@ const TRUST_RANK = { low: 0, mid: 1, high: 2 } as const;
  * 입문 수준에서 쓴다. 신뢰도 경고를 지표 수만큼 늘어놓으면 그 카드가 화면에서 가장
  * 긴 덩어리가 되고, 정작 '무엇을 조심하라'는 말은 배경으로 밀린다.
  */
-function worstTrustItems(metrics: MetricOpt[], sample: number, qual: number) {
+function worstTrustItems<T,>(metrics: MetricOpt<T>[], sample: number, qual: number) {
   const items = metrics.map((m) => ({ metric: m.key, label: m.label }));
   if (items.length === 0) return items;
   return [

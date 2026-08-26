@@ -36,16 +36,20 @@ export interface UserProfile {
     ticketOpen: boolean; // 예매 오픈
   };
   /**
-   * 선수 탭 · 타자 카드에 띄울 세부 지표 (statGlossary 의 key).
+   * 선수 탭 카드에 띄울 세부 지표 (statGlossary 의 key).
    *
    * 지식수준과 다른 축이다. 수준은 '설명을 얼마나 깊게 할까'를 정하고, 이 목록은
    * **무엇을 볼까**를 정한다. 같은 '일반' 팬이라도 장타를 보는 사람과 출루를 보는
    * 사람이 다른 세 칸을 원한다.
+   *
+   * 타자와 투수를 한 목록으로 합치지 않는다. 지표가 아예 다르기도 하지만, 무엇보다
+   * **두 탭을 오갈 때마다 고른 것이 덮어써진다.**
    */
   batterMetrics: string[];
+  pitcherMetrics: string[];
 }
 
-/** 타자 카드가 고를 수 있는 지표 - 여기 없는 키는 저장값에서 걸러낸다 */
+/** 카드가 고를 수 있는 지표 - 여기 없는 키는 저장값에서 걸러낸다 */
 export const BATTER_METRIC_KEYS = [
   'wrcPlus',
   'woba',
@@ -57,17 +61,30 @@ export const BATTER_METRIC_KEYS = [
   'walkRate',
 ] as const;
 
+export const PITCHER_METRIC_KEYS = [
+  'era',
+  'fip',
+  'whip',
+  'war',
+  'kRate',
+  'bbRate',
+  'babipAllowed',
+  'gbRate',
+] as const;
+
 /** 타일이 한 줄에 셋, 넉넉잡아 두 줄까지. 다섯을 넘기면 훑는 화면이 아니게 된다 */
-export const BATTER_METRIC_MIN = 1;
-export const BATTER_METRIC_MAX = 4;
+export const METRIC_MIN = 1;
+export const METRIC_MAX = 4;
 
 export const DEFAULT_BATTER_METRICS = ['wrcPlus', 'woba', 'babip'];
+export const DEFAULT_PITCHER_METRICS = ['era', 'fip', 'whip'];
 
 export const DEFAULT_PROFILE: UserProfile = {
   level: 'fan',
   favoritePlayerId: 'nsh',
   alerts: { clutch: true, goodsDrop: true, ticketOpen: true },
   batterMetrics: DEFAULT_BATTER_METRICS,
+  pitcherMetrics: DEFAULT_PITCHER_METRICS,
 };
 
 /**
@@ -97,7 +114,8 @@ export function normalizeProfile(value: unknown): UserProfile {
       goodsDrop: flag(a.goodsDrop, DEFAULT_PROFILE.alerts.goodsDrop),
       ticketOpen: flag(a.ticketOpen, DEFAULT_PROFILE.alerts.ticketOpen),
     },
-    batterMetrics: normalizeBatterMetrics(v.batterMetrics),
+    batterMetrics: normalizeMetrics(v.batterMetrics, BATTER_METRIC_KEYS, DEFAULT_BATTER_METRICS),
+    pitcherMetrics: normalizeMetrics(v.pitcherMetrics, PITCHER_METRIC_KEYS, DEFAULT_PITCHER_METRICS),
   };
 }
 
@@ -107,17 +125,24 @@ export function normalizeProfile(value: unknown): UserProfile {
  * 저장값은 **지난 판이 남긴 것**이라 지금 없는 키가 섞여 있을 수 있다. 걸러내지 않으면
  * 해설도 눈금도 없는 빈 타일이 뜬다. 걸러낸 결과가 비면 기본값으로 되돌린다 -
  * 지표가 하나도 없는 카드는 사용자가 스스로 빠져나올 수 없는 상태다.
+ *
+ * 타자·투수가 같은 함수를 쓴다. 허용 목록만 갈아 끼우면 되는 일이라 두 벌로 두면
+ * 한쪽만 고쳐지는 날이 온다.
  */
-export function normalizeBatterMetrics(value: unknown): string[] {
-  if (!Array.isArray(value)) return DEFAULT_BATTER_METRICS;
-  const allowed = new Set<string>(BATTER_METRIC_KEYS);
+export function normalizeMetrics(
+  value: unknown,
+  allowedKeys: readonly string[],
+  fallback: string[],
+): string[] {
+  if (!Array.isArray(value)) return fallback;
+  const allowed = new Set<string>(allowedKeys);
   const seen = new Set<string>();
   const picked: string[] = [];
   for (const item of value) {
     if (typeof item !== 'string' || !allowed.has(item) || seen.has(item)) continue;
     seen.add(item);
     picked.push(item);
-    if (picked.length === BATTER_METRIC_MAX) break;
+    if (picked.length === METRIC_MAX) break;
   }
-  return picked.length >= BATTER_METRIC_MIN ? picked : DEFAULT_BATTER_METRICS;
+  return picked.length >= METRIC_MIN ? picked : fallback;
 }

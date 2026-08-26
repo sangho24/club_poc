@@ -79,6 +79,8 @@ export default function App() {
   // 고른 세 칸이 새로고침에 날아가면 그건 편집이 아니라 그때뿐인 필터다
   const setBatterMetrics = (batterMetrics: string[]) =>
     updateProfile({ ...profile, batterMetrics });
+  const setPitcherMetrics = (pitcherMetrics: string[]) =>
+    updateProfile({ ...profile, pitcherMetrics });
   const setFavorite = (id?: string) => updateProfile({ ...profile, favoritePlayerId: id });
   const setAlert = (key: keyof UserProfile['alerts'], value: boolean) =>
     updateProfile({ ...profile, alerts: { ...profile.alerts, [key]: value } });
@@ -167,7 +169,11 @@ export default function App() {
         ) : null}
         {tab === 'live' ? <LiveScreen profile={profile} /> : null}
         {tab === 'players' ? (
-          <PlayersScreen profile={profile} onBatterMetrics={setBatterMetrics} />
+          <PlayersScreen
+            profile={profile}
+            onBatterMetrics={setBatterMetrics}
+            onPitcherMetrics={setPitcherMetrics}
+          />
         ) : null}
         {tab === 'gameday' ? <GamedayScreen /> : null}
         {tab === 'store' ? <StoreScreen profile={profile} /> : null}
