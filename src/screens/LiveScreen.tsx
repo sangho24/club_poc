@@ -397,7 +397,7 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
           {/* 가장 큰 이유 하나는 항상 보인다. 나머지는 시트로 */}
           <Text style={st.topReason}>{pred.reasons[0]}</Text>
           <Pressable onPress={() => setShowWhy(true)} hitSlop={8}>
-            <Text style={st.whyBtn}>근거와 계산 보기 ›</Text>
+            <Text style={st.whyBtn}>AI 계산 근거 보기 ›</Text>
           </Pressable>
         </Card>
 
