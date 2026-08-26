@@ -7,13 +7,18 @@
 // 썸의 그림자도 제각각이었고, 이 앱의 다른 부품(알약 탭·칩·게이지)과 아무 관계가 없었다.
 // 폰 시연과 웹 시연을 나란히 놓고 보면 그 자리만 서로 다른 제품처럼 보인다.
 //
-// ── HeroUI 에서 그대로 가져온 값 ────────────────────────────
-// (heroui-native `src/styles/components/switch.css` 의 md 변형)
-//   - 트랙: 48 × 28 · 완전 라운드 · 안쪽 여백 2px
-//   - 썸  : 24 × 24 원 · 흰 면 + 아주 옅은 그림자
-//   - 이동: 48 - 24 - 2×2 = 20px
+// ── HeroUI 에서 가져온 값 ───────────────────────────────────
+// (heroui-native `src/styles/components/switch.css`)
+//   - 트랙: 48 × 24 · 완전 라운드 · 안쪽 여백 2px
+//   - 썸  : 20 × 20 원 · 흰 면 + 아주 옅은 그림자
+//   - 이동: 48 - 20 - 2×2 = 24px
 //   - 꺼짐 `--color-default`(muted 면) / 켜짐 `--color-accent`(브랜드)
 //   - 비활성: opacity 0.5
+//
+// ⚠ 높이만 md(28)에서 sm(24)으로 내렸다. **폭은 md 그대로 48 이다.**
+//   md 비례(48×28 ≈ 1.7:1)로는 행 안에서 스위치가 뚱뚱해 보였는데, sm 을 통째로 쓰면
+//   폭까지 40 으로 줄어 표적이 더 작아진다. 높이만 내려 2:1 로 길쭉하게 눕혔다 -
+//   썸이 가는 거리가 20 에서 24 로 늘어 켜고 끄는 것이 오히려 더 잘 보인다.
 //
 // ── 두 겹으로 그리는 이유 ───────────────────────────────────
 // 트랙 색을 하나의 값으로 보간하려면 `useNativeDriver: false` 여야 한다(색은 네이티브
@@ -29,8 +34,8 @@ import { Animated, Platform, Pressable, StyleSheet } from 'react-native';
 import { colors } from '../theme';
 
 const TRACK_W = 48;
-const TRACK_H = 28;
-const THUMB = 24;
+const TRACK_H = 24;
+const THUMB = 20;
 const PAD = 2;
 /** 썸이 가는 거리 - 트랙 안쪽 폭에서 썸을 뺀 만큼 */
 const TRAVEL = TRACK_W - THUMB - PAD * 2;
@@ -70,9 +75,10 @@ export function Switch({
     <Pressable
       onPress={() => !disabled && onValueChange(!value)}
       disabled={disabled}
-      // 트랙이 28px 이라 손가락 최소 표적(44)에 못 미친다. 눈에 보이는 것은 그대로 두고
-      // 표적만 넓힌다 - 트랙을 키우면 HeroUI 의 비례가 깨진다
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      // 트랙이 24px 이라 손가락 최소 표적(44)에 못 미친다. 눈에 보이는 것은 그대로 두고
+      // 표적만 넓힌다 - 트랙을 키우면 비례가 다시 뚱뚱해진다.
+      // 위아래 10 을 더해 24 + 20 = 44 로 정확히 맞춘다
+      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
       style={[s.track, disabled && s.disabled]}
       accessibilityRole="switch"
       accessibilityState={{ checked: value, disabled: !!disabled }}

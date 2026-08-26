@@ -1,6 +1,6 @@
 // 굿즈 - 네 갈래 (1차 리뷰 7번)
 //
-// ── 왜 하나의 목록이 아니라 네 개의 탭인가 ───────────────────
+// ── 왜 하나의 목록이 아니라 네 갈래인가 ──────────────────────
 // 처음에는 발매 소식 한 줄기였다. 사건마다 드롭 카드를 세워 시간순으로 늘어놓았는데,
 // 성격이 전혀 다른 네 가지가 같은 카드 모양으로 섞여 있었다. 팬이 굿즈 탭을 여는 이유는
 // 하나가 아니다 - 오늘 구장에서만 살 수 있는 것을 찾는 사람과, 응원 타월 하나 사려는
@@ -14,12 +14,28 @@
 //   기타 굿즈      보여주기까지  - 얹을 판단이 없으므로 바로 공식몰로
 //
 // 앞의 둘은 앱이 아니면 못 한다. 뒤의 둘은 공식몰이 더 잘한다. **깊이를 균등하게 맞추면
-// 앱이 잘하는 것과 못하는 것이 같은 무게로 보인다.** 탭 순서가 그 깊이 순이자 희소성 순이다.
+// 앱이 잘하는 것과 못하는 것이 같은 무게로 보인다.** 격자 순서가 그 깊이 순이자 희소성 순.
+//
+// ── 왜 나란한 탭이 아니라 2×2 격자인가 (2026-08-26) ──────────
+// 초판은 상단 서브탭 네 칸이었다. 두 가지가 어긋났다.
+//   ① **한 칸이 90px 언저리**라 "오프라인 한정"이 들어가지 않는다. 이름을 "오프라인"
+//      으로 줄여 넣었는데, 그러면 탭이 자기가 무엇을 담는 곳인지 말하지 못한다
+//   ② 나란한 탭은 **같은 것을 걸러 보는 자리**다. 여기 넷은 걸러 보는 종류가 아니라
+//      각자 다른 화면이다 - 자격 판정과 카탈로그를 같은 트랙 안에 두면 형태가 거짓말을 한다
+//
+// 지금은 격자 넷을 눌러 **들어간다.** 이름을 온전히 쓸 자리가 생기고, 아이콘이 갈래를
+// 한눈에 가르며, 무엇보다 타일마다 **지금 저기서 무슨 일이 벌어지는지**를 한 줄로 달 수
+// 있다 - 목차는 한 번 읽으면 그만이지만 현황판은 매번 볼 값어치가 있다.
 //
 // ⚠ 결제는 앱에서 하지 않는다 - 공식몰로 리다이렉트한다 (5번 티켓과 같은 원칙).
-import { useMemo, useState } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { SvgProps } from 'react-native-svg';
 
+import GridIcon from '../../assets/icons/goods-grid.svg';
+import JerseyIcon from '../../assets/icons/goods-jersey.svg';
+import PhotocardIcon from '../../assets/icons/goods-photocard.svg';
+import TrophyIcon from '../../assets/icons/goods-trophy.svg';
 import {
   AlertToggle,
   Badge,
@@ -35,7 +51,6 @@ import {
   Label,
   Row,
   SectionTitle,
-  TopTabs,
 } from '../components/common';
 import { GoodsShowcase, PlayerAvatar, TeamEmblem } from '../components/photos';
 import {
@@ -56,6 +71,7 @@ import {
   PhotoCard,
   Uniform,
   UNIFORMS,
+  categoryStatus,
   countdown,
   firstAvailableSize,
   formatDate,
@@ -86,8 +102,17 @@ type Sheet =
   | { kind: 'milestone'; id: string }
   | { kind: 'uniform'; id: string };
 
+/** 격자 타일의 픽토그램. TabBar 와 같은 규칙 - 24 격자 · 굵기 1.75 · 색은 밖에서 온다 */
+const SECTION_ICONS: Record<GoodsCategory, FC<SvgProps>> = {
+  venue: PhotocardIcon,
+  milestone: TrophyIcon,
+  uniform: JerseyIcon,
+  merch: GridIcon,
+};
+
 export function StoreScreen({ profile }: { profile: UserProfile }) {
-  const [tab, setTab] = useState<GoodsCategory>('venue');
+  /** null 이면 격자(굿즈 홈), 값이 있으면 그 갈래 안이다 */
+  const [section, setSection] = useState<GoodsCategory | null>(null);
   const [sheet, setSheet] = useState<Sheet | null>(null);
   /**
    * 구장 입장 인증.
@@ -111,9 +136,9 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
     setSheet({ kind: 'uniform', id: u.id });
   };
 
-  /** 알림 → 해당 갈래로 이동하고 그 항목을 펼친다. 탭만 바꾸면 다시 찾게 만든다 */
+  /** 알림 → 해당 갈래로 들어가고 그 항목을 펼친다. 갈래만 열면 다시 찾게 만든다 */
   const jump = (a: GoodsAlert) => {
-    setTab(a.category);
+    setSection(a.category);
     if (a.category === 'venue') setSheet({ kind: 'card', id: a.targetId });
     else if (a.category === 'milestone') setSheet({ kind: 'milestone', id: a.targetId });
     else if (a.category === 'uniform') {
@@ -122,10 +147,13 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
     }
   };
 
-  const here = CATEGORIES.find((c) => c.key === tab)!;
+  const here = section ? (CATEGORIES.find((c) => c.key === section) ?? null) : null;
 
   return (
     <>
+      {/* 나가는 길은 스크롤 밖에 - 목록을 끝까지 훑고도 같은 자리에 있어야 한다 */}
+      {here ? <SubNav label={here.label} onBack={() => setSection(null)} /> : null}
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -133,42 +161,41 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
           paddingBottom: spacing.scrollBottom,
         }}
       >
-        {profile.alerts.goodsDrop && notices.length > 0 ? (
+        {here ? (
+          <Text style={st.subBlurb}>{here.blurb}</Text>
+        ) : (
           <>
-            <SectionTitle title="놓치기 전에" />
-            <GroupCard>
-              {notices.map((a, i) => (
-                <Row
-                  key={a.id}
-                  last={i === notices.length - 1}
-                  style={st.alertRow}
-                  onPress={() => jump(a)}
-                >
-                  <View style={{ flex: 1, gap: 5 }}>
-                    <Badge text={a.badge} tone={a.tone} />
-                    <Text style={st.alertText}>{a.message}</Text>
-                    <Text style={st.alertNote}>{a.note}</Text>
-                  </View>
-                  <Text style={st.chevron}>›</Text>
-                </Row>
-              ))}
-            </GroupCard>
+            {/* 알림은 격자 위에 둔다. 갈래 안으로 들어가면 그 갈래 이야기만 남는다 */}
+            {profile.alerts.goodsDrop && notices.length > 0 ? (
+              <>
+                <SectionTitle title="놓치기 전에" />
+                <GroupCard>
+                  {notices.map((a, i) => (
+                    <Row
+                      key={a.id}
+                      last={i === notices.length - 1}
+                      style={st.alertRow}
+                      onPress={() => jump(a)}
+                    >
+                      <View style={{ flex: 1, gap: 5 }}>
+                        <Badge text={a.badge} tone={a.tone} />
+                        <Text style={st.alertText}>{a.message}</Text>
+                        <Text style={st.alertNote}>{a.note}</Text>
+                      </View>
+                      <Text style={st.chevron}>›</Text>
+                    </Row>
+                  ))}
+                </GroupCard>
+              </>
+            ) : null}
+
+            {/* 머리글을 달지 않는다. 여기는 굿즈 탭이고 타일마다 이름이 붙어 있으니
+                "굿즈"라고 한 번 더 쓰면 그 줄이 통째로 되풀이가 된다 */}
+            <SectionGrid onEnter={setSection} />
           </>
-        ) : null}
+        )}
 
-        <View style={st.tabWrap}>
-          <TopTabs
-            tabs={CATEGORIES.map((c) => ({ key: c.key, label: c.short }))}
-            value={tab}
-            onChange={setTab}
-          />
-        </View>
-
-        {/* 탭 알약이 이미 자리 이름을 말했다. 여기서 같은 이름을 머리글로 한 번 더 쓰면
-            그 줄이 통째로 되풀이가 된다 - 갈래마다 다른 것, 즉 규칙만 한 줄로 적는다 */}
-        <Text style={st.blurb}>{here.blurb}</Text>
-
-        {tab === 'venue' ? (
+        {section === 'venue' ? (
           <VenueTab
             checkedIn={checkedIn}
             bought={bought}
@@ -176,14 +203,14 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
             onOpen={(c) => setSheet({ kind: 'card', id: c.id })}
           />
         ) : null}
-        {tab === 'milestone' ? (
+        {section === 'milestone' ? (
           <MilestoneTab
             reserved={reserved}
             onOpen={(m) => setSheet({ kind: 'milestone', id: m.id })}
           />
         ) : null}
-        {tab === 'uniform' ? <UniformTab onOpen={openUniform} /> : null}
-        {tab === 'merch' ? <MerchTab /> : null}
+        {section === 'uniform' ? <UniformTab onOpen={openUniform} /> : null}
+        {section === 'merch' ? <MerchTab /> : null}
       </ScrollView>
 
       <CardSheet
@@ -217,6 +244,91 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
         onClose={() => setSheet(null)}
       />
     </>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// 굿즈 홈 - 2×2 격자
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * 갈래로 들어가는 격자.
+ *
+ * 한 줄에 둘씩 두 줄. 타일 안은 **왼쪽에 아이콘, 오른쪽에 글**이다 - 세로로 쌓으면
+ * 아이콘이 주인공이 되는데, 여기서 정작 눌러야 할 것은 이름과 그 아래 현황이다.
+ * 아이콘은 갈래를 한눈에 가르는 이름표지 그림이 아니다.
+ *
+ * 현황 줄은 색으로도 말한다. 오늘만 살 수 있는 것은 `live`, 곧 닫히는 것은 `warn` -
+ * 격자를 훑는 동안 **어디부터 들어가야 하는지**가 글자를 읽기 전에 정해진다.
+ */
+function SectionGrid({ onEnter }: { onEnter: (c: GoodsCategory) => void }) {
+  return (
+    <View style={st.sectionGrid}>
+      {CATEGORIES.map((c) => {
+        const Icon = SECTION_ICONS[c.key];
+        const status = categoryStatus(c.key, DEMO_NOW);
+        const tint = {
+          live: colors.live,
+          warn: colors.warn,
+          brand: colors.brandText,
+          muted: colors.mutedText,
+        }[status.tone];
+
+        return (
+          <Pressable
+            key={c.key}
+            onPress={() => onEnter(c.key)}
+            style={({ pressed }) => [st.sectionSlot, pressed && st.sectionPressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`${c.label} - ${status.text}`}
+          >
+            <View style={st.sectionTile}>
+              <View style={st.sectionIcon}>
+                <Icon width={22} height={22} color={colors.brandText} />
+              </View>
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={st.sectionName} numberOfLines={1}>
+                  {c.label}
+                </Text>
+                <Text style={[st.sectionStatus, { color: tint }]} numberOfLines={2}>
+                  {status.text}
+                </Text>
+              </View>
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * 갈래 안의 내비게이션 바.
+ *
+ * 격자에서 눌러 들어온 자리라 **돌아갈 길**이 반드시 보여야 한다. 하단 탭을 다시 눌러도
+ * 여기서 빠져나가지 못한다 - 같은 탭 안이기 때문이다.
+ *
+ * ⚠ **스크롤 밖에 둔다.** 안에 넣으면 기타 굿즈 열다섯 칸을 훑어 내려간 팬이 돌아가려고
+ * 다시 맨 위까지 올려야 한다. 나가는 길은 늘 같은 자리에 있어야 한다.
+ *
+ * 밑줄(헤어라인)을 긋지 않는다. 바로 위 브랜드 바가 이미 하나를 갖고 있어서, 여기에
+ * 하나를 더 그으면 헤더가 두 겹으로 보이고 크롬이 어디서 끝나는지가 흐려진다.
+ */
+function SubNav({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <View style={st.navBar}>
+      <Pressable
+        onPress={onBack}
+        style={({ pressed }) => [st.backBtn, pressed && st.sectionPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="굿즈 전체로 돌아가기"
+      >
+        <Text style={st.backChevron}>‹</Text>
+      </Pressable>
+      <Text style={st.navTitle} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -1084,14 +1196,66 @@ const st = StyleSheet.create({
   alertNote: typography.caption,
   chevron: { fontSize: 18, color: colors.mutedText },
 
-  tabWrap: { marginTop: spacing.lg },
-  blurb: {
+  // ── 굿즈 홈 격자 ───────────────────────────────────────────
+  sectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.cardGap,
+    // 머리글이 없으므로 그 머리글이 만들던 간격을 여기서 낸다
+    marginTop: spacing.sectionTop,
+  },
+  // 두 칸 고정. 늘어나게 두면 홀수로 남은 타일만 폭이 두 배가 된다
+  sectionSlot: { flexBasis: '48%', maxWidth: '48%' },
+  sectionPressed: { opacity: 0.6 },
+  sectionTile: {
+    flexDirection: 'row',
+    // 아이콘(34)과 두 줄 글의 높이가 엇비슷하다. 위로 붙이면 타일 아래가 통째로 빈다
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 84,
+    padding: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+  },
+  // 아이콘은 이름표다. 틴트 면에 앉혀 두면 갈래마다 같은 자리에서 같은 크기로 읽힌다
+  // ⚠ 상자를 더 키우면 이름 쓸 폭이 줄어 "오프라인 한정"이 말줄임으로 잘린다
+  sectionIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.tile,
+    backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionName: { ...typography.bodyStrong, fontSize: 14, letterSpacing: -0.3 },
+  sectionStatus: { ...typography.micro, fontWeight: '600', lineHeight: 15 },
+
+  // ── 갈래 안의 내비게이션 바 ────────────────────────────────
+  navBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: spacing.touchMin,
+    // 44 짜리 터치 상자 안에서 글리프가 가운데 서므로, 상자를 4 에서 시작해야
+    // 꺾쇠의 왼쪽 끝이 아래 본문의 좌측 정렬선(screenX = 18)과 맞는다
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  // 손가락 최소 터치(44)를 정사각으로 확보한다. 글리프 하나만 두면 누를 데가 없다
+  backBtn: {
+    width: spacing.touchMin,
+    height: spacing.touchMin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backChevron: { fontSize: 26, lineHeight: 30, color: colors.brandText, fontWeight: '600' },
+  navTitle: { ...typography.cardTitle, flex: 1 },
+  subBlurb: {
     ...typography.caption,
     lineHeight: 19,
     paddingHorizontal: spacing.xs,
-    marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
+
   countHint: typography.micro,
 
   body: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
@@ -1230,7 +1394,8 @@ const st = StyleSheet.create({
   tileSlot: { flexBasis: '48%', maxWidth: '48%' },
   tile: {
     flex: 1,
-    minHeight: 104,
+    // 배지가 없는 타일이 대부분이라, 104 로 두면 이름 위가 통째로 빈 칸이 된다
+    minHeight: 84,
     backgroundColor: colors.card,
     borderRadius: radius.tile,
     padding: spacing.lg,

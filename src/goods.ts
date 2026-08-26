@@ -30,46 +30,35 @@ export const OFFICIAL_SHOP_NAME = '이글스 공식몰';
 export type GoodsCategory = 'venue' | 'milestone' | 'uniform' | 'merch';
 
 /**
- * 탭 순서는 **희소성 순**이다.
+ * 격자 순서는 **희소성 순**이다 - 왼쪽 위에서 오른쪽 아래로 읽는 순서.
  *
  * 오프라인 한정은 오늘 못 사면 영영 못 산다. 특별 MD 는 예약 창이 닫히면 끝난다.
- * 유니폼·기타는 내일도 있다. 급한 것이 앞에 있어야 탭 순서가 우선순위를 대신 말한다.
+ * 유니폼·기타는 내일도 있다. 급한 것이 먼저 읽혀야 순서가 우선순위를 대신 말한다.
  */
 export const CATEGORIES: {
   key: GoodsCategory;
   label: string;
-  /**
-   * 서브탭에 들어가는 짧은 이름.
-   *
-   * 네 칸이 화면 폭을 넷으로 나눠 가지므로 한 칸은 90px 언저리다. "오프라인 한정"은
-   * 거기서 두 줄로 접힌다. **탭은 자리 이름이고 제목이 아니다** - 온전한 이름은
-   * 탭을 열었을 때 머리글이 말한다.
-   */
-  short: string;
+  /** 격자 타일의 이름 아래 한 줄. 들어가기 전에 무엇이 있는 곳인지 말한다 */
   blurb: string;
 }[] = [
   {
     key: 'venue',
     label: '오프라인 한정',
-    short: '오프라인',
     blurb: '그날 경기장에 있었던 사람만 살 수 있는 카드입니다.',
   },
   {
     key: 'milestone',
     label: '특별 MD',
-    short: '특별 MD',
     blurb: '기록 달성을 기다리는 굿즈입니다. 가까워지면 예약이 열립니다.',
   },
   {
     key: 'uniform',
     label: '유니폼',
-    short: '유니폼',
     blurb: '지금 공식몰에 올라와 있는 유니폼입니다.',
   },
   {
     key: 'merch',
     label: '기타 굿즈',
-    short: '기타',
     blurb: '공식몰에서 판매 중인 상품입니다.',
   },
 ];
@@ -718,6 +707,48 @@ export const MERCH: Merch[] = [
   { id: 'm-tee', name: '반팔 티셔츠', group: '패션', price: 39000, status: 'onsale' },
   { id: 'm-sticker', name: '스티커 팩', group: '패션', price: 7000, status: 'onsale' },
 ];
+
+/**
+ * 격자 타일에 붙는 현황 한 줄.
+ *
+ * 아이콘과 이름만 있는 격자는 **목차**다. 목차는 한 번 읽으면 다시 볼 이유가 없다.
+ * 들어가기 전에 "지금 저기서 무슨 일이 벌어지고 있는지"를 말해 줘야 격자 자체가
+ * 매번 볼 값어치를 갖는다 - 오늘 카드가 나왔는지, 예약이 열렸는지, 내 사이즈가
+ * 빠지고 있는지는 전부 들어가 보기 전에 알아야 할 것들이다.
+ */
+export function categoryStatus(
+  c: GoodsCategory,
+  nowMs: number,
+): { text: string; tone: 'live' | 'warn' | 'brand' | 'muted' } {
+  switch (c) {
+    case 'venue': {
+      const gates = PHOTOCARDS.map((x) => photocardGate(x, nowMs));
+      if (gates.includes('pending')) return { text: '오늘 경기 카드 발행 중', tone: 'live' };
+      const open = gates.filter((g) => g === 'open').length;
+      return open > 0
+        ? { text: `내가 간 경기 ${open}건`, tone: 'brand' }
+        : { text: '구매 가능한 카드 없음', tone: 'muted' };
+    }
+    case 'milestone': {
+      const open = MILESTONES.filter((m) => milestoneProgress(m, nowMs).reserveOpen);
+      if (open.length === 0) return { text: `기록 ${MILESTONES.length}건 추적 중`, tone: 'muted' };
+      const soon = open.some((m) => milestoneProgress(m, nowMs).reserveRatio >= 0.9);
+      return {
+        text: soon ? `예약 ${open.length}건 · 마감 임박` : `예약 ${open.length}건 진행 중`,
+        tone: soon ? 'warn' : 'brand',
+      };
+    }
+    case 'uniform': {
+      const low = UNIFORMS.filter((u) => u.status === 'lowstock').length;
+      const soon = UNIFORMS.filter((u) => u.status === 'upcoming').length;
+      if (low > 0) return { text: `${UNIFORMS.length}종 · ${low}종 품절 임박`, tone: 'warn' };
+      if (soon > 0) return { text: `${UNIFORMS.length}종 · ${soon}종 발매 예정`, tone: 'brand' };
+      return { text: `${UNIFORMS.length}종 판매 중`, tone: 'muted' };
+    }
+    case 'merch':
+      return { text: `${MERCH.length}종 판매 중`, tone: 'muted' };
+  }
+}
 
 // ═════════════════════════════════════════════════════════════
 // 알림 - 무엇을 언제 밀어 줄 것인가
