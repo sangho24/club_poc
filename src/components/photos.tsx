@@ -18,16 +18,7 @@
 // 정적 asset 의 require 는 **번들 타임에 해석된다.** 템플릿 문자열로 경로를 만들 수 없어
 // 키를 하나씩 나열한다. Record 로 두면 구단이 빠졌을 때 타입에러로 잡힌다.
 import { useEffect, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Image,
-  ImageSourcePropType,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, Easing, Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, ClipPath, G, Path } from 'react-native-svg';
 
 import type { Colorway } from '../goods';
@@ -301,7 +292,11 @@ export function PlayerAvatar({
       const back = BACK_NUMBERS[playerId];
       // 로스터에 없는 id 는 번호도 없다 - 최애 미선택('')이나 지난 시즌 선수가 그렇다.
       // 그 자리에는 지어낸 번호 대신 모자 마크를 둔다
-      return back === undefined ? <CapMark size={size} /> : <JerseyAvatar back={back} size={size} />;
+      return back === undefined ? (
+        <CapMark size={size} />
+      ) : (
+        <JerseyAvatar back={back} size={size} />
+      );
     }
     return (
       <View style={[s.avatar, box]}>
@@ -312,11 +307,7 @@ export function PlayerAvatar({
 
   return (
     <View style={[s.avatar, box, s.avatarPhoto]}>
-      <Image
-        source={photo}
-        style={{ width: size, height: size * FACE_BIAS }}
-        resizeMode="cover"
-      />
+      <Image source={photo} style={{ width: size, height: size * FACE_BIAS }} resizeMode="cover" />
     </View>
   );
 }
@@ -351,7 +342,12 @@ interface JerseyPaint {
 }
 
 const COLORWAYS: Record<Colorway, JerseyPaint> = {
-  home: { body: '#FFFFFF', trim: colors.brand, placket: palette.navy[900], edge: palette.navy[200] },
+  home: {
+    body: '#FFFFFF',
+    trim: colors.brand,
+    placket: palette.navy[900],
+    edge: palette.navy[200],
+  },
   // 원정은 회색이다. 네이비로 두면 얼트(오렌지)와 대비만 남고 '원정'이라는 사실이 사라진다
   away: { body: palette.navy[300], trim: palette.navy[900], placket: '#FFFFFF' },
   alt: { body: colors.brand, trim: palette.navy[900], placket: '#FFFFFF' },
@@ -363,7 +359,12 @@ const COLORWAYS: Record<Colorway, JerseyPaint> = {
     edge: '#DCCDB4',
     stripe: 'rgba(7,17,31,0.20)',
   },
-  youth: { body: '#FFFFFF', trim: colors.brand, placket: palette.navy[900], edge: palette.navy[200] },
+  youth: {
+    body: '#FFFFFF',
+    trim: colors.brand,
+    placket: palette.navy[900],
+    edge: palette.navy[200],
+  },
 };
 
 // 앞판 실루엣 - 목둘레에서 시작해 오른소매 · 밑단 · 왼소매를 돌아 닫는다.
@@ -400,13 +401,7 @@ export function JerseyArt({ colorway, height = 132 }: { colorway: Colorway; heig
         </>
       ) : null}
       {/* 칼라 - 목둘레를 따라 굵게 한 번 */}
-      <Path
-        d={JERSEY_COLLAR}
-        fill="none"
-        stroke={c.trim}
-        strokeWidth={7}
-        strokeLinecap="round"
-      />
+      <Path d={JERSEY_COLLAR} fill="none" stroke={c.trim} strokeWidth={7} strokeLinecap="round" />
       {/* 소매 트림 - 커프스 자리에 짧게 */}
       <Path d="M12 55L34 61" fill="none" stroke={c.trim} strokeWidth={5} strokeLinecap="round" />
       <Path d="M108 55L86 61" fill="none" stroke={c.trim} strokeWidth={5} strokeLinecap="round" />
@@ -478,125 +473,6 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(7,17,31,0.46)',
   },
   heroBody: { padding: 18, gap: 4 },
-});
-
-/**
- * 폼 루프 - 선수를 고르면 도는 짧은 화면.
- *
- * ── 왜 필요한가 ──────────────────────────────────────────────
- * 이 앱은 스스로를 팬덤 미디어로 정의했는데 선수 화면에 움직이는 것이 하나도 없었다.
- * 증명사진과 표만 있으면 지표는 훌륭해도 **좋아하는 마음이 생길 자리가 없다.**
- *
- * ── 왜 실제 영상이 아닌가 ───────────────────────────────────
- * KBO 경기 영상의 권리는 KBO·구단·중계사가 나눠 갖는다. 구단 앱이라 자체 촬영분은
- * 쓸 수 있지만 중계 화면은 별도 계약이 필요하다. 그래서 PoC 에서는 이미 출처를 확보한
- * 사진(assets/photo/SOURCES.md)에 느린 줌·팬을 입혀 **자리와 리듬만 증명**한다.
- * 실서비스에서는 이 자리에 3~4초 폼 루프가 들어간다.
- *
- * 기록을 파는 팬에게는 폼 자체가 데이터이기도 하다 - 릴리스 포인트, 타격 준비 자세.
- */
-export function PlayerFormLoop({
-  playerId,
-  height = 200,
-  label,
-}: {
-  playerId: string;
-  height?: number;
-  /** 무엇을 보는 중인지 - '와인드업' · '타격 준비' */
-  label: string;
-}) {
-  const photo = PLAYER_PHOTOS[playerId];
-  const [playing, setPlaying] = useState(true);
-  const [t] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    if (!photo || !playing) return;
-    // 왕복 루프. 한 방향으로만 돌리면 끝에서 툭 끊겨 '영상'이 아니라 '리셋'으로 보인다
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(t, {
-          toValue: 1,
-          duration: 3600,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(t, {
-          toValue: 0,
-          duration: 3600,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [photo, playing, t]);
-
-  if (!photo) return null;
-
-  // 확보한 사진은 세로 인물사진이고 **얼굴은 늘 위쪽에 있다.** cover 로 채우면 세로 중앙이
-  // 남아 얼굴이 잘려 나간다(PlayerAvatar 가 같은 이유로 위 기준 크롭을 쓴다).
-  // 그래서 상자보다 키가 큰 칸에 채우고 아래를 잘라 위를 남긴다 - FACE_BIAS 주석 참조.
-  //
-  // 그리고 **확대는 쓰지 않는다.** 이미지가 상자보다 훨씬 크므로 중심 기준 scale 은
-  // 조금만 줘도 보이는 구간이 크게 밀려 얼굴이 다시 사라진다. 세로 이동만으로 충분하다.
-  const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [0, -22] });
-
-  return (
-    <Pressable
-      onPress={() => setPlaying((v) => !v)}
-      accessibilityRole="button"
-      accessibilityLabel={`${label} 폼 ${playing ? '멈추기' : '재생'}`}
-      style={[fl.wrap, { height }]}
-    >
-      <Animated.Image
-        source={photo}
-        resizeMode="cover"
-        style={[fl.img, { height: height * FACE_BIAS }, { transform: [{ translateY }] }]}
-      />
-      {/* 위쪽을 덮어야 라벨이 사진 밝기와 무관하게 읽힌다 */}
-      <View style={fl.scrim} />
-      <View style={fl.head}>
-        <View style={[fl.dot, !playing && fl.dotOff]} />
-        <Text style={fl.label}>{label}</Text>
-      </View>
-      <Text style={fl.hint}>{playing ? '탭하면 멈춥니다' : '탭하면 재생'}</Text>
-    </Pressable>
-  );
-}
-
-const fl = StyleSheet.create({
-  wrap: { borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.raised },
-  // 높이는 FACE_BIAS 가 정한다. 상자보다 길어진 만큼 아래가 잘리고 얼굴이 남는다
-  img: { width: '100%' },
-  // 위쪽 라벨이 사진 밝기와 무관하게 읽히도록 전체를 살짝 덮는다
-  scrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(7,17,31,0.22)',
-  },
-  head: {
-    position: 'absolute',
-    top: spacing.md,
-    left: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dot: { width: 7, height: 7, borderRadius: 999, backgroundColor: colors.brand },
-  dotOff: { backgroundColor: '#FFFFFF' },
-  label: { ...typography.micro, color: '#FFFFFF' },
-  hint: {
-    position: 'absolute',
-    bottom: spacing.md,
-    right: spacing.lg,
-    ...typography.micro,
-    fontWeight: '400',
-    color: 'rgba(255,255,255,0.72)',
-  },
 });
 
 /**

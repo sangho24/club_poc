@@ -42,7 +42,7 @@ import {
 } from '../components/common';
 import type { Band } from '../components/common';
 import { DataTable, TableColumn } from '../components/DataTable';
-import { PlayerAvatar, PlayerFormLoop } from '../components/photos';
+import { PlayerAvatar } from '../components/photos';
 import {
   DEFAULT_BATTER_METRICS,
   DEFAULT_PITCHER_METRICS,
@@ -1075,7 +1075,6 @@ function FeaturedDetail({
   if (batter) {
     return (
       <>
-        <PlayerFormLoop playerId={batter.id} label="타격 준비" height={170} />
         <MetricTiles
           stat={batter.stat}
           sample={batter.stat.pa}
@@ -1095,7 +1094,6 @@ function FeaturedDetail({
   const st1 = pitcher.stat;
   return (
     <>
-      <PlayerFormLoop playerId={pitcher.id} label="와인드업" height={170} />
       {/* 전에는 StatTile 셋이 붙박이였다. 고를 수 없는 것은 물론이고 **누를 수도 없어**
           ERA·FIP 가 무슨 값인지 물을 데가 없었다 - 타자 쪽에는 있던 것이 여기만 없었다 */}
       <MetricTiles
@@ -1231,9 +1229,6 @@ function BatterDetail({
           `${b.pa}타석 · ${b.h}안타 · ${b.hr}홈런 · ${b.rbi}타점`,
         ]}
       />
-
-      {/* 지표만 있으면 좋아하는 마음이 생길 자리가 없다. 팬덤 미디어의 몫 */}
-      <PlayerFormLoop playerId={batter.id} label="타격 준비" height={190} />
 
       {/* ── 기본 → 세부 → 심화 ─────────────────────────────
           심화 지표부터 내밀면 그 셋이 야구의 전부인 것처럼 보인다. 타율·홈런·타점을
@@ -1416,8 +1411,6 @@ function PitcherDetail({
           `${p.g}경기 ${ipLabel(p.ipOuts)}이닝 · ${p.w}승 ${p.l}패 · ${p.so}탈삼진`,
         ]}
       />
-
-      <PlayerFormLoop playerId={pitcher.id} label="와인드업" height={190} />
 
       {/* 타자와 같은 순서 - 기본 → 세부 → 심화. 투수를 처음 보는 사람이 아는 것은
           평균자책점·승패·탈삼진이지 FIP 가 아니다 */}
