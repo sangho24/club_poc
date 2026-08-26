@@ -20,6 +20,7 @@ import {
   GroupCard,
   Row,
   SectionCard,
+  SectionTitle,
   Segmented,
   StatTile,
 } from '../components/common';
@@ -218,22 +219,39 @@ export function MyScreen({
           paddingBottom: spacing.scrollBottom,
         }}
       >
-        {/* ── 내 티켓 ────────────────────────────────────────────
+        {/* ── 나의 티켓 ──────────────────────────────────────────
             직관 탭은 **예매하기 전**까지를 맡는다. 예매를 마치고 나면 앱 안에 그 사실이
             아무 데도 남지 않아서, 팬은 그때부터 문자함을 뒤진다.
 
             MY 의 다른 카드는 나에 대한 것이고 급할 것이 없다. 표는 경기 당일에 앱을
-            여는 이유 그 자체라 맨 위에 온다 ── */}
-        {tickets.map((t) => (
-          <TicketCard
-            key={t.date}
-            ticket={t}
-            nowMs={DEMO_NOW}
-            alertOn={gameAlert[t.date] ?? true}
-            onAlert={() => setGameAlert((v) => ({ ...v, [t.date]: !(v[t.date] ?? true) }))}
-            onCoupon={() => setCoupon(t)}
-          />
-        ))}
+            여는 이유 그 자체라 맨 위에 온다.
+
+            ── 왜 머리글로 묶는가 (2026-08-26) ──────────────────
+            표가 둘 이상이면 접힌 카드가 나란히 서는데, 그 둘이 **한 묶음이라는 표시가
+            없었다.** 아래 '프로필'·'멤버십'도 같은 생김새의 카드라, 맨 위 두 장이
+            무엇인지 말해 주는 것 없이 그냥 카드 넉 장이 흐르는 것으로 읽힌다.
+
+            머리글은 카드 밖에 둔다 - 카드 안에 들이면(SectionCard) 그건 '표 하나'의
+            제목이 되지 표 여럿을 덮는 묶음이 못 된다. 대신 표가 없으면 머리글도 함께
+            사라진다. 덮을 것이 없는 머리글은 빈 서랍의 이름표다 ── */}
+        {tickets.length > 0 ? (
+          <>
+            <SectionTitle
+              title="나의 티켓"
+              right={<Text style={st.ticketCount}>{tickets.length}경기</Text>}
+            />
+            {tickets.map((t) => (
+              <TicketCard
+                key={t.date}
+                ticket={t}
+                nowMs={DEMO_NOW}
+                alertOn={gameAlert[t.date] ?? true}
+                onAlert={() => setGameAlert((v) => ({ ...v, [t.date]: !(v[t.date] ?? true) }))}
+                onCoupon={() => setCoupon(t)}
+              />
+            ))}
+          </>
+        ) : null}
 
         {/* ── 프로필 ─────────────────────────────────────────────
             MY 는 세 묶음이 서로 독립적이다 - 내 정보 · 알림 설정 · 내 기록.
@@ -522,7 +540,11 @@ const st = StyleSheet.create({
 
   headNote: typography.micro,
 
-  // ── 내 티켓 ──────────────────────────────────────────────
+  // ── 나의 티켓 ────────────────────────────────────────────
+  // 묶음 머리글 오른쪽의 개수. 굿즈 탭의 countHint 와 같은 서식이라 두 화면에서
+  // 같은 뜻의 숫자가 같은 모양으로 보인다
+  ticketCount: { ...typography.micro, ...tabularFigures },
+
   dday: { ...typography.micro, ...tabularFigures, color: colors.brandText, fontWeight: '600' },
   ticketHead: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   ticketSeat: { ...typography.cardTitle, fontSize: 16 },
