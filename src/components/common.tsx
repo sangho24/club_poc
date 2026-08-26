@@ -313,7 +313,17 @@ export function StatTile({
           {label}
         </Text>
       </View>
-      <Text style={[s.tileValue, tone === 'brand' && { color: colors.brandText }]}>{value}</Text>
+      {/* 값은 한 줄로 붙든다. 타일 셋이 나란히 선 자리라 폭이 화면의 1/3 인데,
+          `.412` 같은 값은 괜찮아도 `0.941` · `54-53` 처럼 길어지면 두 줄로 접히면서
+          **셋의 높이가 어긋난다.** 접히게 두느니 글자를 조금 줄이는 쪽이 낫다 */}
+      <Text
+        style={[s.tileValue, tone === 'brand' && { color: colors.brandText }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
+        {value}
+      </Text>
       {sub ? <Text style={s.tileSub}>{sub}</Text> : null}
     </View>
   );

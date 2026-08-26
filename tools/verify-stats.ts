@@ -4,6 +4,7 @@
 // "디자인 문제"로 오인하게 되고, 무엇보다 시연 중에 파트너가 값을 물었을 때 답할 수 없다.
 //
 // 실행: npx tsc -p tools/tsconfig.verify.json && node .tmp/tools/verify-stats.js
+import { PLATE_SEQUENCE } from '../src/game';
 import { JosaKind, josa } from '../src/korean';
 import { BATTERS, OPPONENT_PITCHERS, PITCHERS, verifyRoster } from '../src/roster';
 import {
@@ -51,6 +52,37 @@ if (errs.length === 0) {
 } else {
   errs.forEach(bad);
 }
+
+/**
+ * 시연 시퀀스가 가리키는 선수가 실제로 명단에 있는가.
+ *
+ * ⚠ **화면이 `BATTERS.find(...) ?? BATTERS[0]` 으로 폴백한다.** 명단에서 빠진 선수를
+ * 가리켜도 앱은 멀쩡히 돌아가고 **조용히 다른 선수를 그린다.** 실제로 2026 명단
+ * 갱신에서 플로리얼·안치홍·황영묵이 빠졌을 때, 시연 카드에는 "페라자 고의4구"라고
+ * 적혀 있는데 매치업 타자는 이원석으로 나오고 있었다 - 같은 타석에 이름이 둘이었다.
+ *
+ * 폴백 자체는 화면이 죽지 않게 하는 옳은 처리다. 그래서 **검사가 대신 소리를 내야 한다.**
+ */
+console.log('\n═══ 1-b. 시연 시퀀스 ↔ 명단 정합 ═══');
+const batterIds = new Set(BATTERS.map((b) => b.id));
+const oppIds = new Set(OPPONENT_PITCHERS.map((p) => p.id));
+for (const [i, pa] of PLATE_SEQUENCE.entries()) {
+  if (!batterIds.has(pa.batterId)) {
+    bad(
+      `PLATE_SEQUENCE[${i}] batterId '${pa.batterId}' 가 BATTERS 에 없다 - 화면은 조용히 ${BATTERS[0].name} 을 그린다`,
+    );
+  }
+  if (!oppIds.has(pa.pitcherId)) {
+    bad(`PLATE_SEQUENCE[${i}] pitcherId '${pa.pitcherId}' 가 OPPONENT_PITCHERS 에 없다`);
+  }
+  // 문장에 적힌 이름과 실제로 그려질 선수가 같은지. 위 검사를 통과해도 여기서 갈릴 수 있다.
+  // 마지막 타석은 **아직 결과가 없는 현재 타석**이라 outcome 이 '?' 다 - 이름이 없는 게 맞다
+  const b = BATTERS.find((x) => x.id === pa.batterId);
+  if (b && pa.outcome !== '?' && !pa.outcome.startsWith(b.name)) {
+    bad(`PLATE_SEQUENCE[${i}] outcome 은 "${pa.outcome.slice(0, 12)}…" 인데 타자는 ${b.name} 이다`);
+  }
+}
+if (failed === 0) console.log(`  ✓ ${PLATE_SEQUENCE.length}개 타석 전부 명단·문장과 맞는다`);
 
 console.log('\n═══ 2. 타자 지표 ═══');
 console.log('  이름     타율   출루   장타   OPS    wOBA   wRC+  WAR   BABIP');
