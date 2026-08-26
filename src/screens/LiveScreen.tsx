@@ -565,6 +565,14 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
             label="좌우 상성"
             value={`${pred.breakdown.platoon >= 0 ? '+' : ''}${pred.breakdown.platoon.toFixed(3)}`}
           />
+          {/* 기록이 없으면 줄을 아예 두지 않는다. `0.000` 을 적으면 '상대전적이 없다'가
+              아니라 '상대전적이 영향을 안 줬다'로 읽힌다 - 둘은 다른 말이다 */}
+          {pred.breakdown.headToHeadRecord ? (
+            <KeyValueRow
+              label={`상대전적 ${pred.breakdown.headToHeadRecord.pa}타석`}
+              value={`${pred.breakdown.headToHead >= 0 ? '+' : ''}${pred.breakdown.headToHead.toFixed(3)}`}
+            />
+          ) : null}
           <KeyValueRow
             label="상황 보정"
             value={`${pred.breakdown.situational >= 0 ? '+' : ''}${pred.breakdown.situational.toFixed(3)}`}

@@ -8,7 +8,7 @@ import { LINEUP, PLATE_SEQUENCE, STANDING } from '../src/game';
 import { GAME_LOG, LG_ORDER } from '../src/gameLog';
 import { EXPECTED_SCORE, FINAL_STEP, lineScoreAt, scoreAt } from '../src/liveFeed';
 import { JosaKind, josa } from '../src/korean';
-import { BATTERS, OPPONENT_PITCHERS, PITCHERS, verifyRoster } from '../src/roster';
+import { BATTERS, HEAD_TO_HEAD, OPPONENT_PITCHERS, PITCHERS, verifyRoster } from '../src/roster';
 import {
   GameSituation,
   bullpenAdvice,
@@ -426,6 +426,35 @@ for (const b of [BATTERS[0], BATTERS[4], BATTERS[9]]) {
   for (const m of ['babip', 'wrcPlus', 'soRate']) {
     console.log(`    [${m}] ${trustSentence(m, b.stat.pa, QUAL_PA)}`);
   }
+}
+
+/**
+ * 상대전적 표가 야구적으로 말이 되는가.
+ *
+ * 손으로 적는 표라 오타가 조용히 산다 - 안타가 타석보다 많아도 앱은 멀쩡히 돌아가고
+ * **출루율 1.2 짜리 보정**을 확률에 얹는다. 화면이 이상해 보일 때 원인을 여기서
+ * 찾으려면 이미 늦다.
+ */
+console.log('\n═══ 13. 상대전적 표 ═══');
+{
+  const ids = new Set([...BATTERS, ...PITCHERS, ...OPPONENT_PITCHERS].map((p) => p.id));
+  let n = 0;
+  for (const [key, r] of Object.entries(HEAD_TO_HEAD)) {
+    const [pid, bid] = key.split(':');
+    if (!ids.has(pid)) bad(`${key} - 투수 '${pid}' 가 명단에 없다`);
+    if (!ids.has(bid)) bad(`${key} - 타자 '${bid}' 가 명단에 없다`);
+    if (r.pa <= 0) bad(`${key} - 타석이 ${r.pa} 다. 기록이 없으면 표에서 빼야 한다`);
+    if (r.h + r.bb > r.pa) bad(`${key} - 안타+볼넷(${r.h + r.bb})이 타석(${r.pa})보다 많다`);
+    if (r.hr > r.h) bad(`${key} - 홈런(${r.hr})이 안타(${r.h})보다 많다`);
+    n += 1;
+  }
+  const worst = Object.entries(HEAD_TO_HEAD)
+    .map(([k, r]) => ({ k, obp: (r.h + r.bb) / r.pa, pa: r.pa }))
+    .sort((a, b) => b.obp - a.obp);
+  console.log(
+    `  ${n}건 · 최고 ${worst[0].k} ${worst[0].obp.toFixed(3)}(${worst[0].pa}타석)` +
+      ` · 최저 ${worst[worst.length - 1].k} ${worst[worst.length - 1].obp.toFixed(3)}(${worst[worst.length - 1].pa}타석)`,
+  );
 }
 
 console.log(

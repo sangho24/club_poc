@@ -23,7 +23,7 @@
 // 시간대가 겹쳐도 충돌하지 않는다. 중계 화면은 지금 무슨 일이 일어났는지를 보여주고,
 // 이 앱은 지금 무슨 일이 일어날 확률이 얼마인지를 보여준다.
 import { josa } from './korean';
-import { Batter, Pitcher } from './roster';
+import { Batter, HeadToHead, Pitcher, headToHead } from './roster';
 import {
   LEAGUE,
   PARK_FACTORS,
@@ -350,6 +350,10 @@ export interface MatchupPrediction {
     pitcherOBPAllowed: number;
     log5Base: number;
     platoon: number;
+    /** 상대전적 보정 - 기록이 없으면 0 */
+    headToHead: number;
+    /** 상대전적 원본 - 화면이 '14타석 5안타'처럼 되짚을 수 있어야 한다 */
+    headToHeadRecord?: HeadToHead;
     situational: number;
     final: number;
   };
@@ -379,6 +383,44 @@ function leverageLabel(li: number): string {
 }
 
 /**
+ * 상대전적 보정 - "이 타자가 저 투수한테 강하다"를 확률에 반영한다.
+ *
+ * ── 표본만큼만 믿는다 ───────────────────────────────────────
+ * 한 시즌에 같은 투수를 만나는 타석은 많아야 스무 번 남짓이다. 그 스무 번을 시즌
+ * 오백 타석과 같은 무게로 쓰면 **우연이 실력을 이겨 버린다** - 3타수 3안타 하나로
+ * 확률이 통째로 뒤집힌다.
+ *
+ * 그래서 축소추정(shrinkage)을 건다. 표본이 늘수록 1 에 가까워지고 적으면 0 에
+ * 가까워지는 가중치를 곱한다.
+ *
+ *     w = pa / (pa + PRIOR)
+ *
+ * PRIOR 를 40 으로 둔 것은 **20타석이 대략 3분의 1 만큼만 말하게** 하기 위해서다.
+ * 20타석은 중계에서 "상대전적이 좋다"고 말하기 시작하는 지점이자 그것만으로 결론을
+ * 내리기에는 한참 모자란 지점이다 - 그 어중간함을 그대로 숫자로 옮긴 값이다.
+ *
+ * ⚠ 이 함수는 **경고 문장을 만들지 않는다.** 표본이 작다는 사정은 가중치가 이미
+ *   반영하고 있어서, 화면에 "표본이 작습니다"를 덧붙이면 같은 말이 두 번 나온다.
+ */
+const H2H_PRIOR = 40;
+const H2H_CAP = 0.045;
+
+export function headToHeadAdj(
+  batter: Batter,
+  pitcher: Pitcher,
+  league: number,
+): { delta: number; record?: HeadToHead } {
+  const record = headToHead(pitcher.id, batter.id);
+  if (!record || record.pa === 0) return { delta: 0 };
+
+  const obp = (record.h + record.bb) / record.pa;
+  const weight = record.pa / (record.pa + H2H_PRIOR);
+  const raw = (obp - league) * weight;
+  // 한 요인이 승부를 혼자 결정하면 나머지 보정이 장식이 된다. 좌우 상성과 같은 상한을 둔다
+  return { delta: Math.max(-H2H_CAP, Math.min(H2H_CAP, raw)), record };
+}
+
+/**
  * 이 승부를 예측한다.
  *
  * 순서: 로그5로 바탕을 깔고 → 좌우 상성을 얹고 → 상황 보정을 더한다.
@@ -399,11 +441,14 @@ export function predictMatchup(
   // ② 좌우 상성
   const platoon = platoonAdj(batter, pitcher);
 
-  // ③ 상황 보정
+  // ③ 상대전적 - 표본만큼만 믿는다
+  const h2h = headToHeadAdj(batter, pitcher, leagueOBP);
+
+  // ④ 상황 보정
   const adjs = situationAdjustments(s, batter, pitcher);
   const situational = adjs.reduce((a, x) => a + x.delta, 0);
 
-  const final = Math.min(0.85, Math.max(0.05, base + platoon + situational));
+  const final = Math.min(0.85, Math.max(0.05, base + platoon + h2h.delta + situational));
   const edge = final - leagueOBP;
 
   // ── 근거 문장 조립 ──────────────────────────────────────────
@@ -447,7 +492,22 @@ export function predictMatchup(
     );
   }
 
-  // 근거 3~: 상황 보정 (영향이 큰 것부터)
+  // 근거 3: 상대전적 - 중계석이 늘 하는 말이라 팬이 가장 먼저 궁금해한다
+  if (h2h.record) {
+    const r = h2h.record;
+    const h2hObp = (r.h + r.bb) / r.pa;
+    const hrPart = r.hr > 0 ? ` ${r.hr}홈런` : '';
+    const moved =
+      Math.abs(h2h.delta) < 0.004
+        ? '시즌 성적과 크게 다르지 않아 확률을 거의 움직이지 않았습니다.'
+        : `${h2h.delta > 0 ? '타자' : '투수'} 쪽으로 ${(Math.abs(h2h.delta) * 100).toFixed(1)}%p 옮겼습니다.`;
+    reasons.push(
+      `두 사람은 올 시즌 ${r.pa}타석에서 만났습니다 - ${r.h}안타 ${r.bb}볼넷${hrPart}, ` +
+        `출루율 ${h2hObp.toFixed(3)}. ${moved}`,
+    );
+  }
+
+  // 근거 4~: 상황 보정 (영향이 큰 것부터)
   const sortedAdjs = adjs.slice().sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
   sortedAdjs.forEach((a) => reasons.push(a.reason));
 
@@ -510,6 +570,8 @@ export function predictMatchup(
       batterOBP: Math.round(bOBP * 1000) / 1000,
       pitcherOBPAllowed: Math.round(pOBPA * 1000) / 1000,
       log5Base: Math.round(base * 1000) / 1000,
+      headToHead: Math.round(h2h.delta * 1000) / 1000,
+      headToHeadRecord: h2h.record,
       platoon: Math.round(platoon * 1000) / 1000,
       situational: Math.round(situational * 1000) / 1000,
       final: Math.round(final * 1000) / 1000,
