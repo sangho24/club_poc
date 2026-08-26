@@ -49,7 +49,7 @@ import {
   METRIC_MIN,
   UserProfile,
 } from '../profile';
-import { analyzeBatter } from '../playerAnalysis';
+import { PlayerAnalysis, analyzeBatter, analyzePitcher } from '../playerAnalysis';
 import { STANDING } from '../game';
 import {
   BATTERS,
@@ -1144,7 +1144,7 @@ function FeaturedDetail({
         />
         {glossary}
         <MetricGauges stat={batter.stat} metrics={metrics} />
-        <AiAnalysis batter={batter} />
+        <AiAnalysis analysis={analyzeBatter(batter, PARK)} />
       </>
     );
   }
@@ -1179,7 +1179,7 @@ function FeaturedDetail({
           </View>
         ))}
       </View>
-      <Text style={st.note}>{pitcher.note}</Text>
+      <AiAnalysis analysis={analyzePitcher(pitcher, PARK, QUAL_BF)} />
     </>
   );
 }
@@ -1438,7 +1438,7 @@ function BatterDetail({
         }
       />
 
-      <AiAnalysis batter={batter} />
+      <AiAnalysis analysis={analyzeBatter(batter, PARK)} />
     </View>
   );
 }
@@ -1616,7 +1616,7 @@ function PitcherDetail({
         <BattedBall gb={p.gbRate} fb={p.fbRate} ld={p.ldRate} />
       </Card>
 
-      <Text style={st.note}>{pitcher.note}</Text>
+      <AiAnalysis analysis={analyzePitcher(pitcher, PARK, QUAL_BF)} />
     </View>
   );
 }
@@ -1966,8 +1966,7 @@ function MetricGauges<T,>({ stat, metrics }: { stat: T; metrics: MetricOpt<T>[] 
  *
  * 문장을 짓는 규칙은 src/playerAnalysis.ts 에 있다 (모델 호출이 아니라 규칙이다).
  */
-function AiAnalysis({ batter }: { batter: Batter }) {
-  const a = analyzeBatter(batter, PARK);
+function AiAnalysis({ analysis: a }: { analysis: PlayerAnalysis }) {
   return (
     <View style={st.aiWrap}>
       <View style={st.aiHead}>
@@ -2219,7 +2218,8 @@ function GlossaryCard({
 }
 
 const st = StyleSheet.create({
-  tabsWrap: { backgroundColor: colors.card },
+  // 알약 탭은 지면 위에 떠 있는다 - 흰 띄를 깔면 브랜드 바가 두 겹으로 보인다
+  tabsWrap: { paddingHorizontal: spacing.screenX, paddingTop: spacing.md },
 
   playerRow: { paddingVertical: spacing.lg },
   nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
