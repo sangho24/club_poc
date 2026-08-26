@@ -676,7 +676,11 @@ function StatTable<T>({
         <View style={{ flexDirection: 'row' }}>
           {/* 붙박이 이름 열 */}
           <View style={st.tblNameCol}>
-            <View style={[st.tblHeadCell, st.tblNameCell]}>
+            {/* ⚠ 순서가 중요하다. `[tblHeadCell, tblNameCell]` 로 두면 뒤에 온
+                tblNameCell 의 height(44)가 이겨서 **이름 열 머리만 44, 지표 열 머리는
+                40** 이 된다. 그 4px 이 시작점을 밀어 아래 모든 행이 어긋난다.
+                머리 높이는 tblHeadCell 이, 폭·여백은 tblNameCell 이 갖게 순서를 잡는다 */}
+            <View style={[st.tblNameCell, st.tblHeadCell]}>
               <Text style={st.tblHead}>선수</Text>
             </View>
             {sorted.map((r, i) => (

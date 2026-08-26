@@ -158,7 +158,13 @@ export function HomeScreen({
 
           <Divider />
 
-          <CardHeading label="지금 이 승부" title={pred.headline} />
+          {/* 라이브와 같은 이유로 verdict 를 쓴다. 다만 홈에는 확률을 보여줄 자리가
+              따로 없어서 라벨 옆에 붙인다 - 제목 문장 안에 넣으면 다시 길어진다 */}
+          <CardHeading
+            label="지금 이 승부"
+            title={pred.verdict}
+            right={<Text style={st.probPill}>출루 {Math.round(pred.onBaseProb * 100)}%</Text>}
+          />
           <Text style={st.reason}>{pred.reasons[0]}</Text>
           <Text style={st.more}>근거 보기 ›</Text>
         </Card>
@@ -333,6 +339,18 @@ const st = StyleSheet.create({
   favNote: { ...typography.caption, lineHeight: 19 },
 
   chevron: { fontSize: 18, color: colors.mutedText },
+
+  // 확률은 제목 옆에 조용히. 숫자를 크게 세우면 홈이 라이브 화면 흉내가 된다
+  probPill: {
+    ...typography.micro,
+    ...tabularFigures,
+    color: colors.brandText,
+    backgroundColor: colors.brandSoft,
+    borderRadius: radius.chip,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
 
   // 다른 탭으로 가는 지름길 - 직관 '가기 전에'와 같은 문법(3열·아이콘 위·라벨 아래)
   quickRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.cardGap },

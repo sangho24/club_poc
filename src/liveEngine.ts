@@ -327,8 +327,21 @@ export interface MatchupPrediction {
    * 사실이고, 그건 상황 보정을 따로 계산해야만 나온다.
    */
   flipped: boolean;
-  /** 한 줄 결론 - 화면 최상단 */
+  /**
+   * 한 줄 결론 - **알림용**.
+   *
+   * 앱 밖에서 이 한 줄만 보고도 상황을 알아야 하므로 베이스·볼카운트·확률을 전부 담는다.
+   * 그래서 길다. **화면 제목으로 쓰면 안 된다** - 화면에는 그 정보가 이미 다른 자리에
+   * 있어서 같은 말이 두 번 나오고, 세 줄짜리 굵은 제목이 카드를 짓누른다.
+   */
   headline: string;
+  /**
+   * 화면용 짧은 결론.
+   *
+   * 상황·확률을 뺀 **판정만** 남긴다. 화면은 베이스도 볼카운트도 확률도 이미 그리고
+   * 있으므로, 제목이 할 일은 "그래서 어느 쪽인가" 하나뿐이다.
+   */
+  verdict: string;
   /** 근거 - 이게 비면 확률을 띄우지 않는다 */
   reasons: string[];
   /** 계산 과정 - '왜 이 숫자인지'를 펼쳐 볼 수 있게 */
@@ -454,18 +467,24 @@ export function predictMatchup(
   const topAdj = sortedAdjs[0];
 
   let headline: string;
+  let verdict: string;
   if (flipped) {
     const skillWinner = skillSide === 'batter' ? batter.name : pitcher.name;
     const nowWinner = favors === 'batter' ? batter.name : pitcher.name;
     headline =
       `시즌 성적만 보면 ${skillWinner}의 승부인데, ${basesLabel(s.bases)} ${s.outs}아웃 ${s.balls}-${s.strikes}라는 ` +
       `지금 상황이 ${nowWinner} 쪽으로 뒤집었습니다. 타자 출루 확률 ${pct}%`;
+    // 화면에는 '무엇이 뒤집혔는가'만. 시즌 성적 대비라는 사실은 아래 근거가 말한다
+    verdict = `상황이 ${nowWinner} 쪽으로 뒤집었습니다`;
   } else if (favors === 'batter') {
     headline = `${basesLabel(s.bases)} ${s.outs}아웃. 이 승부는 ${josa(batter.name, '이/가')} 유리합니다. 출루 확률 ${pct}%`;
+    verdict = `${josa(batter.name, '이/가')} 유리합니다`;
   } else if (favors === 'pitcher') {
     headline = `${basesLabel(s.bases)} ${s.outs}아웃. 이 승부는 ${josa(pitcher.name, '이/가')} 유리합니다. 타자 출루 확률 ${pct}%`;
+    verdict = `${josa(pitcher.name, '이/가')} 유리합니다`;
   } else {
     headline = `${basesLabel(s.bases)} ${s.outs}아웃. 어느 쪽으로도 기울지 않은 승부입니다. 출루 확률 ${pct}%`;
+    verdict = '어느 쪽으로도 기울지 않았습니다';
   }
 
   // 뒤집힌 승부는 그 사실을 근거의 맨 앞에 세운다 - 실력 비교보다 이게 먼저 읽혀야 한다.
@@ -485,6 +504,7 @@ export function predictMatchup(
     favors,
     flipped,
     headline,
+    verdict,
     reasons,
     breakdown: {
       batterOBP: Math.round(bOBP * 1000) / 1000,

@@ -150,9 +150,13 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
 
           <Divider />
 
+          {/* ⚠ `pred.headline` 을 쓰면 안 된다. 그건 알림용이라 베이스·볼카운트·확률을
+              전부 담고 있는데, 이 카드는 **그 셋을 이미 그리고 있다**(바로 위 상황 행,
+              아래 37% 숫자). 같은 말이 두 번 나오는 데다 세 줄짜리 굵은 제목이 카드를
+              짓눌러 아래 문자중계와의 경계까지 흐려졌다. 제목이 할 일은 판정 하나다 */}
           <CardHeading
             label={pred.flipped ? '상황이 뒤집은 승부' : '매치업'}
-            title={pred.headline}
+            title={pred.verdict}
           />
 
           <View style={st.matchupRow}>

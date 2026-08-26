@@ -23,10 +23,12 @@ import {
 } from '../components/common';
 import { FavoritePicker } from '../components/FavoritePicker';
 import { PlayerAvatar } from '../components/photos';
-import { ATTENDANCE, attendanceSummary } from '../my';
+import { SEAT_GRADES } from '../gameday';
+import { STANDING } from '../game';
+import { ATTENDANCE, attendanceEdge, attendanceSummary, membershipOf, seatHabit } from '../my';
 import { KNOWLEDGE_OPTIONS, KnowledgeLevel, UserProfile } from '../profile';
 import { BATTERS, PITCHERS } from '../roster';
-import { colors, spacing, tabularFigures, typography } from '../theme';
+import { colors, radius, spacing, tabularFigures, typography } from '../theme';
 
 export function MyScreen({
   profile,
@@ -54,6 +56,12 @@ export function MyScreen({
     : undefined;
 
   const summary = attendanceSummary(ATTENDANCE);
+  const member = membershipOf(summary.games);
+  const edge = attendanceEdge(ATTENDANCE, STANDING.winRate);
+  const seat = seatHabit(
+    ATTENDANCE,
+    SEAT_GRADES.map((g) => g.name),
+  );
 
   return (
     <>
@@ -104,6 +112,41 @@ export function MyScreen({
           </Pressable>
         </SectionCard>
 
+        {/* ── 멤버십 ─────────────────────────────────────────────
+            상단바가 등급을 배지로 달고만 있었고 **그게 무엇인지 볼 자리가 없었다.**
+            등급은 저장하지 않고 직관 기록에서 매번 집계하므로(my.ts 원칙) 여기 값은
+            언제나 아래 '나의 직관'과 맞는다 ── */}
+        <SectionCard title="멤버십" padded>
+          <View style={st.tierHead}>
+            <View style={{ gap: 2 }}>
+              <Text style={st.tierName}>{member.tier.label}</Text>
+              <Text style={st.tierSub}>
+                {member.next
+                  ? `다음 ${member.next.label}까지 ${member.toNext}회`
+                  : '최고 등급입니다'}
+              </Text>
+            </View>
+            <Text style={st.tierCount}>
+              {summary.games}
+              <Text style={st.tierCountUnit}>
+                {member.next ? ` / ${member.next.from}회` : '회'}
+              </Text>
+            </Text>
+          </View>
+
+          {/* 다음 등급까지 얼마나 왔는지. 숫자만 있으면 '5회'가 먼 건지 가까운 건지 모른다 */}
+          {member.next ? (
+            <View style={st.tierTrack}>
+              <View
+                style={[
+                  st.tierFill,
+                  { width: `${Math.min(100, (summary.games / member.next.from) * 100)}%` },
+                ]}
+              />
+            </View>
+          ) : null}
+        </SectionCard>
+
         {/* ── 알림 - 온보딩 STEP 3 와 같은 부품 ──────────────── */}
         <SectionCard title="알림">
           <Row>
@@ -145,6 +188,28 @@ export function MyScreen({
             <StatTile label="전적" value={`${summary.wins}-${summary.losses}`} />
             <StatTile label="승률" value={summary.winRate.toFixed(3)} />
           </View>
+
+          {/* ⚠ 팬이 가장 하고 싶어 하는 말("내가 가면 이긴다")을 앱이 대신 해 주되
+              **단정하지 않는다.** 5경기 .600 은 3승 2패일 뿐이고 한 경기만 뒤집혀도
+              .400 이 된다. 심화 지표에 표본 신뢰도를 붙인 것과 같은 원칙이다 -
+              팬이 재미로 보는 값이어도 근거 없이 단정하면 다른 수치까지 못 믿게 된다 */}
+          <View style={st.edgeBox}>
+            <Text style={st.edgeLine}>
+              내가 간 날 <Text style={st.edgeStrong}>{summary.winRate.toFixed(3)}</Text>
+              <Text style={st.edgeDim}> · 팀 시즌 {STANDING.winRate.toFixed(3)}</Text>
+            </Text>
+            <Text style={st.edgeNote}>
+              {edge.settled
+                ? `표본이 ${summary.games}경기라 경향으로 읽어도 됩니다.`
+                : `${summary.games}경기는 아직 우연입니다. ${edge.gamesToTrust}번 더 가면 경향이라 말할 수 있습니다.`}
+            </Text>
+          </View>
+
+          {seat ? (
+            <Text style={st.seatHabit}>
+              가장 자주 앉은 자리 <Text style={st.edgeStrong}>{seat.name}</Text> · {seat.times}회
+            </Text>
+          ) : null}
 
           <Divider />
 
@@ -209,6 +274,34 @@ const st = StyleSheet.create({
 
   headNote: typography.micro,
   tileRow: { flexDirection: 'row', gap: spacing.sm },
+
+  // 멤버십 - 등급 이름이 이 카드에서 가장 큰 글자다. 팬이 확인하러 오는 값이라 그렇다
+  tierHead: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  tierName: {
+    ...typography.metric,
+    fontSize: 24,
+    lineHeight: 28,
+    color: colors.brandText,
+    letterSpacing: 0.5,
+  },
+  tierSub: typography.caption,
+  tierCount: { ...typography.bodyStrong, ...tabularFigures, fontSize: 17 },
+  tierCountUnit: { ...typography.caption, fontWeight: '400' },
+  tierTrack: {
+    height: 6,
+    borderRadius: radius.bar,
+    backgroundColor: colors.dim,
+    overflow: 'hidden',
+  },
+  tierFill: { height: '100%', borderRadius: radius.bar, backgroundColor: colors.brand },
+
+  // 직관 승률 해석 - 사실(수치)과 해석(표본 경고)을 한 상자에 묶는다
+  edgeBox: { gap: 3 },
+  edgeLine: { ...typography.bodyStrong, ...tabularFigures },
+  edgeStrong: { color: colors.brandText },
+  edgeDim: { ...typography.caption, fontWeight: '400' },
+  edgeNote: { ...typography.caption, lineHeight: 18 },
+  seatHabit: { ...typography.caption, lineHeight: 18 },
 
   // 접어 둔 기록을 여는 줄 - 카드 안이라 Row 의 좌우 여백을 지우고 카드에 맞춘다
   logRow: { paddingHorizontal: 0, paddingVertical: 0 },

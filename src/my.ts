@@ -32,6 +32,48 @@ export function attendanceSummary(records: AttendanceRecord[]) {
   return { games, wins, losses, winRate };
 }
 
+/**
+ * 직관 승률이 팀 시즌 승률과 얼마나 다른가.
+ *
+ * 팬이 가장 하고 싶어 하는 말("내가 가면 이긴다")을 앱이 대신 해 주는 자리다.
+ * **다만 단정하지 않는다.** 5경기 승률 .600 은 3승 2패일 뿐이고, 한 경기만 뒤집혀도
+ * .400 이 된다. 심화 지표에 표본 신뢰도를 붙인 것과 같은 원칙을 여기에도 건다 -
+ * 팬이 재미로 보는 값이어도 앱이 근거 없이 단정하면 다른 수치까지 못 믿게 된다.
+ *
+ * 기준 30경기: 시즌 144경기의 약 1/5 이고, 이항분포에서 승률 차이 0.1 이 우연과
+ * 구분되기 시작하는 대략의 지점이다.
+ */
+export function attendanceEdge(records: AttendanceRecord[], teamWinRate: number) {
+  const { games, winRate } = attendanceSummary(records);
+  const diff = winRate - teamWinRate;
+  return {
+    diff,
+    /** 이만큼 더 봐야 '경향'이라고 말할 수 있다 */
+    gamesToTrust: Math.max(0, 30 - games),
+    settled: games >= 30,
+  };
+}
+
+/**
+ * 가장 자주 앉은 좌석 등급.
+ *
+ * 좌석 문자열은 '1루 내야지정석 213블록'처럼 등급 + 블록이라, 등급명으로 앞을 맞춰
+ * 자른다. **등급 목록을 여기서 새로 만들지 않고 예매 화면과 같은 것을 쓴다** -
+ * 따로 두면 예매에 없는 등급이 MY 에만 생기는 날이 온다.
+ */
+export function seatHabit(records: AttendanceRecord[], gradeNames: readonly string[]) {
+  const count = new Map<string, number>();
+  for (const r of records) {
+    const g = gradeNames.find((n) => r.seat.startsWith(n));
+    if (g) count.set(g, (count.get(g) ?? 0) + 1);
+  }
+  let top: { name: string; times: number } | null = null;
+  for (const [name, times] of count) {
+    if (!top || times > top.times) top = { name, times };
+  }
+  return top;
+}
+
 // ─────────────────────────────────────────────────────────────
 // 멤버십 등급 - 상단바가 들고 있을 '변하는 값'
 // ─────────────────────────────────────────────────────────────
