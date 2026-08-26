@@ -95,6 +95,56 @@ export function SectionTitle({
   );
 }
 
+/**
+ * 제목을 **카드 안에 들인** 섹션.
+ *
+ * ── 왜 만들었나 ─────────────────────────────────────────────
+ * `SectionTitle` 은 머리글을 카드 **밖에** 띄운다(iOS 그룹 리스트 문법). 그런데 화면이
+ * 길어지자 문제가 드러났다 - 머리글이 어느 카드의 것인지 눈으로 이어지지 않고,
+ * 모든 섹션이 같은 회색 · 같은 흰 카드라 **어디서 끊기는지 알 수 없다.**
+ *
+ * 2026-08-11 에 머리글을 작은 회색으로 물린 결정은 그대로 옳다 - 굵은 제목이 연달아
+ * 서면 화면이 제목 대결이 된다. 그래서 **굵기를 올려 구분하지 않는다.**
+ * 대신 제목을 카드 안으로 들여 **카드 경계가 곧 섹션 경계**가 되게 한다.
+ * 글자 크기는 그대로 두고 소속만 바꾸는 것이라 제목 대결이 다시 생기지 않는다.
+ *
+ * ── 언제 쓰나 ───────────────────────────────────────────────
+ * **묶음**에 쓴다 - 여러 항목이 한 주제로 묶이고 그 주제가 위아래와 독립적일 때
+ * (알림 설정, 프로필, 나의 직관, 팀 성적).
+ *
+ * **흐름에는 쓰지 않는다** - 문자중계처럼 위아래로 이어 읽는 지면이나, 히어로 바로
+ * 아래의 핵심 카드는 테두리로 가두면 답답해진다. 그런 자리는 `SectionTitle` 이 맞다.
+ */
+export function SectionCard({
+  title,
+  right,
+  presenter,
+  padded,
+  children,
+  style,
+}: {
+  title: string;
+  right?: ReactNode;
+  presenter?: string;
+  /** 행(`Row`) 목록이 아니라 자유 콘텐츠를 담을 때. 좌우 여백을 준다 */
+  padded?: boolean;
+  children: ReactNode;
+  style?: ViewStyle;
+}) {
+  return (
+    <View style={[s.sectionCard, style]}>
+      <View style={s.sectionCardHead}>
+        <View style={s.sectionTitleWrap}>
+          <Text style={s.sectionTitle}>{title}</Text>
+          {presenter ? <Text style={s.presenter}>presented by {presenter}</Text> : null}
+        </View>
+        {right}
+      </View>
+      <View style={padded ? s.sectionCardBody : undefined}>{children}</View>
+    </View>
+  );
+}
+
 /** 카드 안 제목 - 작은 라벨 + 굵은 제목의 2단. 화면에서 가장 굵은 글자가 여기다 */
 export function CardHeading({
   label,
@@ -1093,6 +1143,27 @@ const s = StyleSheet.create({
     marginTop: spacing.sectionTop,
     marginBottom: spacing.sm,
   },
+
+  // 제목을 안에 들인 섹션. 카드 경계가 곧 섹션 경계다
+  sectionCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    overflow: 'hidden',
+    marginTop: spacing.sectionTop,
+  },
+  // 머리와 본문 사이 구분선. 없으면 제목이 첫 행에 붙어 행처럼 읽힌다
+  sectionCardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.cardPad,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sectionCardBody: { padding: spacing.cardPad, gap: spacing.md },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, flexWrap: 'wrap' },
   sectionTitle: typography.sectionHeader,

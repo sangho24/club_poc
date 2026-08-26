@@ -24,6 +24,7 @@ import {
   Divider,
   ExternalButton,
   GroupCard,
+  SectionCard,
   InfoRow,
   InfoTip,
   Label,
@@ -169,12 +170,15 @@ export function GamedayScreen() {
                 ) : null}
               </View>
 
-              {/* ── 예매 ─────────────────────────────────────── */}
-              <SectionTitle
+              {/* ── 예매 ───────────────────────────────────────
+                  예매·주차·혜택은 각각 **묶음**이다. 셋 다 "가기 전에 정하는 것"이지만
+                  서로 다른 결정이고, 한 화면에 흰 카드로 나란히 서면 어디서 하나가
+                  끝나고 다음이 시작하는지 사라진다 ── */}
+              <SectionCard
                 title="예매"
+                padded
                 right={openIn ? <Text style={st.headNote}>{openIn}</Text> : null}
-              />
-              <Card>
+              >
                 <CardHeading label={TICKET_CHANNEL.channel} title="8월 14일 오후 2시 오픈" />
 
                 <View>
@@ -249,53 +253,56 @@ export function GamedayScreen() {
                   label="티켓링크에서 예매"
                   onPress={() => Linking.openURL(TICKET_CHANNEL.url)}
                 />
-              </Card>
+              </SectionCard>
 
               {/* ── 주차 ───────────────────────────────────────
                   남은 시간은 앱이 안다. 팬이 고르는 것은 **무엇을 아쉬워할 것인가**다 */}
               {/* 스폰서를 여기 둔 이유: 자동차보험 브랜드와 주차 안내는 맥락이 맞는다.
                   팬이 "지금 어디에 댈까"를 묻는 자리에 자동차 관련 브랜드가 있으면
                   광고가 아니라 후원으로 읽힌다. 맥락이 안 맞는 지면에 붙이면 그때부터 소음이다. */}
-              <SectionTitle title="주차" presenter="한화손해보험" />
-              <Card style={{ gap: spacing.md }}>
-                <View style={st.countdownRow}>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={st.countdown}>
-                      {/* '0시간 38분'은 사람이 쓰지 않는 말이다 */}
-                      경기까지{' '}
-                      {minutes >= 60
-                        ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
-                        : `${minutes}분`}
-                    </Text>
-                    <Text style={st.countdownSub}>
-                      {TODAY_GAME.startTime} · {TODAY_GAME.opponent.name}전
-                    </Text>
+              {/* 카운트다운·정렬과 주차장 목록이 카드 둘로 갈려 있었다. 같은 질문
+                  ("지금 출발하면 어디에 대나")에 답하는 한 덩어리인데 갈라 두면
+                  정렬 기준을 바꿔도 그게 아래 목록에 걸리는 건지 알 수 없다.
+                  하나로 합치되 **목록 행은 카드 끝까지 닿아야** 하므로 위쪽만 여백을 준다 */}
+              <SectionCard title="주차" presenter="한화손해보험">
+                <View style={{ padding: spacing.cardPad, gap: spacing.md }}>
+                  <View style={st.countdownRow}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={st.countdown}>
+                        {/* '0시간 38분'은 사람이 쓰지 않는 말이다 */}
+                        경기까지{' '}
+                        {minutes >= 60
+                          ? `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`
+                          : `${minutes}분`}
+                      </Text>
+                      <Text style={st.countdownSub}>
+                        {TODAY_GAME.startTime} · {TODAY_GAME.opponent.name}전
+                      </Text>
+                    </View>
+                    {/* 시연 시각이 경기 시각과 동떨어졌을 때 조용히 바꿔치기하지 않는다 */}
+                    <Badge text={assumed ? '시연 기준' : '지금 출발 기준'} tone="brand" />
                   </View>
-                  {/* 시연 시각이 경기 시각과 동떨어졌을 때 조용히 바꿔치기하지 않는다 */}
-                  <Badge text={assumed ? '시연 기준' : '지금 출발 기준'} tone="brand" />
+
+                  {/* 근거는 머리글에서 카드 안으로 내렸다. 스폰서 표기와 한 줄에 두면
+                    390px 폭에서 둘 다 안 읽힌다 */}
+                  <Text style={st.basisNote}>{PARKING_BASIS}</Text>
+
+                  {/* 늦게 열면 전부 만차다. 그때 정렬 기준을 내밀면 고를 수 없는 것을 고르라는 말이 된다.
+                    이 시간대에 팬이 실제로 필요한 답은 "주차 말고 다른 방법"이다 */}
+                  {allFull ? (
+                    <View style={st.fullNote}>
+                      <Text style={st.fullTitle}>지금 출발하면 주차는 어렵습니다</Text>
+                      <Text style={st.fullBody}>
+                        네 곳 모두 경기 {Math.min(...advice.map((a) => a.lot.fullBeforeMinutes))}분
+                        전에는 찹니다. 아래 대중교통 안내를 보시거나, 다음 경기에는 조금 일찍
+                        출발하세요.
+                      </Text>
+                    </View>
+                  ) : (
+                    <Segmented options={PARKING_SORTS} value={sort} onChange={(k) => setSort(k)} />
+                  )}
                 </View>
 
-                {/* 근거는 머리글에서 카드 안으로 내렸다. 스폰서 표기와 한 줄에 두면
-                    390px 폭에서 둘 다 안 읽힌다 */}
-                <Text style={st.basisNote}>{PARKING_BASIS}</Text>
-
-                {/* 늦게 열면 전부 만차다. 그때 정렬 기준을 내밀면 고를 수 없는 것을 고르라는 말이 된다.
-                    이 시간대에 팬이 실제로 필요한 답은 "주차 말고 다른 방법"이다 */}
-                {allFull ? (
-                  <View style={st.fullNote}>
-                    <Text style={st.fullTitle}>지금 출발하면 주차는 어렵습니다</Text>
-                    <Text style={st.fullBody}>
-                      네 곳 모두 경기 {Math.min(...advice.map((a) => a.lot.fullBeforeMinutes))}분
-                      전에는 찹니다. 아래 대중교통 안내를 보시거나, 다음 경기에는 조금 일찍
-                      출발하세요.
-                    </Text>
-                  </View>
-                ) : (
-                  <Segmented options={PARKING_SORTS} value={sort} onChange={(k) => setSort(k)} />
-                )}
-              </Card>
-
-              <GroupCard style={{ marginTop: spacing.md }}>
                 {advice.map(({ lot, status, summary }, i) => (
                   <Row
                     key={lot.id}
@@ -319,7 +326,7 @@ export function GamedayScreen() {
                     <Text style={st.chevron}>›</Text>
                   </Row>
                 ))}
-              </GroupCard>
+              </SectionCard>
 
               {/* ── 가기 전에 ─────────────────────────────────
                   게이트 · 반입 · 교통은 필요한 정보지만 **매번 읽는 것은 아니다.**
@@ -331,13 +338,14 @@ export function GamedayScreen() {
           ) : (
             <>
               {/* ── 오늘 열리는 혜택 ─────────────────────────── */}
-              <SectionTitle title="오늘 열리는 혜택" />
-              <View style={st.chipRow}>
-                <Chip label="승리한 날" selected={won} onPress={() => setWon(true)} />
-                <Chip label="평소" selected={!won} onPress={() => setWon(false)} />
-              </View>
+              <SectionCard title="오늘 열리는 혜택">
+                <View style={{ padding: spacing.cardPad, paddingBottom: 0 }}>
+                  <View style={st.chipRow}>
+                    <Chip label="승리한 날" selected={won} onPress={() => setWon(true)} />
+                    <Chip label="평소" selected={!won} onPress={() => setWon(false)} />
+                  </View>
+                </View>
 
-              <GroupCard style={{ marginTop: spacing.md }}>
                 {perks.map(({ partner, perk }, i) => (
                   <Row
                     key={partner.id}
@@ -349,12 +357,12 @@ export function GamedayScreen() {
                     <Text style={st.chevron}>›</Text>
                   </Row>
                 ))}
-              </GroupCard>
+              </SectionCard>
               <Text style={st.footNote}>{won ? '승리한 날 열리는 혜택' : '당일 티켓 인증 시'}</Text>
 
               {/* ── 제휴 가게 ───────────────────────────────────
                   설명은 지면을 차지하지 않고 물음표 뒤에 있다 - 묻는 사람에게만 답한다 */}
-              <SectionTitle
+              <SectionCard
                 title="제휴 가게"
                 right={
                   <View style={st.headRight}>
@@ -368,8 +376,7 @@ export function GamedayScreen() {
                     />
                   </View>
                 }
-              />
-              <GroupCard>
+              >
                 {partners.map((p, i) => (
                   <Row
                     key={p.id}
@@ -402,7 +409,7 @@ export function GamedayScreen() {
                     <Text style={st.chevron}>›</Text>
                   </Row>
                 ))}
-              </GroupCard>
+              </SectionCard>
 
               {/* ── 어떤 구조인가 · 운영 원칙 · 배분 구조 섹션을 걷어냈다 ──
                   팬은 협찬금 구조를 궁금해하지 않는다. 팬의 질문은 "우리 동네에 이글스

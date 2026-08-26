@@ -11,8 +11,8 @@ import {
   Card,
   CardHeading,
   Divider,
-  GroupCard,
   Row,
+  SectionCard,
   SectionTitle,
   StatTile,
 } from '../components/common';
@@ -167,26 +167,25 @@ export function HomeScreen({
             '경기를 보러 갈 준비를 한다'인데, 후자로 가는 길이 하단 탭뿐이었다 */}
         <QuickTiles onGo={onGo} dots={{ store: profile.alerts.goodsDrop && goods.length > 0 }} />
 
-        {/* ── 감지 ───────────────────────────────────────────── */}
+        {/* ── 감지 ─────────────────────────────────────────────
+            아래 셋은 **묶음**이다 - 감지·팀 성적·최애 선수가 서로 독립적이고, 각각
+            안에서만 항목이 묶인다. 위 '오늘 경기'는 히어로에서 이어지는 **흐름**이라
+            머리글을 밖에 둔 채로 남긴다 - 거기까지 테두리로 가두면 첫 화면이 답답해진다 ── */}
         {alerts.length > 0 ? (
-          <>
-            <SectionTitle title="지금 눈여겨볼 것" />
-            <GroupCard>
-              {alerts.slice(0, 2).map((a, i, arr) => (
-                <Row key={i} last={i === arr.length - 1} style={st.alertRow}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={st.alertTitle}>{a.title}</Text>
-                    <Text style={st.alertBody}>{a.body}</Text>
-                  </View>
-                </Row>
-              ))}
-            </GroupCard>
-          </>
+          <SectionCard title="지금 눈여겨볼 것">
+            {alerts.slice(0, 2).map((a, i, arr) => (
+              <Row key={i} last={i === arr.length - 1} style={st.alertRow}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={st.alertTitle}>{a.title}</Text>
+                  <Text style={st.alertBody}>{a.body}</Text>
+                </View>
+              </Row>
+            ))}
+          </SectionCard>
         ) : null}
 
         {/* ── 순위 ───────────────────────────────────────────── */}
-        <SectionTitle title="2026 정규시즌" />
-        <Card>
+        <SectionCard title="2026 정규시즌" padded>
           <View style={st.tileRow}>
             <StatTile
               label="순위"
@@ -220,57 +219,57 @@ export function HomeScreen({
               );
             })}
           </View>
-        </Card>
+        </SectionCard>
 
         {/* ── 최애 선수 ─────────────────────────────────────── */}
-        <SectionTitle
+        <SectionCard
           title="최애 선수"
+          padded
           right={
             <Pressable onPress={() => setPickerOpen(true)} hitSlop={8}>
               <Text style={st.changeBtn}>변경</Text>
             </Pressable>
           }
-        />
-        {favBatter ? (
-          <Card>
-            <CardHeading
-              label={`${favBatter.back} · ${favBatter.pos}`}
-              title={favBatter.name}
-              right={<PlayerAvatar playerId={favBatter.id} size={52} />}
-            />
-            <Text style={st.favNote}>{favBatter.note}</Text>
-            <View style={st.tileRow}>
-              <StatTile
-                label="wRC+"
-                value={String(wrcPlusOf(favBatter.stat, '대전'))}
-                tone="brand"
+        >
+          {favBatter ? (
+            <>
+              <CardHeading
+                label={`${favBatter.back} · ${favBatter.pos}`}
+                title={favBatter.name}
+                right={<PlayerAvatar playerId={favBatter.id} size={52} />}
               />
-              <StatTile label="WAR" value={String(batterWarOf(favBatter.stat, '대전'))} />
-              <StatTile label="OPS" value={opsOf(favBatter.stat).toFixed(3)} />
-            </View>
-          </Card>
-        ) : favPitcher ? (
-          <Card>
-            <CardHeading
-              label={`${favPitcher.back} · ${favPitcher.role}`}
-              title={favPitcher.name}
-              right={<PlayerAvatar playerId={favPitcher.id} size={52} />}
-            />
-            <Text style={st.favNote}>{favPitcher.note}</Text>
-            <View style={st.tileRow}>
-              <StatTile label="ERA" value={eraOf(favPitcher.stat).toFixed(2)} tone="brand" />
-              <StatTile label="FIP" value={fipOf(favPitcher.stat).toFixed(2)} />
-              <StatTile label="WAR" value={String(pitcherWarOf(favPitcher.stat, '대전'))} />
-            </View>
-          </Card>
-        ) : (
-          <Card onPress={() => setPickerOpen(true)}>
-            <View style={st.favEmptyRow}>
+              <Text style={st.favNote}>{favBatter.note}</Text>
+              <View style={st.tileRow}>
+                <StatTile
+                  label="wRC+"
+                  value={String(wrcPlusOf(favBatter.stat, '대전'))}
+                  tone="brand"
+                />
+                <StatTile label="WAR" value={String(batterWarOf(favBatter.stat, '대전'))} />
+                <StatTile label="OPS" value={opsOf(favBatter.stat).toFixed(3)} />
+              </View>
+            </>
+          ) : favPitcher ? (
+            <>
+              <CardHeading
+                label={`${favPitcher.back} · ${favPitcher.role}`}
+                title={favPitcher.name}
+                right={<PlayerAvatar playerId={favPitcher.id} size={52} />}
+              />
+              <Text style={st.favNote}>{favPitcher.note}</Text>
+              <View style={st.tileRow}>
+                <StatTile label="ERA" value={eraOf(favPitcher.stat).toFixed(2)} tone="brand" />
+                <StatTile label="FIP" value={fipOf(favPitcher.stat).toFixed(2)} />
+                <StatTile label="WAR" value={String(pitcherWarOf(favPitcher.stat, '대전'))} />
+              </View>
+            </>
+          ) : (
+            <Pressable onPress={() => setPickerOpen(true)} style={st.favEmptyRow}>
               <Text style={st.favEmptyText}>최애 선수 고르기</Text>
               <Text style={st.chevron}>›</Text>
-            </View>
-          </Card>
-        )}
+            </Pressable>
+          )}
+        </SectionCard>
 
         {/* ── 굿즈 ─────────────────────────────────────────────
             '발매 소식' 섹션이 여기 있었다. 굿즈 탭의 '놓치기 전에'와 **같은 데이터**

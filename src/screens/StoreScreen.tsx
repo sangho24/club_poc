@@ -23,6 +23,7 @@ import {
   Divider,
   ExternalButton,
   GroupCard,
+  SectionCard,
   InfoRow,
   Label,
   Row,
@@ -82,32 +83,32 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
           paddingBottom: spacing.scrollBottom,
         }}
       >
+        {/* '놓치기 전에'는 **묶음**이다 - 지금 급한 것만 모아 놓은 독립된 덩어리라
+            아래 '발매 소식' 목록과 섞이면 안 된다. 반대로 '발매 소식'은 필터 칩으로
+            걸러 보는 **흐름**이라 머리글을 밖에 둔다 */}
         {profile.alerts.goodsDrop && notices.length > 0 ? (
-          <>
-            <SectionTitle title="놓치기 전에" />
-            <GroupCard>
-              {notices.map((a, i) => (
-                <Row
-                  key={i}
-                  last={i === notices.length - 1}
-                  style={st.alertRow}
-                  onPress={() => openDrop(a.drop)}
-                >
-                  <View style={{ flex: 1, gap: 5 }}>
-                    <Badge
-                      text={
-                        a.urgency >= 90 ? '품절 임박' : a.urgency >= 80 ? '발매 임박' : '최애 선수'
-                      }
-                      tone={a.urgency >= 90 ? 'live' : a.urgency >= 80 ? 'warn' : 'brand'}
-                    />
-                    <Text style={st.alertText}>{a.message}</Text>
-                    <Text style={st.alertNote}>{a.note}</Text>
-                  </View>
-                  <Text style={st.chevron}>›</Text>
-                </Row>
-              ))}
-            </GroupCard>
-          </>
+          <SectionCard title="놓치기 전에">
+            {notices.map((a, i) => (
+              <Row
+                key={i}
+                last={i === notices.length - 1}
+                style={st.alertRow}
+                onPress={() => openDrop(a.drop)}
+              >
+                <View style={{ flex: 1, gap: 5 }}>
+                  <Badge
+                    text={
+                      a.urgency >= 90 ? '품절 임박' : a.urgency >= 80 ? '발매 임박' : '최애 선수'
+                    }
+                    tone={a.urgency >= 90 ? 'live' : a.urgency >= 80 ? 'warn' : 'brand'}
+                  />
+                  <Text style={st.alertText}>{a.message}</Text>
+                  <Text style={st.alertNote}>{a.note}</Text>
+                </View>
+                <Text style={st.chevron}>›</Text>
+              </Row>
+            ))}
+          </SectionCard>
         ) : null}
 
         <SectionTitle title="발매 소식" />

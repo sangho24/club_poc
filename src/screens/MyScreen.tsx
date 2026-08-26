@@ -13,12 +13,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   AlertToggle,
-  Card,
   DetailSheet,
   Divider,
   GroupCard,
   Row,
-  SectionTitle,
+  SectionCard,
   Segmented,
   StatTile,
 } from '../components/common';
@@ -65,9 +64,11 @@ export function MyScreen({
           paddingBottom: spacing.scrollBottom,
         }}
       >
-        {/* ── 프로필 ─────────────────────────────────────────── */}
-        <SectionTitle title="프로필" />
-        <Card>
+        {/* ── 프로필 ─────────────────────────────────────────────
+            MY 는 세 묶음이 서로 독립적이다 - 내 정보 · 알림 설정 · 내 기록.
+            머리글이 카드 밖에 떠 있으면 어느 카드의 것인지 눈으로 이어지지 않아
+            셋이 한 덩어리로 흘러 보인다. 제목을 카드 안에 들여 경계를 세운다 ── */}
+        <SectionCard title="프로필" padded>
           <Row style={st.favRow} onPress={() => setPickerOpen(true)}>
             <PlayerAvatar playerId={fav?.id ?? ''} size={44} />
             <View style={{ flex: 1, gap: 1 }}>
@@ -101,11 +102,10 @@ export function MyScreen({
           >
             <Text style={st.resetText}>온보딩 다시 하기 ›</Text>
           </Pressable>
-        </Card>
+        </SectionCard>
 
         {/* ── 알림 - 온보딩 STEP 3 와 같은 부품 ──────────────── */}
-        <SectionTitle title="알림" />
-        <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
+        <SectionCard title="알림">
           <Row>
             <View style={{ flex: 1 }}>
               <AlertToggle
@@ -136,11 +136,10 @@ export function MyScreen({
               />
             </View>
           </Row>
-        </GroupCard>
+        </SectionCard>
 
         {/* ── 나의 직관 ──────────────────────────────────────── */}
-        <SectionTitle title="나의 직관" right={<Text style={st.headNote}>2026 시즌</Text>} />
-        <Card>
+        <SectionCard title="나의 직관" right={<Text style={st.headNote}>2026 시즌</Text>} padded>
           <View style={st.tileRow}>
             <StatTile label="직관" value={`${summary.games}회`} tone="brand" />
             <StatTile label="전적" value={`${summary.wins}-${summary.losses}`} />
@@ -156,7 +155,7 @@ export function MyScreen({
             <Text style={st.logLabel}>경기 기록</Text>
             <Text style={st.chevron}>›</Text>
           </Row>
-        </Card>
+        </SectionCard>
 
         {/* iOS 설정 하단의 버전 표기 문법 - 카드가 아니라 지면에 직접 */}
         <Text style={st.appInfo}>이글스 앱 PoC v0.1 · 모든 데이터는 시연용 샘플</Text>
