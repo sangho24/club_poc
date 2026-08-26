@@ -41,6 +41,7 @@ import {
   TopTabs,
 } from '../components/common';
 import type { Band } from '../components/common';
+import { DataTable, TableColumn } from '../components/DataTable';
 import { PlayerAvatar, PlayerFormLoop } from '../components/photos';
 import {
   DEFAULT_BATTER_METRICS,
@@ -387,7 +388,10 @@ export function PlayersScreen({
                     hitSlop={10}
                     style={({ pressed }) => [st.editBtn, pressed && states.pressed]}
                     accessibilityRole="button"
-                    accessibilityLabel={`세부 지표 편집 · 현재 ${(tab === 'batter' ? metrics : pMetrics)
+                    accessibilityLabel={`세부 지표 편집 · 현재 ${(tab === 'batter'
+                      ? metrics
+                      : pMetrics
+                    )
                       .map((m) => m.label)
                       .join(', ')}`}
                   >
@@ -568,8 +572,7 @@ function MetricPicker({
     onChange([...picked, key]);
   };
 
-  const isDefault =
-    picked.length === defaults.length && picked.every((k, i) => k === defaults[i]);
+  const isDefault = picked.length === defaults.length && picked.every((k, i) => k === defaults[i]);
 
   return (
     <DetailSheet
@@ -624,8 +627,7 @@ function MetricPicker({
         </GroupCard>
 
         <Text style={st.pickFoot}>
-          고른 지표는 목록에 펼쳐 둔 선수와 선수 상세 양쪽에 같이 적용되고, 앱을 껐다 켜도
-          남습니다.
+          고른 지표는 목록에 펼쳐 둔 선수와 선수 상세 양쪽에 같이 적용되고, 앱을 껐다 켜도 남습니다.
         </Text>
       </View>
     </DetailSheet>
@@ -789,6 +791,12 @@ function RecordTab({ onOpen }: { onOpen: (id: string) => void }) {
 }
 
 /** 표의 한 열. 정렬도 이 정의 하나로 굴러간다 */
+/**
+ * 표의 한 열.
+ *
+ * 스무 개 넘는 열을 DataTable 의 TableColumn 형태로 그대로 적으면 `key` 와 `render` 가
+ * 라벨마다 되풀이된다. 여기서는 짧게 적고 toColumns() 가 옮긴다.
+ */
 interface Col<T> {
   label: string;
   /** 정렬에 쓰는 값 */
@@ -799,6 +807,18 @@ interface Col<T> {
   /** 이 열로 처음 열리는 정렬 기준 */
   initial?: boolean;
 }
+
+// 표가 다루는 것은 선수(T) 가 아니라 **줄(TableRow<T>)** 이다 - 규정 충족 여부처럼
+// 선수에는 없고 줄에만 있는 것이 붙어 있다. 그래서 여기서 한 겹 벗겨 넘긴다
+const toColumns = <T,>(cols: Col<T>[]): TableColumn<TableRow<T>>[] =>
+  cols.map((c) => ({
+    key: c.label,
+    label: c.label,
+    allowsSorting: true,
+    sortValue: (r: TableRow<T>) => c.value(r.item),
+    ascendingFirst: c.asc,
+    render: (r: TableRow<T>) => c.format(r.item),
+  }));
 
 const BATTER_COLS: Col<Batter>[] = [
   { label: '타율', value: (x) => avgOf(x.stat), format: (x) => dec3(avgOf(x.stat)) },
@@ -919,119 +939,41 @@ function StatTable<T>({
   rows: TableRow<T>[];
   onOpen: (id: string) => void;
 }) {
-  const initial = Math.max(
-    0,
-    columns.findIndex((c) => c.initial),
-  );
-  const [sortIdx, setSortIdx] = useState(initial);
-  const [asc, setAsc] = useState(!!columns[initial]?.asc);
-
   if (rows.length === 0) return null;
-  const col = columns[sortIdx];
-  const sorted = rows
-    .slice()
-    .sort((a, b) =>
-      asc ? col.value(a.item) - col.value(b.item) : col.value(b.item) - col.value(a.item),
-    );
-
-  const press = (i: number) => {
-    if (i === sortIdx) setAsc((v) => !v);
-    else {
-      setSortIdx(i);
-      setAsc(!!columns[i].asc);
-    }
-  };
+  const initial = columns.find((c) => c.initial) ?? columns[0];
 
   return (
     <>
       <SectionTitle title={title} right={note ? <Text style={st.headNote}>{note}</Text> : null} />
-      <GroupCard>
-        <View style={{ flexDirection: 'row' }}>
-          {/* 붙박이 이름 열 */}
-          <View style={st.tblNameCol}>
-            <View style={[st.tblHeadCell, st.tblNameCell]}>
-              <Text style={st.tblHead}>선수</Text>
-            </View>
-            {sorted.map((r, i) => (
-              <Pressable
-                key={r.id}
-                onPress={() => onOpen(r.id)}
-                style={({ pressed }) => [
-                  st.tblNameCell,
-                  i < sorted.length - 1 && st.tblRowLine,
-                  pressed && { opacity: 0.6 },
-                ]}
-              >
-                <Text
-                  style={[st.tblName, !r.strong && { color: colors.subText }]}
-                  numberOfLines={1}
-                >
-                  {r.name}
-                </Text>
-                <Text style={st.tblMeta} numberOfLines={1}>
-                  {r.meta}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          {/* 흐르는 지표 열 */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View>
-              <View style={[st.tblHeadCell, { flexDirection: 'row' }]}>
-                {columns.map((c, ci) => {
-                  const on = ci === sortIdx;
-                  return (
-                    <Pressable
-                      key={c.label}
-                      onPress={() => press(ci)}
-                      style={({ pressed }) => [st.tblCell, pressed && { opacity: 0.6 }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${c.label} 로 정렬`}
-                    >
-                      <Text
-                        style={[st.tblHead, on && { color: colors.brandText }]}
-                        numberOfLines={1}
-                      >
-                        {c.label}
-                      </Text>
-                      <Text style={[st.tblSortMark, on && { color: colors.brandText }]}>
-                        {on ? (asc ? '▲' : '▼') : '⌄'}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {sorted.map((r, i) => (
-                <View
-                  key={r.id}
-                  style={[
-                    { flexDirection: 'row', alignItems: 'center', height: st.tblNameCell.height },
-                    i < sorted.length - 1 && st.tblRowLine,
-                  ]}
-                >
-                  {columns.map((c, ci) => (
-                    <Text
-                      key={c.label}
-                      style={[
-                        st.tblCell,
-                        st.tblValue,
-                        // 규정을 못 채운 줄은 흐리게 - 비율 지표를 곧이곧대로 읽으면 안 된다
-                        !r.strong && { color: colors.mutedText, fontWeight: '500' },
-                        // 지금 정렬 기준인 열을 눈에 띄게 둔다
-                        ci === sortIdx && r.strong && { color: colors.brandText },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {c.format(r.item)}
-                    </Text>
-                  ))}
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-      </GroupCard>
+      <DataTable
+        label={title}
+        columns={toColumns(columns)}
+        items={rows}
+        getKey={(r) => r.id}
+        // 이름 열은 값이 아니라 사람이라 붙박이로 둔다 (DataTable 주석 참고)
+        stickyColumn={{
+          label: '선수',
+          render: (r) => (
+            <>
+              <Text style={[st.tblName, !r.strong && { color: colors.subText }]} numberOfLines={1}>
+                {r.name}
+              </Text>
+              <Text style={st.tblMeta} numberOfLines={1}>
+                {r.meta}
+              </Text>
+            </>
+          ),
+        }}
+        defaultSortDescriptor={{
+          column: initial.label,
+          direction: initial.asc ? 'ascending' : 'descending',
+        }}
+        onRowAction={(id) => onOpen(id)}
+        // 규정을 못 채운 줄은 흐리게 - 비율 지표를 곧이곧대로 읽으면 안 된다
+        rowMuted={(r) => !r.strong}
+        isStriped
+        emptyContent="아직 기록이 없습니다"
+      />
     </>
   );
 }
@@ -1679,8 +1621,7 @@ function SplitSection({
   /** 이 표본에 못 미치면 '표본 적음'을 붙인다 */
   thinBelow: number;
 }) {
-  const at = (v: number) =>
-    Math.min(1, Math.max(0, (v - domain.low) / (domain.high - domain.low)));
+  const at = (v: number) => Math.min(1, Math.max(0, (v - domain.low) / (domain.high - domain.low)));
   const live = groups.filter((g) => g.rows.length === 2 || g.rows.length === 1);
   if (live.length === 0 || live.every((g) => g.rows.length === 0)) return null;
 
@@ -1908,7 +1849,7 @@ function CompareSection({ prev, rows }: { prev: unknown; rows: CompareRow[] }) {
  * 타일 폭이 70px 남짓이 되어 `0.360` 이 두 줄로 꺾이거나 `…` 로 잘린다 - 값이 안 읽히면
  * 지표를 넷 고른 의미가 없다.
  */
-function MetricTiles<T,>({
+function MetricTiles<T>({
   stat,
   sample,
   qual,
@@ -1946,7 +1887,7 @@ function MetricTiles<T,>({
 }
 
 /** 같은 지표를 구간 게이지로 한 번 더 - 값 옆에 '어디쯤인가'가 붙는 이 화면의 규칙 */
-function MetricGauges<T,>({ stat, metrics }: { stat: T; metrics: MetricOpt<T>[] }) {
+function MetricGauges<T>({ stat, metrics }: { stat: T; metrics: MetricOpt<T>[] }) {
   return (
     <View style={{ gap: spacing.md }}>
       {metrics.map((m) => (
@@ -2127,7 +2068,7 @@ const TRUST_RANK = { low: 0, mid: 1, high: 2 } as const;
  * 입문 수준에서 쓴다. 신뢰도 경고를 지표 수만큼 늘어놓으면 그 카드가 화면에서 가장
  * 긴 덩어리가 되고, 정작 '무엇을 조심하라'는 말은 배경으로 밀린다.
  */
-function worstTrustItems<T,>(metrics: MetricOpt<T>[], sample: number, qual: number) {
+function worstTrustItems<T>(metrics: MetricOpt<T>[], sample: number, qual: number) {
   const items = metrics.map((m) => ({ metric: m.key, label: m.label }));
   if (items.length === 0) return items;
   return [
@@ -2301,7 +2242,13 @@ const st = StyleSheet.create({
   splitTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surface, overflow: 'hidden' },
   splitFill: { height: 6, borderRadius: 3 },
   // 리그 평균 눈금. 막대 위에 그려야 브랜드색 구간에서도 살아남는다(형제 순서로 해결)
-  splitMid: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: colors.mutedText },
+  splitMid: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: colors.mutedText,
+  },
   // 표본이 얇은 줄 - 숫자를 지우지 않고 색으로 물러서게만 한다
   splitThin: { color: colors.warn, fontWeight: '700' },
   splitLegend: { ...typography.micro, lineHeight: 16, marginTop: spacing.xs },
@@ -2346,23 +2293,10 @@ const st = StyleSheet.create({
   },
   chipRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.screenX },
 
-  // 기록 탭 - 세부지표 표. 행 높이를 두 열이 공유해야 줄이 어긋나지 않는다
-  tblNameCol: { borderRightWidth: 1, borderRightColor: colors.border },
-  tblNameCell: {
-    width: 92,
-    height: 44,
-    justifyContent: 'center',
-    paddingLeft: spacing.cardPad,
-    paddingRight: spacing.sm,
-  },
-  tblHeadCell: { height: 40, justifyContent: 'center', backgroundColor: colors.surface },
-  tblHead: { ...typography.micro, fontSize: 10, fontWeight: '700', textAlign: 'center' },
-  tblSortMark: { fontSize: 8, color: colors.dim, textAlign: 'center', marginTop: 1 },
-  tblRowLine: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  // 기록 탭 - 세부지표 표. 칸·머리글·줄무늬는 전부 DataTable 로 옮겼고,
+  // 여기 남은 둘은 붙박이 이름 열에 넣는 내용물이다
   tblName: { fontSize: 14, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
   tblMeta: { ...typography.micro, fontSize: 10 },
-  tblCell: { width: 52, textAlign: 'center' },
-  tblValue: { ...typography.caption, ...tabularFigures, fontWeight: '700', color: colors.text },
 
   // 기록 탭 - 부문 카드
   leaderHead: {
