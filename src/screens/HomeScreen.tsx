@@ -26,7 +26,7 @@ import { BATTERS, OPPONENT_PITCHERS, PITCHERS } from '../roster';
 import { batterWarOf, eraOf, fipOf, opsOf, pitcherWarOf, wrcPlusOf } from '../sabermetrics';
 import { colors, radius, spacing, states, tabularFigures, typography } from '../theme';
 import type { TabKey } from '../../App';
-import ShopIcon from '../../assets/icons/shop.svg';
+import BagIcon from '../../assets/icons/tab-bag.svg';
 import StatsIcon from '../../assets/icons/stats.svg';
 import TicketIcon from '../../assets/icons/ticket.svg';
 
@@ -45,10 +45,13 @@ const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
 const QUICK: { key: TabKey; label: string; icon: HomeIconName }[] = [
   { key: 'gameday', label: '예매·직관', icon: 'ticket' },
   { key: 'players', label: '기록', icon: 'stats' },
-  { key: 'store', label: '굿즈', icon: 'shop' },
+  { key: 'store', label: '굿즈', icon: 'bag' },
 ];
 
-const HOME_ICONS = { ticket: TicketIcon, stats: StatsIcon, shop: ShopIcon };
+// 지름길 타일과 하단탭은 **같은 파일**을 쓴다. 두 자리가 같은 곳을 가리키는데 그림이
+// 둘이면 언젠가 한쪽만 고쳐져 어긋난다 - 실제로 어긋나 있었다. 기록은 막대그래프 대
+// 방망이였고, 굿즈는 옷걸이(shop.svg) 대 쇼핑백이었다.
+const HOME_ICONS = { ticket: TicketIcon, stats: StatsIcon, bag: BagIcon };
 type HomeIconName = keyof typeof HOME_ICONS;
 
 function QuickTiles({
