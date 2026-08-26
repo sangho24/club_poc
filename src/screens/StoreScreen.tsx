@@ -1,21 +1,29 @@
-// 굿즈 - 기념 유니폼·한정 MD 발매 소식 (1차 리뷰 7번)
+// 굿즈 - 네 갈래 (1차 리뷰 7번)
 //
-// ── 단위는 상품이 아니라 사건이다 ────────────────────────────
-// 공유받은 사례(키움 박병호 은퇴 MD)는 타월 하나가 아니라 티셔츠+키링+응원타월 세트였다.
-// 기념 굿즈는 은퇴·기록 달성·헤리티지 데이 같은 사건에 붙어서 나온다. 그래서 카드 하나가
-// 상품 하나가 아니라 드롭 하나이고, 맨 위에 가격이 아니라 **왜 이게 나오는지**가 온다.
+// ── 왜 하나의 목록이 아니라 네 개의 탭인가 ───────────────────
+// 처음에는 발매 소식 한 줄기였다. 사건마다 드롭 카드를 세워 시간순으로 늘어놓았는데,
+// 성격이 전혀 다른 네 가지가 같은 카드 모양으로 섞여 있었다. 팬이 굿즈 탭을 여는 이유는
+// 하나가 아니다 - 오늘 구장에서만 살 수 있는 것을 찾는 사람과, 응원 타월 하나 사려는
+// 사람은 **같은 화면을 볼 이유가 없다.** 그래서 자료 구조를 넷으로 나누고(src/goods.ts)
+// 화면도 그대로 넷으로 갈랐다.
 //
-// ── 백링크 직전까지 앱이 하는 일 ─────────────────────────────
-// 결제는 공식몰로 넘긴다. 대신 그 전에 필요한 것은 앱이 끝낸다.
-//   발매까지 남은 시간 · 구성품과 사이즈 · 남은 재고 · 수령 방법 · 1인 구매 제한 · 알림 신청
-// 특히 **알림 신청**이 이 화면을 공지사항에서 도구로 바꾼다. 한정 굿즈에서 팬이 가장 크게
-// 실망하는 것은 비싼 것이 아니라 몰라서 못 산 것이다.
+// ── 갈래마다 앱이 하는 일의 깊이가 다르다 ────────────────────
+//   오프라인 한정  자격 판정까지 - 그날 그 자리에 있었는지를 앱이 안다
+//   특별 MD       예측까지     - 기록이 언제 달성될지, 언제 예약이 열리는지
+//   유니폼        고르기까지    - 내 사이즈가 남아 있는지
+//   기타 굿즈      보여주기까지  - 얹을 판단이 없으므로 바로 공식몰로
+//
+// 앞의 둘은 앱이 아니면 못 한다. 뒤의 둘은 공식몰이 더 잘한다. **깊이를 균등하게 맞추면
+// 앱이 잘하는 것과 못하는 것이 같은 무게로 보인다.** 탭 순서가 그 깊이 순이자 희소성 순이다.
+//
+// ⚠ 결제는 앱에서 하지 않는다 - 공식몰로 리다이렉트한다 (5번 티켓과 같은 원칙).
 import { useMemo, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   AlertToggle,
   Badge,
+  Button,
   Card,
   CardHeading,
   Chip,
@@ -27,51 +35,94 @@ import {
   Label,
   Row,
   SectionTitle,
+  TopTabs,
 } from '../components/common';
 import { GoodsShowcase, PlayerAvatar, TeamEmblem } from '../components/photos';
 import {
-  DROPS,
-  GoodsDrop,
+  CATEGORIES,
+  CardGate,
+  GoodsAlert,
+  GoodsCategory,
+  MERCH,
+  MERCH_GROUPS,
+  MILESTONES,
+  Merch,
+  Milestone,
+  MilestoneProgress,
+  OFFICIAL_SHOP,
+  OFFICIAL_SHOP_NAME,
+  PHOTOCARDS,
+  PHOTOCARD_WINDOW_DAYS,
+  PhotoCard,
+  Uniform,
+  UNIFORMS,
   countdown,
-  dropAlerts,
-  statusLabel,
-  stockLeft,
-  stockRatio,
+  firstAvailableSize,
+  formatDate,
+  formatDateTime,
+  formatKstDate,
+  gameKey,
+  gateBadge,
+  gateReason,
+  goodsAlerts,
+  milestoneProgress,
+  photocardCloseAt,
+  photocardGate,
+  sizeSoldOut,
+  stockLabel,
+  stockTone,
 } from '../goods';
 import { UserProfile } from '../profile';
-import { BATTERS, PITCHERS } from '../roster';
 import { colors, radius, spacing, tabularFigures, typography } from '../theme';
 
 /** 시연 기준 시각 - Date.now() 를 쓰면 실행할 때마다 카운트다운이 달라진다 */
 const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
 
-const FILTERS: { key: 'all' | 'onsale' | 'upcoming'; label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'onsale', label: '판매 중' },
-  { key: 'upcoming', label: '발매 예정' },
-];
+const shop = () => void Linking.openURL(OFFICIAL_SHOP);
+
+/** 어떤 갈래의 무엇을 펼쳐 놓았는가. 상세가 셋이라 열쇠를 하나로 묶는다 */
+type Sheet =
+  | { kind: 'card'; id: string }
+  | { kind: 'milestone'; id: string }
+  | { kind: 'uniform'; id: string };
 
 export function StoreScreen({ profile }: { profile: UserProfile }) {
-  const [filter, setFilter] = useState<'all' | 'onsale' | 'upcoming'>('all');
-  const [open, setOpen] = useState<GoodsDrop | null>(null);
-  const [alerts, setAlerts] = useState<Record<string, boolean>>({ d1: true });
+  const [tab, setTab] = useState<GoodsCategory>('venue');
+  const [sheet, setSheet] = useState<Sheet | null>(null);
+  /**
+   * 구장 입장 인증.
+   *
+   * 실서비스에서는 티켓 QR 과 구장 위치가 이 값을 세운다. 시연에서는 버튼 하나로
+   * 대신하되, **인증 전 화면을 먼저 보여준다** - 잠긴 상태가 이 갈래의 규칙이다.
+   */
+  const [checkedIn, setCheckedIn] = useState(false);
+  const [bought, setBought] = useState<Record<string, boolean>>({});
+  const [reserved, setReserved] = useState<Record<string, boolean>>({});
+  const [alerts, setAlerts] = useState<Record<string, boolean>>({});
   const [size, setSize] = useState<string | null>(null);
 
   const notices = useMemo(
-    () => dropAlerts(DEMO_NOW, profile.favoritePlayerId),
+    () => goodsAlerts(DEMO_NOW, profile.favoritePlayerId),
     [profile.favoritePlayerId],
   );
 
-  const list = DROPS.filter((d) => {
-    if (filter === 'onsale') return d.status === 'onsale';
-    if (filter === 'upcoming') return d.status === 'upcoming' || d.status === 'teaser';
-    return true;
-  });
-
-  const openDrop = (d: GoodsDrop) => {
-    setSize(d.items.find((i) => i.sizes)?.sizes?.[1] ?? null);
-    setOpen(d);
+  const openUniform = (u: Uniform) => {
+    setSize(firstAvailableSize(u));
+    setSheet({ kind: 'uniform', id: u.id });
   };
+
+  /** 알림 → 해당 갈래로 이동하고 그 항목을 펼친다. 탭만 바꾸면 다시 찾게 만든다 */
+  const jump = (a: GoodsAlert) => {
+    setTab(a.category);
+    if (a.category === 'venue') setSheet({ kind: 'card', id: a.targetId });
+    else if (a.category === 'milestone') setSheet({ kind: 'milestone', id: a.targetId });
+    else if (a.category === 'uniform') {
+      const u = UNIFORMS.find((x) => x.id === a.targetId);
+      if (u) openUniform(u);
+    }
+  };
+
+  const here = CATEGORIES.find((c) => c.key === tab)!;
 
   return (
     <>
@@ -88,18 +139,13 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
             <GroupCard>
               {notices.map((a, i) => (
                 <Row
-                  key={i}
+                  key={a.id}
                   last={i === notices.length - 1}
                   style={st.alertRow}
-                  onPress={() => openDrop(a.drop)}
+                  onPress={() => jump(a)}
                 >
                   <View style={{ flex: 1, gap: 5 }}>
-                    <Badge
-                      text={
-                        a.urgency >= 90 ? '품절 임박' : a.urgency >= 80 ? '발매 임박' : '최애 선수'
-                      }
-                      tone={a.urgency >= 90 ? 'live' : a.urgency >= 80 ? 'warn' : 'brand'}
-                    />
+                    <Badge text={a.badge} tone={a.tone} />
                     <Text style={st.alertText}>{a.message}</Text>
                     <Text style={st.alertNote}>{a.note}</Text>
                   </View>
@@ -110,240 +156,925 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
           </>
         ) : null}
 
-        <SectionTitle title="발매 소식" />
-        <View style={st.filterRow}>
-          {FILTERS.map((f) => (
-            <Chip
-              key={f.key}
-              label={f.label}
-              selected={filter === f.key}
-              onPress={() => setFilter(f.key)}
-            />
-          ))}
+        <View style={st.tabWrap}>
+          <TopTabs
+            tabs={CATEGORIES.map((c) => ({ key: c.key, label: c.short }))}
+            value={tab}
+            onChange={setTab}
+          />
         </View>
 
-        <View style={{ gap: spacing.cardGap, marginTop: spacing.md }}>
-          {list.map((d) => (
-            <DropCard key={d.id} drop={d} alerted={!!alerts[d.id]} onPress={() => openDrop(d)} />
-          ))}
-        </View>
+        {/* 탭 알약이 이미 자리 이름을 말했다. 여기서 같은 이름을 머리글로 한 번 더 쓰면
+            그 줄이 통째로 되풀이가 된다 - 갈래마다 다른 것, 즉 규칙만 한 줄로 적는다 */}
+        <Text style={st.blurb}>{here.blurb}</Text>
+
+        {tab === 'venue' ? (
+          <VenueTab
+            checkedIn={checkedIn}
+            bought={bought}
+            onCheckIn={() => setCheckedIn(true)}
+            onOpen={(c) => setSheet({ kind: 'card', id: c.id })}
+          />
+        ) : null}
+        {tab === 'milestone' ? (
+          <MilestoneTab
+            reserved={reserved}
+            onOpen={(m) => setSheet({ kind: 'milestone', id: m.id })}
+          />
+        ) : null}
+        {tab === 'uniform' ? <UniformTab onOpen={openUniform} /> : null}
+        {tab === 'merch' ? <MerchTab /> : null}
       </ScrollView>
 
-      {/* ── 드롭 상세 ──────────────────────────────────────── */}
-      <DetailSheet
-        visible={!!open}
-        title={open?.title ?? ''}
-        subtitle={open ? `${open.occasion} · ${statusLabel(open.status)}` : ''}
-        onClose={() => setOpen(null)}
-        actions={
-          open ? (
-            open.status === 'ended' ? (
-              <View style={{ flex: 1 }}>
-                <Text style={st.endedNote}>판매가 종료된 상품입니다</Text>
-              </View>
-            ) : (
-              <>
-                <AlertToggle
-                  compact
-                  on={!!alerts[open.id]}
-                  onPress={() => setAlerts((a) => ({ ...a, [open.id]: !a[open.id] }))}
-                />
-                <View style={{ flex: 1.4 }}>
-                  <ExternalButton
-                    label={open.status === 'onsale' ? '공식몰에서 구매' : '공식몰 보기'}
-                    onPress={() => Linking.openURL(open.shopUrl)}
-                  />
-                </View>
-              </>
-            )
-          ) : null
+      <CardSheet
+        card={sheet?.kind === 'card' ? (PHOTOCARDS.find((c) => c.id === sheet.id) ?? null) : null}
+        checkedIn={checkedIn}
+        bought={bought}
+        onCheckIn={() => setCheckedIn(true)}
+        onBuy={(id) => setBought((b) => ({ ...b, [id]: true }))}
+        onClose={() => setSheet(null)}
+      />
+
+      <MilestoneSheet
+        milestone={
+          sheet?.kind === 'milestone' ? (MILESTONES.find((m) => m.id === sheet.id) ?? null) : null
         }
-      >
-        {open ? (
-          <>
-            <Card>
-              <View style={st.sheetHeadRow}>
-                {open.playerId ? (
-                  <PlayerAvatar playerId={open.playerId} team="HH" size={54} />
-                ) : (
-                  <View style={st.emblemThumb}>
-                    <TeamEmblem team="HH" size={34} />
-                  </View>
-                )}
-                <View style={{ flex: 1, gap: 4 }}>
-                  {countdown(open.openAt, DEMO_NOW) ? (
-                    <Text style={st.countdown}>{countdown(open.openAt, DEMO_NOW)}</Text>
-                  ) : null}
-                  <Text style={st.sheetBody}>{open.story}</Text>
-                </View>
-              </View>
-            </Card>
+        reserved={reserved}
+        alerted={alerts}
+        onReserve={(id) => setReserved((r) => ({ ...r, [id]: true }))}
+        onToggleAlert={(id) => setAlerts((a) => ({ ...a, [id]: !a[id] }))}
+        onClose={() => setSheet(null)}
+      />
 
-            {/* 재고 */}
-            {stockRatio(open) !== null && open.status === 'onsale' ? (
-              <View style={{ marginTop: spacing.cardGap }}>
-                <Card>
-                  <View style={st.stockHead}>
-                    <Label>남은 수량</Label>
-                    <Text
-                      style={[st.stockValue, stockRatio(open)! <= 0.2 && { color: colors.live }]}
-                    >
-                      {stockLeft(open)?.toLocaleString()}개
-                    </Text>
-                  </View>
-                </Card>
-              </View>
-            ) : null}
-
-            {/* 물건이 보여야 커머스다. 사이즈 표만 있으면 팬은 사진을 찾으러 앱을 나간다 */}
-            <View style={{ marginTop: spacing.cardGap }}>
-              <GoodsShowcase kind={/모자|캡|CAP/i.test(open.title) ? 'cap' : 'emblem'} />
-            </View>
-
-            {/* 구성 */}
-            {open.items.length > 0 ? (
-              <View style={{ marginTop: spacing.cardGap }}>
-                <SectionTitle title="구성" />
-                <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
-                  {open.items.map((it, i) => (
-                    <View
-                      key={it.name}
-                      style={[st.itemRow, i < open.items.length - 1 && st.divider]}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={st.itemName}>{it.name}</Text>
-                        {it.limit ? (
-                          <Text style={st.itemLimit}>
-                            한정 {it.limit.toLocaleString()}개
-                            {it.remain !== undefined
-                              ? ` · ${it.remain.toLocaleString()}개 남음`
-                              : ''}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Text style={st.itemPrice}>{it.price.toLocaleString()}원</Text>
-                    </View>
-                  ))}
-                </GroupCard>
-              </View>
-            ) : null}
-
-            {/* 사이즈 - 고르는 것까지가 앱의 일이다 */}
-            {open.items.some((i) => i.sizes) ? (
-              <View style={{ marginTop: spacing.cardGap }}>
-                <SectionTitle title="사이즈" />
-                <View style={st.sizeRow}>
-                  {open.items
-                    .find((i) => i.sizes)!
-                    .sizes!.map((sz) => (
-                      <Chip
-                        key={sz}
-                        label={sz}
-                        selected={size === sz}
-                        onPress={() => setSize(sz)}
-                      />
-                    ))}
-                </View>
-                <Text style={st.footNote}>선택한 사이즈는 공식몰로 넘어갈 때 함께 전달됩니다.</Text>
-              </View>
-            ) : null}
-
-            {/* 구매 정보 */}
-            <View style={{ marginTop: spacing.cardGap }}>
-              <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
-                <InfoRow label="발매" value={formatDate(open.openAt)} />
-                {open.closeAt ? <InfoRow label="마감" value={formatDate(open.closeAt)} /> : null}
-                <InfoRow label="수령" value={open.delivery} />
-                {open.buyLimit ? <InfoRow label="구매 제한" value={open.buyLimit} /> : null}
-                <InfoRow label="판매처" value={open.shopName} last />
-              </GroupCard>
-            </View>
-
-            {open.venueOnly ? (
-              <View style={{ marginTop: spacing.cardGap }}>
-                <Card>
-                  <Label>현장 한정</Label>
-                  <Text style={st.sheetBody}>
-                    구장 MD샵에서만 판매합니다. 온라인 배송은 하지 않습니다.
-                  </Text>
-                </Card>
-              </View>
-            ) : null}
-          </>
-        ) : null}
-      </DetailSheet>
+      <UniformSheet
+        uniform={
+          sheet?.kind === 'uniform' ? (UNIFORMS.find((u) => u.id === sheet.id) ?? null) : null
+        }
+        size={size}
+        alerted={alerts}
+        onSize={setSize}
+        onToggleAlert={(id) => setAlerts((a) => ({ ...a, [id]: !a[id] }))}
+        onClose={() => setSheet(null)}
+      />
     </>
   );
 }
 
-function formatDate(iso: string): string {
-  const d = new Date(Date.parse(iso));
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${d.getHours()}시`;
-}
+// ═════════════════════════════════════════════════════════════
+// ① 오프라인 한정
+// ═════════════════════════════════════════════════════════════
 
-function DropCard({
-  drop,
-  alerted,
-  onPress,
+function VenueTab({
+  checkedIn,
+  bought,
+  onCheckIn,
+  onOpen,
 }: {
-  drop: GoodsDrop;
-  alerted: boolean;
-  onPress: () => void;
+  checkedIn: boolean;
+  bought: Record<string, boolean>;
+  onCheckIn: () => void;
+  onOpen: (c: PhotoCard) => void;
 }) {
-  const ratio = stockRatio(drop);
-  const player = [...BATTERS, ...PITCHERS].find((p) => p.id === drop.playerId)?.name ?? null;
-  const left = countdown(drop.openAt, DEMO_NOW);
+  const gated = PHOTOCARDS.map((c) => ({ card: c, gate: photocardGate(c, DEMO_NOW) }));
+  const today = gated.filter((g) => g.gate === 'pending');
+  const buyable = gated.filter((g) => g.gate === 'open');
+  const past = gated.filter((g) => g.gate !== 'pending' && g.gate !== 'open');
 
-  const thumb = drop.playerId ? (
-    <PlayerAvatar playerId={drop.playerId} team="HH" size={46} />
-  ) : (
-    <View style={st.emblemThumb}>
-      <TeamEmblem team="HH" size={30} />
+  return (
+    <View style={{ gap: spacing.sm }}>
+      {/* 인증 - 이 갈래의 자물쇠. 화면 맨 위에 있어야 아래 카드들이 왜 그런지 설명된다 */}
+      <Card>
+        <CardHeading
+          label="오늘 경기"
+          title="대전 한화생명 볼파크"
+          right={
+            checkedIn ? <Badge text="입장 확인됨" tone="win" /> : <Badge text="미인증" tone="muted" />
+          }
+        />
+        <Text style={st.body}>
+          {checkedIn
+            ? '오늘 경기 입장이 확인되었습니다. 오늘의 카드를 선점할 수 있습니다.'
+            : '오늘의 카드는 경기장에 온 분만 살 수 있습니다. 입장 게이트에서 찍은 티켓과 현재 위치로 확인합니다.'}
+        </Text>
+        {checkedIn ? null : (
+          <Button label="구장에서 입장 인증" onPress={onCheckIn} full />
+        )}
+        <Text style={st.footNote}>
+          지난 경기 카드는 인증이 필요 없습니다 - MY 탭의 직관 기록이 그날 자리를 대신
+          증명합니다.
+        </Text>
+      </Card>
+
+      {today.length > 0 ? (
+        <>
+          <SectionTitle title="오늘의 카드" />
+          <View style={{ gap: spacing.cardGap }}>
+            {today.map((g) => (
+              <PhotoCardItem
+                key={g.card.id}
+                card={g.card}
+                gate={g.gate}
+                checkedIn={checkedIn}
+                bought={!!bought[g.card.id]}
+                onPress={() => onOpen(g.card)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {buyable.length > 0 ? (
+        <>
+          <SectionTitle title="내가 간 경기" right={<Text style={st.countHint}>{buyable.length}경기</Text>} />
+          <View style={{ gap: spacing.cardGap }}>
+            {buyable.map((g) => (
+              <PhotoCardItem
+                key={g.card.id}
+                card={g.card}
+                gate={g.gate}
+                checkedIn={checkedIn}
+                bought={!!bought[g.card.id]}
+                onPress={() => onOpen(g.card)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {/* 살 수 없는 것도 지우지 않는다. 없으면 팬은 카드가 발행되지 않은 줄 안다 */}
+      {past.length > 0 ? (
+        <>
+          <SectionTitle title="살 수 없는 카드" />
+          <GroupCard>
+            {past.map((g, i) => (
+              <Row key={g.card.id} last={i === past.length - 1} onPress={() => onOpen(g.card)}>
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={st.lockedTitle}>
+                    {gameKey(g.card)} {g.card.opponent}전
+                  </Text>
+                  <Text style={st.lockedWhy} numberOfLines={2}>
+                    {gateReason(g.gate, g.card)}
+                  </Text>
+                </View>
+                <Text style={st.chevron}>›</Text>
+              </Row>
+            ))}
+          </GroupCard>
+        </>
+      ) : null}
     </View>
   );
+}
 
-  const tone: 'brand' | 'live' | 'muted' | 'win' =
-    drop.status === 'onsale' ? 'win' : drop.status === 'upcoming' ? 'brand' : 'muted';
-
-  const meta = [drop.occasion, player, drop.venueOnly ? '현장 한정' : null]
-    .filter(Boolean)
-    .join(' · ');
+function PhotoCardItem({
+  card,
+  gate,
+  checkedIn,
+  bought,
+  onPress,
+}: {
+  card: PhotoCard;
+  gate: CardGate;
+  checkedIn: boolean;
+  bought: boolean;
+  onPress: () => void;
+}) {
+  const badge = bought
+    ? { text: gate === 'pending' ? '선점 완료' : '구매 완료', tone: 'brand' as const }
+    : gate === 'pending' && !checkedIn
+      ? { text: '인증 필요', tone: 'warn' as const }
+      : gateBadge(gate);
+  const days = (photocardCloseAt(card) - DEMO_NOW) / 86400000;
 
   return (
     <Card onPress={onPress}>
-      <View style={st.dropHead}>
-        {thumb}
+      <View style={st.cardHead}>
+        {card.moment ? (
+          <PlayerAvatar playerId={card.moment.playerId} team="HH" size={46} />
+        ) : (
+          <View style={st.emblemThumb}>
+            <TeamEmblem team="HH" size={30} />
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <CardHeading
-            label={meta}
-            title={drop.title}
-            right={<Badge text={statusLabel(drop.status)} tone={tone} />}
+            label={card.result ? (card.result.win ? '승' : '패') + ` ${card.result.ours}:${card.result.theirs}` : '경기 중'}
+            title={`${gameKey(card)} ${card.opponent}전`}
+            right={<Badge text={badge.text} tone={badge.tone} />}
           />
         </View>
       </View>
 
-      <Text style={st.story} numberOfLines={2}>
-        {drop.story}
-      </Text>
-
-      {ratio !== null && drop.status === 'onsale' ? (
-        <View style={st.stockHead}>
-          <Text style={st.stockLabel}>남은 수량</Text>
-          <Text style={[st.stockValueSm, ratio <= 0.2 && { color: colors.live }]}>
-            {stockLeft(drop)?.toLocaleString()}개
-          </Text>
+      {card.moment ? (
+        <View style={st.momentBox}>
+          <Text style={st.momentName}>{card.moment.playerName}</Text>
+          <Text style={st.momentLine}>{card.moment.line}</Text>
         </View>
-      ) : null}
+      ) : (
+        <Text style={st.body}>
+          경기가 끝나면 그날의 장면으로 도안이 확정됩니다. 지금은 수량만 선점합니다.
+        </Text>
+      )}
 
       <Divider />
 
-      <View style={st.dropFoot}>
-        <Text style={st.dropFootText}>
-          {drop.status === 'ended' ? '판매 종료' : left ? left : formatDate(drop.openAt)}
+      <View style={st.cardFoot}>
+        <Text style={st.price}>{card.price.toLocaleString()}원</Text>
+        <Text style={st.footMeta}>
+          {gate === 'pending'
+            ? '경기 종료 후 발행'
+            : gate === 'open'
+              ? `${card.remain?.toLocaleString()}장 남음 · 마감 ${days < 1 ? `${Math.max(1, Math.round(days * 24))}시간` : `${Math.ceil(days)}일`} 전`
+              : stockLabel('soldout')}
         </Text>
-        {alerted ? <Badge text="알림 신청됨" tone="brand" /> : <Text style={st.chevron}>›</Text>}
       </View>
     </Card>
+  );
+}
+
+function CardSheet({
+  card,
+  checkedIn,
+  bought,
+  onCheckIn,
+  onBuy,
+  onClose,
+}: {
+  card: PhotoCard | null;
+  checkedIn: boolean;
+  bought: Record<string, boolean>;
+  onCheckIn: () => void;
+  onBuy: (id: string) => void;
+  onClose: () => void;
+}) {
+  const gate = card ? photocardGate(card, DEMO_NOW) : null;
+  const done = !!card && !!bought[card.id];
+  const days = card ? (photocardCloseAt(card) - DEMO_NOW) / 86400000 : 0;
+
+  return (
+    <DetailSheet
+      visible={!!card}
+      title={card ? `${gameKey(card)} ${card.opponent}전 포토카드` : ''}
+      subtitle={card?.stadium}
+      onClose={onClose}
+      actions={
+        card && gate ? (
+          done ? (
+            <View style={{ flex: 1 }}>
+              <Text style={st.doneNote}>
+                {gate === 'pending'
+                  ? '수량을 선점했습니다. 경기 종료 후 구장 MD샵에서 받으세요.'
+                  : '구매가 접수되었습니다. 3~5일 안에 배송됩니다.'}
+              </Text>
+            </View>
+          ) : gate === 'pending' ? (
+            <View style={{ flex: 1 }}>
+              <Button
+                label={checkedIn ? '오늘 수량 선점' : '구장에서 입장 인증'}
+                onPress={checkedIn ? () => onBuy(card.id) : onCheckIn}
+                full
+              />
+            </View>
+          ) : gate === 'open' ? (
+            <View style={{ flex: 1 }}>
+              <Button label={`${card.price.toLocaleString()}원 구매`} onPress={() => onBuy(card.id)} full />
+            </View>
+          ) : (
+            <View style={{ flex: 1 }}>
+              <Text style={st.doneNote}>{gateReason(gate, card)}</Text>
+            </View>
+          )
+        ) : null
+      }
+    >
+      {card && gate ? (
+        <>
+          {/* 카드가 어떻게 생겼는지 - 물건이 안 보이면 팬은 사진을 찾으러 앱을 나간다 */}
+          <PhotoCardPreview card={card} />
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <Card>
+              <View style={st.gateHead}>
+                <Badge text={gateBadge(gate).text} tone={gateBadge(gate).tone} />
+              </View>
+              <Text style={st.body}>{gateReason(gate, card)}</Text>
+              {gate === 'pending' && !checkedIn ? (
+                <Text style={st.footNote}>
+                  입장 인증은 게이트를 지날 때 자동으로 됩니다. 시연에서는 아래 버튼으로
+                  대신합니다.
+                </Text>
+              ) : null}
+            </Card>
+          </View>
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
+              <InfoRow label="경기" value={`${formatDate(card.gameAt)} · ${card.opponent}전`} />
+              {card.result ? (
+                <InfoRow
+                  label="결과"
+                  value={`${card.result.ours}:${card.result.theirs} ${card.result.win ? '승' : '패'}`}
+                />
+              ) : null}
+              <InfoRow label="가격" value={`${card.price.toLocaleString()}원`} />
+              {card.issued ? (
+                <InfoRow
+                  label="발행"
+                  value={`${card.issued.toLocaleString()}장 · ${(card.remain ?? 0).toLocaleString()}장 남음`}
+                />
+              ) : (
+                <InfoRow label="발행" value="경기 종료 후 확정" />
+              )}
+              <InfoRow
+                label="판매 마감"
+                value={
+                  gate === 'closed'
+                    ? `${formatKstDate(photocardCloseAt(card))} · 종료`
+                    : `${formatKstDate(photocardCloseAt(card))} (D-${Math.max(0, Math.ceil(days))})`
+                }
+              />
+              <InfoRow
+                label="수령"
+                value={gate === 'pending' ? '경기 종료 후 구장 MD샵' : '택배 배송 (3~5일)'}
+                last
+              />
+            </GroupCard>
+          </View>
+
+          <Text style={st.footNote}>
+            그날 경기장에 있었던 분만 살 수 있습니다. 판매는 경기 후 {PHOTOCARD_WINDOW_DAYS}일
+            동안만 열립니다.
+          </Text>
+        </>
+      ) : null}
+    </DetailSheet>
+  );
+}
+
+/**
+ * 포토카드 미리보기.
+ *
+ * 회전 전시(GoodsShowcase)를 쓰지 않는다 - 저건 입체물을 돌려 보는 장치고 카드는 평면이다.
+ * 카드의 형태(세로 비율 · 오렌지 머리띠 · 아래쪽 장면 글자)를 그대로 세워 두는 편이
+ * 실물을 더 정확히 말한다.
+ */
+function PhotoCardPreview({ card }: { card: PhotoCard }) {
+  return (
+    <View style={st.preview}>
+      <View style={st.previewCard}>
+        <View style={st.previewTop}>
+          <Text style={st.previewDate}>
+            {gameKey(card)} vs {card.opponent}
+          </Text>
+        </View>
+        <View style={st.previewBody}>
+          {card.moment ? (
+            <PlayerAvatar playerId={card.moment.playerId} team="HH" size={76} />
+          ) : (
+            <TeamEmblem team="HH" size={54} />
+          )}
+          <Text style={st.previewName}>{card.moment?.playerName ?? '도안 확정 전'}</Text>
+          <Text style={st.previewLine} numberOfLines={2}>
+            {card.moment?.line ?? '경기 종료 후 그날의 장면이 들어갑니다'}
+          </Text>
+        </View>
+      </View>
+      <Text style={st.previewHint}>실물 카드 시안</Text>
+    </View>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// ② 특별 MD
+// ═════════════════════════════════════════════════════════════
+
+function MilestoneTab({
+  reserved,
+  onOpen,
+}: {
+  reserved: Record<string, boolean>;
+  onOpen: (m: Milestone) => void;
+}) {
+  return (
+    <View style={{ gap: spacing.cardGap }}>
+      {MILESTONES.map((m) => {
+        const p = milestoneProgress(m, DEMO_NOW);
+        const mine = !!reserved[m.id];
+        const badge = mine
+          ? { text: '예약함', tone: 'brand' as const }
+          : p.reserveOpen
+            ? p.reserveRatio >= 0.9
+              ? { text: '예약 마감 임박', tone: 'warn' as const }
+              : { text: '예약 중', tone: 'win' as const }
+            : { text: '예약 대기', tone: 'muted' as const };
+
+        return (
+          <Card key={m.id} onPress={() => onOpen(m)}>
+            <View style={st.cardHead}>
+              <PlayerAvatar playerId={m.playerId} team="HH" size={46} />
+              <View style={{ flex: 1 }}>
+                <CardHeading
+                  label={m.playerName}
+                  title={m.title}
+                  right={<Badge text={badge.text} tone={badge.tone} />}
+                />
+              </View>
+            </View>
+
+            {/* 목록에서는 '얼마나 왔나'만. '언제 열리나'는 상세의 확대 막대가 맡는다 */}
+            <View style={{ gap: 6 }}>
+              <View style={st.progressHead}>
+                <Text style={st.progressNow}>
+                  {m.current.toLocaleString()}
+                  <Text style={st.progressTarget}> / {m.target.toLocaleString()}</Text>
+                </Text>
+                <Text style={st.progressPct}>{Math.round(p.ratio * 100)}%</Text>
+              </View>
+              <View style={st.track}>
+                <View style={[st.fill, { width: `${p.ratio * 100}%` }]} />
+              </View>
+            </View>
+
+            <Divider />
+
+            <View style={st.cardFoot}>
+              <Text style={st.remainText}>
+                {p.remain}
+                {m.unit} 남음
+              </Text>
+              <Text style={st.footMeta}>{p.eta}</Text>
+            </View>
+          </Card>
+        );
+      })}
+
+      <Text style={st.footNote}>
+        기록은 날짜로 오지 않습니다. 그래서 예약도 날짜가 아니라 남은 개수로 엽니다 - 기준은
+        지표마다 다릅니다.
+      </Text>
+    </View>
+  );
+}
+
+function MilestoneSheet({
+  milestone: m,
+  reserved,
+  alerted,
+  onReserve,
+  onToggleAlert,
+  onClose,
+}: {
+  milestone: Milestone | null;
+  reserved: Record<string, boolean>;
+  alerted: Record<string, boolean>;
+  onReserve: (id: string) => void;
+  onToggleAlert: (id: string) => void;
+  onClose: () => void;
+}) {
+  const p = m ? milestoneProgress(m, DEMO_NOW) : null;
+  const mine = !!m && !!reserved[m.id];
+
+  return (
+    <DetailSheet
+      visible={!!m}
+      title={m ? `${m.playerName} ${m.title}` : ''}
+      subtitle={m ? `기념 MD · ${p?.reserveOpen ? '예약 중' : '예약 대기'}` : ''}
+      onClose={onClose}
+      actions={
+        m && p ? (
+          mine ? (
+            <View style={{ flex: 1 }}>
+              <Text style={st.doneNote}>
+                예약되었습니다. 달성 순간 알림이 가고, 다음 날부터 순차 발송됩니다.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <AlertToggle
+                compact
+                on={!!alerted[m.id]}
+                onPress={() => onToggleAlert(m.id)}
+                label="달성 알림"
+              />
+              <View style={{ flex: 1.4 }}>
+                <Button
+                  label={p.reserveOpen ? '예약 구매' : `${p.toReserve}${m.unit} 뒤 예약`}
+                  onPress={() => onReserve(m.id)}
+                  disabled={!p.reserveOpen}
+                  full
+                />
+              </View>
+            </>
+          )
+        ) : null
+      }
+    >
+      {m && p ? (
+        <>
+          <Card>
+            <View style={st.sheetHeadRow}>
+              <PlayerAvatar playerId={m.playerId} team="HH" size={54} />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={st.etaLine}>
+                  {p.remain}
+                  {m.unit} 남음 · {p.eta}
+                </Text>
+                <Text style={st.body}>{m.story}</Text>
+              </View>
+            </View>
+          </Card>
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <SectionTitle title="진행" />
+            <Card>
+              <MilestoneChart m={m} p={p} />
+            </Card>
+          </View>
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <SectionTitle title="예약" />
+            <Card>
+              {p.reserveOpen ? (
+                <>
+                  <View style={st.progressHead}>
+                    <Label>예약 접수</Label>
+                    <Text style={st.reserveCount}>
+                      {m.reserved.toLocaleString()}
+                      <Text style={st.progressTarget}> / {m.reserveLimit.toLocaleString()}</Text>
+                    </Text>
+                  </View>
+                  <View style={st.track}>
+                    <View
+                      style={[
+                        st.fill,
+                        { width: `${p.reserveRatio * 100}%` },
+                        p.reserveRatio >= 0.9 && { backgroundColor: colors.warn },
+                      ]}
+                    />
+                  </View>
+                  <Text style={st.body}>
+                    {p.reserveRatio >= 0.9
+                      ? `예약 수량이 ${(m.reserveLimit - m.reserved).toLocaleString()}개 남았습니다. 달성 전에 마감될 수 있습니다.`
+                      : '달성 순간 발매되며, 예약분이 먼저 나갑니다. 미달성 시 전액 환불됩니다.'}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Label>아직 열리지 않았습니다</Label>
+                  <Text style={st.body}>
+                    {`${m.target - m.reserveFrom}${m.unit}(앞으로 ${p.toReserve}${m.unit})을 넘기면 예약이 열립니다. ` +
+                      '너무 일찍 받으면 구단이 재고를 떠안고, 너무 늦게 열면 팬이 놓칩니다.'}
+                  </Text>
+                  <AlertToggle
+                    on={!!alerted[m.id]}
+                    onPress={() => onToggleAlert(m.id)}
+                    label="예약 열리면 알림"
+                    caption={`${p.toReserve}${m.unit}을 더 기록하는 순간 알려 드립니다`}
+                  />
+                </>
+              )}
+            </Card>
+          </View>
+
+          {m.items.length > 0 ? (
+            <View style={{ marginTop: spacing.cardGap }}>
+              <SectionTitle title="구성" />
+              <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
+                {m.items.map((it, i) => (
+                  <View key={it.name} style={[st.itemRow, i < m.items.length - 1 && st.divider]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={st.itemName}>{it.name}</Text>
+                      {it.limit ? (
+                        <Text style={st.itemLimit}>한정 {it.limit.toLocaleString()}개</Text>
+                      ) : null}
+                    </View>
+                    <Text style={st.itemPrice}>{it.price.toLocaleString()}원</Text>
+                  </View>
+                ))}
+              </GroupCard>
+            </View>
+          ) : (
+            <View style={{ marginTop: spacing.cardGap }}>
+              <Card>
+                <Label>구성</Label>
+                <Text style={st.body}>달성이 가까워지면 공개합니다.</Text>
+              </Card>
+            </View>
+          )}
+
+          <Text style={st.footNote}>
+            결제는 {OFFICIAL_SHOP_NAME}에서 이루어집니다. 앱은 예약 접수까지만 맡습니다.
+          </Text>
+        </>
+      ) : null}
+    </DetailSheet>
+  );
+}
+
+/**
+ * 기록 진행 그래프.
+ *
+ * ── 왜 전체 막대로는 안 되는가 ───────────────────────────────
+ * 통산 기록은 진행률이 늘 95% 를 넘는다. 1487/1500 은 99.1%, 1490/1500 은 99.3% 라
+ * 화면에서 **같은 그림**이 된다. 목록 카드의 전체 막대는 "거의 다 왔다"까지만 말하고,
+ * 정작 이 화면이 답해야 할 "예약이 열렸나"는 아무 말도 못 한다.
+ *
+ * 그래서 상세에서는 **목표 직전 구간만 잘라 그린다.** 구간 폭은 남은 개수와 예약
+ * 임계값에서 나오므로(goods.ts 의 zoom), 6홈런 남은 사람과 58안타 남은 사람이 각자
+ * 자기 눈금으로 읽힌다. 임계선을 같은 막대 위에 세우면 **예약이 열렸는지가 위치로**
+ * 읽힌다 - 숫자를 비교하지 않아도 된다.
+ */
+function MilestoneChart({ m, p }: { m: Milestone; p: MilestoneProgress }) {
+  const zoomStart = Math.round(m.target - p.zoom);
+  const threshold = m.target - m.reserveFrom;
+  const maxSeason = Math.max(...m.recentSeasons.map((s) => s.count), 1);
+
+  return (
+    <View style={{ gap: spacing.lg }}>
+      {/* 큰 수치 - 그래프가 아니라 이게 먼저 읽혀야 한다 */}
+      <View style={st.chartHead}>
+        <View>
+          <Label>통산</Label>
+          <Text style={st.chartValue}>
+            {m.current.toLocaleString()}
+            <Text style={st.chartUnit}> {m.unit}</Text>
+          </Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Label>목표까지</Label>
+          <Text style={[st.chartValue, { color: colors.brandText }]}>
+            {p.remain}
+            <Text style={st.chartUnit}> {m.unit}</Text>
+          </Text>
+        </View>
+      </View>
+
+      {/* 확대 막대 - 목표 직전 구간만 */}
+      <View style={{ gap: 6 }}>
+        <View style={st.axisRow}>
+          <Text style={st.axisText}>{zoomStart.toLocaleString()}</Text>
+          <Text style={st.axisText}>목표 {m.target.toLocaleString()}</Text>
+        </View>
+        <View style={st.zoomTrack}>
+          <View style={[st.zoomFill, { width: `${p.zoomPos * 100}%` }]} />
+          <View style={[st.threshold, { left: `${p.zoomThreshold * 100}%` }]} />
+        </View>
+        <View style={st.legendRow}>
+          <View style={st.legendMark} />
+          <Text style={st.legendText}>
+            {threshold.toLocaleString()}
+            {m.unit}부터 예약 {p.reserveOpen ? '· 지금 열려 있습니다' : `· ${p.toReserve}${m.unit} 남음`}
+          </Text>
+        </View>
+      </View>
+
+      {/* 남은 개수를 셀 수 있게. 6개는 세어지고 58개는 세어지지 않으므로 조건부다 */}
+      {p.remain <= 15 ? (
+        <View style={{ gap: 6 }}>
+          <Label>앞으로</Label>
+          <View style={st.dotRow}>
+            {Array.from({ length: p.remain }, (_, i) => (
+              <View key={i} style={st.dot} />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {/* 페이스 - '언제 달성'이라는 예측의 근거. 근거 없이 날짜만 말하면 점집이다 */}
+      <View style={{ gap: spacing.sm }}>
+        <Label>최근 시즌 {m.unit}</Label>
+        <View style={st.seasonRow}>
+          {m.recentSeasons.map((s, i) => {
+            const last = i === m.recentSeasons.length - 1;
+            return (
+              <View key={s.year} style={st.seasonCol}>
+                <Text style={[st.seasonCount, last && st.seasonCountOn]}>{s.count}</Text>
+                <View style={st.seasonBarBox}>
+                  <View
+                    style={[
+                      st.seasonBar,
+                      { height: Math.max(3, (s.count / maxSeason) * 56) },
+                      last && st.seasonBarOn,
+                    ]}
+                  />
+                </View>
+                <Text style={st.seasonYear}>{`'${String(s.year).slice(2)}`}</Text>
+              </View>
+            );
+          })}
+        </View>
+        <Text style={st.footNote}>
+          올 시즌 {m.seasonApps}
+          {m.appUnit} {m.seasonCount}
+          {m.unit} 페이스. 남은 {p.remain}
+          {m.unit}에 {p.appsNeeded === Infinity ? '—' : p.appsNeeded}
+          {m.appUnit}가 필요하고, 잔여 {m.appsLeft}
+          {m.appUnit}
+          {p.withinSeason ? ' 안에 들어옵니다.' : ' 로는 모자랍니다.'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// ③ 유니폼
+// ═════════════════════════════════════════════════════════════
+
+function UniformTab({ onOpen }: { onOpen: (u: Uniform) => void }) {
+  return (
+    <View style={{ gap: spacing.cardGap }}>
+      {UNIFORMS.map((u) => {
+        const out = u.soldOutSizes ?? [];
+        return (
+          <Card key={u.id} onPress={() => onOpen(u)}>
+            <CardHeading
+              label={`${u.kind} · ${u.wear}`}
+              title={u.name}
+              right={<Badge text={stockLabel(u.status)} tone={stockTone(u.status)} />}
+            />
+            <Text style={st.body} numberOfLines={2}>
+              {u.note}
+            </Text>
+            <Divider />
+            <View style={st.cardFoot}>
+              <Text style={st.price}>{u.price.toLocaleString()}원</Text>
+              <Text style={st.footMeta}>
+                {u.status === 'upcoming'
+                  ? (countdown(u.openAt ?? '', DEMO_NOW) ?? '곧 발매')
+                  : out.length > 0
+                    ? `${out.join('·')} 품절`
+                    : '전 사이즈 보유'}
+              </Text>
+            </View>
+          </Card>
+        );
+      })}
+
+      <ExternalButton
+        label={`${OFFICIAL_SHOP_NAME}에서 전체 보기`}
+        sub="결제는 공식몰에서 이루어집니다."
+        onPress={shop}
+      />
+    </View>
+  );
+}
+
+function UniformSheet({
+  uniform: u,
+  size,
+  alerted,
+  onSize,
+  onToggleAlert,
+  onClose,
+}: {
+  uniform: Uniform | null;
+  size: string | null;
+  alerted: Record<string, boolean>;
+  onSize: (s: string) => void;
+  onToggleAlert: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <DetailSheet
+      visible={!!u}
+      title={u?.name ?? ''}
+      subtitle={u ? `${u.kind} · ${stockLabel(u.status)}` : ''}
+      onClose={onClose}
+      actions={
+        u ? (
+          u.status === 'upcoming' ? (
+            <>
+              <AlertToggle compact on={!!alerted[u.id]} onPress={() => onToggleAlert(u.id)} />
+              <View style={{ flex: 1.4 }}>
+                <ExternalButton label="공식몰 보기" onPress={shop} />
+              </View>
+            </>
+          ) : (
+            <View style={{ flex: 1 }}>
+              <ExternalButton label="공식몰에서 구매" onPress={shop} />
+            </View>
+          )
+        ) : null
+      }
+    >
+      {u ? (
+        <>
+          <GoodsShowcase kind="emblem" />
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <Card>
+              {u.status === 'upcoming' && u.openAt ? (
+                <Text style={st.etaLine}>{countdown(u.openAt, DEMO_NOW) ?? '발매되었습니다'}</Text>
+              ) : null}
+              <Text style={st.body}>{u.note}</Text>
+            </Card>
+          </View>
+
+          {/* 사이즈 - 공식몰에 가서야 품절을 알게 되면 앱이 헛걸음시킨 것이다 */}
+          <View style={{ marginTop: spacing.cardGap }}>
+            <SectionTitle title="사이즈" />
+            <View style={st.sizeRow}>
+              {u.sizes.map((sz) => (
+                <Chip
+                  key={sz}
+                  label={sz}
+                  selected={size === sz}
+                  disabled={sizeSoldOut(u, sz)}
+                  onPress={() => onSize(sz)}
+                />
+              ))}
+            </View>
+            <Text style={st.footNote}>
+              {(u.soldOutSizes ?? []).length > 0
+                ? `${(u.soldOutSizes ?? []).join('·')} 는 품절입니다. 선택한 사이즈는 공식몰로 넘어갈 때 함께 전달됩니다.`
+                : '선택한 사이즈는 공식몰로 넘어갈 때 함께 전달됩니다.'}
+            </Text>
+          </View>
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
+              <InfoRow label="종류" value={u.kind} />
+              <InfoRow label="착용" value={u.wear} />
+              <InfoRow label="가격" value={`${u.price.toLocaleString()}원`} />
+              {u.marking ? <InfoRow label="마킹" value={u.marking} /> : null}
+              {u.openAt ? <InfoRow label="발매" value={formatDateTime(u.openAt)} /> : null}
+              <InfoRow label="판매처" value={OFFICIAL_SHOP_NAME} last />
+            </GroupCard>
+          </View>
+        </>
+      ) : null}
+    </DetailSheet>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════
+// ④ 기타 굿즈
+// ═════════════════════════════════════════════════════════════
+
+function MerchTab() {
+  return (
+    <View>
+      {MERCH_GROUPS.map((g) => {
+        const items = MERCH.filter((m) => m.group === g);
+        if (items.length === 0) return null;
+        return (
+          <View key={g}>
+            <SectionTitle title={g} />
+            <View style={st.grid}>
+              {items.map((m) => (
+                <MerchTile key={m.id} item={m} />
+              ))}
+            </View>
+          </View>
+        );
+      })}
+
+      <View style={{ marginTop: spacing.xl }}>
+        <ExternalButton
+          label={`${OFFICIAL_SHOP_NAME}에서 전체 보기`}
+          sub="상품을 누르면 공식몰의 해당 상품으로 이동합니다."
+          onPress={shop}
+        />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * 상품 타일.
+ *
+ * 배지는 **판매 중이 아닐 때만** 붙는다. 전부에 붙이면 그 줄이 상품 이름보다 먼저 읽혀
+ * 카탈로그가 상태 목록이 된다. 구장 한정 상품은 누를 곳이 없다 - 공식몰에 가도 없는
+ * 물건을 링크로 걸면 그게 헛걸음이다.
+ */
+function MerchTile({ item }: { item: Merch }) {
+  const badge = item.venueOnly
+    ? { text: '구장 MD샵 한정', tone: 'brand' as const }
+    : item.status !== 'onsale'
+      ? { text: stockLabel(item.status), tone: stockTone(item.status) }
+      : null;
+
+  const body = (
+    <View style={st.tile}>
+      <View style={st.tileTop}>{badge ? <Badge text={badge.text} tone={badge.tone} /> : null}</View>
+      <Text style={st.tileName} numberOfLines={2}>
+        {item.name}
+      </Text>
+      <Text style={st.tilePrice}>{item.price.toLocaleString()}원</Text>
+    </View>
+  );
+
+  if (item.venueOnly) return <View style={st.tileSlot}>{body}</View>;
+  return (
+    <Pressable
+      onPress={shop}
+      style={({ pressed }) => [st.tileSlot, pressed && { opacity: 0.6 }]}
+      accessibilityRole="link"
+      accessibilityLabel={`${item.name} - 공식몰에서 보기`}
+    >
+      {body}
+    </Pressable>
   );
 }
 
@@ -353,9 +1084,26 @@ const st = StyleSheet.create({
   alertNote: typography.caption,
   chevron: { fontSize: 18, color: colors.mutedText },
 
-  filterRow: { flexDirection: 'row', gap: spacing.sm },
+  tabWrap: { marginTop: spacing.lg },
+  blurb: {
+    ...typography.caption,
+    lineHeight: 19,
+    paddingHorizontal: spacing.xs,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  countHint: typography.micro,
 
-  dropHead: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
+  body: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
+  footNote: {
+    ...typography.micro,
+    fontWeight: '400',
+    lineHeight: 17,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+
+  cardHead: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   emblemThumb: {
     width: 46,
     height: 46,
@@ -364,28 +1112,103 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  cardFoot: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  price: { ...typography.bodyStrong, ...tabularFigures, fontSize: 15 },
+  footMeta: { ...typography.micro, ...tabularFigures, fontWeight: '600' },
 
-  story: { ...typography.caption, lineHeight: 20 },
+  // ── 포토카드 ───────────────────────────────────────────────
+  momentBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.tile,
+    padding: spacing.md,
+    gap: 2,
+  },
+  momentName: { ...typography.bodyStrong, fontSize: 13.5 },
+  momentLine: { ...typography.caption, lineHeight: 18 },
 
-  stockHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  stockLabel: typography.micro,
-  stockValue: { ...typography.metric, ...tabularFigures, fontSize: 22, color: colors.text },
-  stockValueSm: { ...typography.micro, ...tabularFigures, fontWeight: '700', color: colors.text },
-  stockTrack: {
-    height: 6,
+  lockedTitle: { ...typography.bodyStrong, fontSize: 13.5, color: colors.subText },
+  lockedWhy: { ...typography.caption, lineHeight: 17 },
+
+  gateHead: { flexDirection: 'row' },
+  doneNote: { ...typography.caption, textAlign: 'center', lineHeight: 18 },
+
+  preview: { alignItems: 'center', gap: spacing.sm },
+  previewCard: {
+    width: 168,
+    borderRadius: radius.tile,
+    backgroundColor: colors.card,
+    overflow: 'hidden',
+  },
+  previewTop: {
+    backgroundColor: colors.brand,
+    paddingVertical: 7,
+    alignItems: 'center',
+  },
+  previewDate: { ...typography.micro, ...tabularFigures, color: colors.onBrand, fontWeight: '700' },
+  previewBody: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  previewName: { ...typography.cardTitle, fontSize: 15 },
+  previewLine: { ...typography.caption, fontSize: 11, lineHeight: 16, textAlign: 'center' },
+  previewHint: typography.micro,
+
+  // ── 마일스톤 ───────────────────────────────────────────────
+  progressHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  progressNow: { ...typography.bodyStrong, ...tabularFigures, fontSize: 16 },
+  progressTarget: { ...typography.micro, color: colors.mutedText },
+  progressPct: { ...typography.micro, ...tabularFigures, color: colors.brandText },
+  reserveCount: { ...typography.bodyStrong, ...tabularFigures, fontSize: 15 },
+  track: { height: 6, borderRadius: radius.bar, backgroundColor: colors.dim, overflow: 'hidden' },
+  fill: { height: 6, borderRadius: radius.bar, backgroundColor: colors.brand },
+  remainText: { ...typography.bodyStrong, ...tabularFigures, fontSize: 14, color: colors.brandText },
+
+  sheetHeadRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
+  etaLine: { ...typography.bodyStrong, color: colors.brandText, fontSize: 14 },
+
+  chartHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  chartValue: { ...typography.metric, ...tabularFigures, fontSize: 28 },
+  chartUnit: { ...typography.micro, color: colors.mutedText },
+
+  axisRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  axisText: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
+  // 확대 막대는 목록의 전체 막대보다 두껍다 - 임계선을 얹어야 하고, 이 화면의 주인공이다
+  zoomTrack: {
+    height: 14,
     borderRadius: radius.bar,
     backgroundColor: colors.dim,
     overflow: 'hidden',
   },
-  stockFill: { height: 6, borderRadius: radius.bar },
+  zoomFill: { height: 14, borderRadius: radius.bar, backgroundColor: colors.brand },
+  threshold: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: colors.text },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendMark: { width: 2, height: 11, backgroundColor: colors.text },
+  legendText: { ...typography.micro, fontWeight: '400' },
 
-  dropFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dropFootText: {
-    ...typography.micro,
-    ...tabularFigures,
-    color: colors.brandText,
-    fontWeight: '700',
+  dotRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  dot: {
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: colors.brand,
   },
+
+  seasonRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' },
+  seasonCol: { flex: 1, alignItems: 'center', gap: 4 },
+  seasonCount: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
+  seasonCountOn: { color: colors.brandText, fontWeight: '700' },
+  seasonBarBox: { height: 56, justifyContent: 'flex-end' },
+  seasonBar: {
+    width: 18,
+    borderRadius: 3,
+    backgroundColor: colors.neutralFill,
+  },
+  seasonBarOn: { backgroundColor: colors.brand },
+  seasonYear: { ...typography.micro, ...tabularFigures, fontWeight: '400', fontSize: 10 },
 
   divider: { borderBottomWidth: 1, borderBottomColor: colors.border },
   itemRow: {
@@ -399,13 +1222,22 @@ const st = StyleSheet.create({
   itemLimit: { ...typography.micro, ...tabularFigures, fontWeight: '400', marginTop: 2 },
   itemPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 13.5 },
 
-  sheetHeadRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
-  sheetBody: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
-  countdown: { ...typography.bodyStrong, color: colors.brandText, fontSize: 14 },
-
+  // ── 유니폼·기타 ────────────────────────────────────────────
   sizeRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
 
-  endedNote: { ...typography.caption, textAlign: 'center', paddingVertical: spacing.md },
-
-  footNote: { ...typography.micro, marginTop: spacing.sm, paddingHorizontal: spacing.xs },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.cardGap },
+  // 두 칸 고정 - 늘어나게 두면 홀수로 남은 마지막 타일만 폭이 두 배가 된다
+  tileSlot: { flexBasis: '48%', maxWidth: '48%' },
+  tile: {
+    flex: 1,
+    minHeight: 104,
+    backgroundColor: colors.card,
+    borderRadius: radius.tile,
+    padding: spacing.lg,
+    gap: 4,
+    justifyContent: 'flex-end',
+  },
+  tileTop: { flex: 1 },
+  tileName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19 },
+  tilePrice: { ...typography.micro, ...tabularFigures, color: colors.brandText },
 });

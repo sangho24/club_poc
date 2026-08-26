@@ -19,7 +19,7 @@ import {
 import { FavoritePicker } from '../components/FavoritePicker';
 import { PhotoHeader, PlayerAvatar, TeamEmblem, stadiumPhoto } from '../components/photos';
 import { PLATE_SEQUENCE, RECENT, STANDING, TODAY_GAME } from '../game';
-import { dropAlerts } from '../goods';
+import { goodsAlerts } from '../goods';
 import { liveAlerts, predictMatchup } from '../liveEngine';
 import { UserProfile } from '../profile';
 import { BATTERS, OPPONENT_PITCHERS, PITCHERS } from '../roster';
@@ -48,7 +48,7 @@ export function HomeScreen({
 
   const favBatter = BATTERS.find((b) => b.id === profile.favoritePlayerId);
   const favPitcher = PITCHERS.find((p) => p.id === profile.favoritePlayerId);
-  const goods = dropAlerts(DEMO_NOW, profile.favoritePlayerId);
+  const goods = goodsAlerts(DEMO_NOW, profile.favoritePlayerId);
 
   return (
     <>

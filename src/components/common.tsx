@@ -235,24 +235,34 @@ export function TopTabs<T extends string>({
 export function Chip({
   label,
   selected,
+  disabled,
   onPress,
 }: {
   label: string;
   selected?: boolean;
+  /**
+   * 고를 수 **없는** 선택지. 품절 사이즈처럼 목록에서 지우면 안 되는 것에 쓴다 -
+   * 사라지면 팬은 그 사이즈가 원래 없는 줄 알고, 남아 있으면 품절임을 안다.
+   */
+  disabled?: boolean;
   onPress?: () => void;
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         s.chip,
-        selected && s.chipOn,
-        pressed && !selected && pressHighlight,
+        selected && !disabled && s.chipOn,
+        disabled && states.disabled,
+        pressed && !selected && !disabled && pressHighlight,
       ]}
       accessibilityRole="button"
-      accessibilityState={{ selected: !!selected }}
+      accessibilityState={{ selected: !!selected, disabled: !!disabled }}
     >
-      <Text style={[s.chipText, selected && s.chipTextOn]}>{label}</Text>
+      <Text style={[s.chipText, selected && !disabled && s.chipTextOn, disabled && s.chipTextOff]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -1147,6 +1157,8 @@ const s = StyleSheet.create({
   chipOn: { backgroundColor: colors.brandSoft },
   chipText: { fontSize: 13, fontWeight: '600', color: colors.subText },
   chipTextOn: { color: colors.brandText, fontWeight: '700' },
+  // 불투명도만으로는 '눌리지 않음'이 약하다. 취소선이 품절을 글자로도 말한다
+  chipTextOff: { textDecorationLine: 'line-through' },
 
   badge: {
     flexDirection: 'row',
