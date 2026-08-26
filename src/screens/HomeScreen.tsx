@@ -4,7 +4,7 @@
 // 대시보드라면, 구단 앱의 홈은 우리 팀 하나만 다룬다. 경기가 하나뿐이라 그 경기를
 // 깊게 파고들 지면이 생기고, 그게 구단 앱이 리그 앱보다 잘할 수 있는 유일한 축이다.
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   Badge,
@@ -19,6 +19,7 @@ import {
 import { FavoritePicker } from '../components/FavoritePicker';
 import { PhotoHeader, PlayerAvatar, TeamEmblem, stadiumPhoto } from '../components/photos';
 import { PLATE_SEQUENCE, RECENT, STANDING, TODAY_GAME } from '../game';
+import { TICKET_INFO_URL } from '../gameday';
 import { goodsAlerts } from '../goods';
 import { liveAlerts, predictMatchup } from '../liveEngine';
 import { UserProfile } from '../profile';
@@ -42,8 +43,10 @@ const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
  * 세로로 쌓으면 목록이 되고 목록은 위에서부터 읽게 만든다. 나란히 두면 **고르는 것**이
  * 되어 필요한 하나만 짚고 지나간다 - 직관의 '가기 전에'와 같은 판단이라 3열도 맞췄다.
  */
-const QUICK: { key: TabKey; label: string; icon: HomeIconName }[] = [
-  { key: 'gameday', label: '예매·직관', icon: 'ticket' },
+const QUICK: { key: TabKey; label: string; icon: HomeIconName; url?: string }[] = [
+  // '예매'는 탭이 아니라 구단 예매 안내로 나간다. 예매 자체는 앱이 하지 않는다고
+  // 정해 뒀으니(gameday.ts), 지름길이 가야 할 곳도 앱 안이 아니라 그 안내 페이지다.
+  { key: 'gameday', label: '예매', icon: 'ticket', url: TICKET_INFO_URL },
   { key: 'players', label: '기록', icon: 'stats' },
   { key: 'store', label: '굿즈', icon: 'bag' },
 ];
@@ -70,9 +73,10 @@ function QuickTiles({
         return (
           <Pressable
             key={q.key}
-            onPress={() => onGo(q.key)}
+            onPress={() => (q.url ? void Linking.openURL(q.url) : onGo(q.key))}
             style={({ pressed }) => [st.quickTile, pressed && states.pressed]}
-            accessibilityRole="button"
+            /* 앱 밖으로 나가는 타일은 link 로 읽는다 - 나간다는 사실을 누르기 전에 안다 */
+            accessibilityRole={q.url ? 'link' : 'button'}
             accessibilityLabel={hasNew ? `${q.label} - 새 소식 있음` : q.label}
           >
             <View>
