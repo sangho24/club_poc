@@ -177,6 +177,15 @@ export const opsOf = (b: BatterStatLine) => r3(obpOf(b) + slgOf(b));
 export const isoOf = (b: BatterStatLine) => r3(slgOf(b) - avgOf(b));
 
 /**
+ * 타자 삼진율·볼넷율 - **타수가 아니라 타석**으로 나눈다.
+ *
+ * 투수 쪽 kRateOf·bbRateOf 와 이름이 비슷하지만 분모가 다르다(저쪽은 상대한 타자 수).
+ * 같은 함수를 돌려쓰면 볼넷이 많은 타자의 삼진율이 실제보다 높게 찍힌다.
+ */
+export const soRateOf = (b: BatterStatLine) => r3(safe(b.so, b.pa));
+export const walkRateOf = (b: BatterStatLine) => r3(safe(b.bb, b.pa));
+
+/**
  * BABIP - 인플레이 타구 타율.
  *
  * 분모에서 **삼진과 홈런을 뺀다**는 것이 이 지표의 전부다. 삼진은 타구가 없고,
@@ -335,6 +344,17 @@ export const STABILIZATION_PA: Record<string, number> = {
   babip: 820, // 한 시즌으로도 모자란다
   gbRate: 80,
   fbRate: 80,
+
+  // '지표 편집'으로 고를 수 있게 된 것들. 여기 없으면 기본값 300 이 적용되는데,
+  // 그러면 삼진율(60타석이면 충분)이 BABIP 와 같은 무게로 경고를 받는다
+  soRate: 60,
+  walkRate: 120,
+  iso: 160,
+  ops: 320,
+  // WAR 은 비율 지표가 아니라 합계라 '안정화 표본'이라는 말이 엄밀히는 맞지 않는다.
+  // 다만 구성 요소 중 가장 늦게 자리 잡는 수비·주루가 한 시즌은 돌아야 하므로
+  // 규정타석(약 500) 언저리를 기준으로 둔다
+  war: 500,
 };
 
 export function trustOf(metric: string, sample: number): TrustLevel {

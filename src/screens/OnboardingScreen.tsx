@@ -59,7 +59,9 @@ export function OnboardingScreen({
 
   const meta = STEPS[step - 1];
 
-  const finish = () => onDone({ level, favoritePlayerId: favorite, alerts });
+  // 온보딩이 **묻지 않은 것**은 들고 온 프로필의 값을 그대로 넘긴다. 객체를 새로 지으면
+  // MY 의 '온보딩 다시 하기' 한 번에 선수 탭에서 고른 세부 지표가 조용히 초기화된다
+  const finish = () => onDone({ ...initialProfile, level, favoritePlayerId: favorite, alerts });
   const goNext = () => (step === TOTAL_STEPS ? finish() : setStep(step + 1));
 
   const playerGroup = (title: string, options: { id: string; name: string; sub: string }[]) => (

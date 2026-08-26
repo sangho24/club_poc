@@ -35,13 +35,20 @@ import {
   RichText,
   Row,
   SectionTitle,
+  SecondaryButton,
   SplitBar,
   StatTile,
   TopTabs,
 } from '../components/common';
 import type { Band } from '../components/common';
 import { PlayerAvatar, PlayerFormLoop } from '../components/photos';
-import { UserProfile } from '../profile';
+import {
+  BATTER_METRIC_MAX,
+  BATTER_METRIC_MIN,
+  DEFAULT_BATTER_METRICS,
+  UserProfile,
+} from '../profile';
+import { analyzeBatter } from '../playerAnalysis';
 import { STANDING } from '../game';
 import {
   BATTERS,
@@ -55,6 +62,7 @@ import {
   PREV_PITCHER,
   Pitcher,
 } from '../roster';
+import type { BatterStatLine } from '../sabermetrics';
 import {
   LEAGUE,
   avgOf,
@@ -74,10 +82,12 @@ import {
   qualifiedIPOuts,
   qualifiedPA,
   slgOf,
+  soRateOf,
   sumBatterLines,
   sumPitcherLines,
   trustOf,
   trustSentence,
+  walkRateOf,
   whipOf,
   wobaOf,
   wrcPlusOf,
@@ -154,6 +164,55 @@ const PITCHER_SORTS: SortOpt<Pitcher>[] = [
 
 const ROLE_FILTERS: RoleFilter[] = ['전체', '선발', '불펜', '마무리'];
 
+/**
+ * 타자 카드에 띄울 수 있는 세부 지표.
+ *
+ * 정렬(BATTER_SORTS)과 다른 축이다. 정렬은 **누구를 먼저 볼까**를 정하고, 이쪽은
+ * 고른 선수에 대해 **무엇을 볼까**를 정한다. 그래서 목록이 겹치는 것(WAR·OPS)이
+ * 있어도 한쪽으로 합치지 않는다 - 홈런 순으로 세워 놓고 wRC+ 를 보는 일이 흔하다.
+ *
+ * `key` 는 GLOSSARY · STABILIZATION_PA 의 키와 같아야 한다. 이 하나로 타일의 설명,
+ * 신뢰도 점, 게이지 눈금이 전부 따라온다 - 여기 없는 키를 넣으면 설명도 눈금도 없는
+ * 맹탕 타일이 뜬다(그래서 profile.normalizeBatterMetrics 가 저장값도 한 번 거른다).
+ */
+interface MetricOpt {
+  key: string;
+  label: string;
+  value: (b: BatterStatLine) => number;
+  format: (b: BatterStatLine) => string;
+}
+
+const pctText = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+const BATTER_METRICS: MetricOpt[] = [
+  {
+    key: 'wrcPlus',
+    label: 'wRC+',
+    value: (b) => wrcPlusOf(b, PARK),
+    format: (b) => String(wrcPlusOf(b, PARK)),
+  },
+  { key: 'woba', label: 'wOBA', value: wobaOf, format: (b) => wobaOf(b).toFixed(3) },
+  { key: 'babip', label: 'BABIP', value: babipOf, format: (b) => babipOf(b).toFixed(3) },
+  {
+    key: 'war',
+    label: 'WAR',
+    value: (b) => batterWarOf(b, PARK),
+    format: (b) => batterWarOf(b, PARK).toFixed(1),
+  },
+  { key: 'ops', label: 'OPS', value: opsOf, format: (b) => opsOf(b).toFixed(3) },
+  { key: 'iso', label: 'ISO', value: isoOf, format: (b) => isoOf(b).toFixed(3) },
+  { key: 'soRate', label: '삼진율', value: soRateOf, format: (b) => pctText(soRateOf(b)) },
+  { key: 'walkRate', label: '볼넷율', value: walkRateOf, format: (b) => pctText(walkRateOf(b)) },
+];
+
+/** 저장된 키 목록을 그릴 수 있는 지표로 - 모르는 키는 조용히 버린다 */
+function metricsOf(keys: string[]): MetricOpt[] {
+  const picked = keys
+    .map((k) => BATTER_METRICS.find((m) => m.key === k))
+    .filter((m): m is MetricOpt => !!m);
+  return picked.length > 0 ? picked : metricsOf(DEFAULT_BATTER_METRICS);
+}
+
 /** 목록의 한 줄에 들어가는 것 - 시트를 열지 않고도 훑을 수 있어야 한다 */
 interface RowData {
   id: string;
@@ -168,14 +227,25 @@ interface RowData {
   statLabel: string;
 }
 
-export function PlayersScreen({ profile }: { profile: UserProfile }) {
+export function PlayersScreen({
+  profile,
+  onBatterMetrics,
+}: {
+  profile: UserProfile;
+  /** '지표 편집'의 결과. App 이 받아 저장소까지 보낸다 */
+  onBatterMetrics: (keys: string[]) => void;
+}) {
   const [tab, setTab] = useState<Tab>('batter');
+  /** 지표 편집 시트가 열려 있는가 */
+  const [editing, setEditing] = useState(false);
   const [batterSort, setBatterSort] = useState('war');
   const [pitcherSort, setPitcherSort] = useState('war');
   const [role, setRole] = useState<RoleFilter>('전체');
   /** 상세 시트에 열려 있는 선수. null 이면 시트가 닫힌 상태 */
   const [openId, setOpenId] = useState<string | null>(null);
   const [glossaryKey, setGlossaryKey] = useState<string | null>(null);
+
+  const metrics = metricsOf(profile.batterMetrics);
 
   const openBatter = BATTERS.find((b) => b.id === openId);
   const openPitcher = PITCHERS.find((p) => p.id === openId);
@@ -253,9 +323,28 @@ export function PlayersScreen({ profile }: { profile: UserProfile }) {
             <RecordTab onOpen={openPlayer} />
           ) : (
             <>
+              {/* ── 오른쪽 자리를 명수에서 '편집'으로 바꾼다 ──────────
+                  명수는 목록을 보면 알 수 있는 값이라 이 자리에 있을 이유가 약했다.
+                  반면 아래 카드에 뜨는 세 지표는 **바꿀 수 있다는 사실 자체가**
+                  화면 어디에도 없었다. 카드 안에 편집 버튼을 넣으면 펼쳐 둔 한 명의
+                  설정처럼 보이므로, 목록 전체를 지배하는 머리글에 둔다 */}
               <SectionTitle
                 title={`${tab === 'batter' ? '타자' : '투수'} ${sortLabel} 순`}
-                right={<Text style={st.headNote}>{rows.length}명</Text>}
+                right={
+                  tab === 'batter' ? (
+                    <Pressable
+                      onPress={() => setEditing(true)}
+                      hitSlop={10}
+                      style={({ pressed }) => [st.editBtn, pressed && states.pressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`세부 지표 편집 · 현재 ${metrics.map((m) => m.label).join(', ')}`}
+                    >
+                      <Text style={st.editBtnText}>지표 편집</Text>
+                    </Pressable>
+                  ) : (
+                    <Text style={st.headNote}>{rows.length}명</Text>
+                  )
+                }
               />
 
               {/* 정렬 - 무엇을 기준으로 줄 세울지. 오른쪽 수치도 따라 바뀐다 */}
@@ -309,6 +398,7 @@ export function PlayersScreen({ profile }: { profile: UserProfile }) {
                         i === 0 ? (
                           <FeaturedDetail
                             row={r}
+                            metrics={metrics}
                             profile={profile}
                             glossaryKey={glossaryKey}
                             onGlossary={setGlossaryKey}
@@ -341,6 +431,7 @@ export function PlayersScreen({ profile }: { profile: UserProfile }) {
         {openBatter ? (
           <BatterDetail
             batter={openBatter}
+            metrics={metrics}
             profile={profile}
             glossaryKey={glossaryKey}
             onGlossary={setGlossaryKey}
@@ -355,7 +446,116 @@ export function PlayersScreen({ profile }: { profile: UserProfile }) {
           />
         ) : null}
       </DetailSheet>
+
+      <MetricPicker
+        visible={editing}
+        selected={profile.batterMetrics}
+        onChange={onBatterMetrics}
+        onClose={() => setEditing(false)}
+      />
     </>
+  );
+}
+
+/**
+ * 세부 지표 고르기.
+ *
+ * ── 왜 순서를 보이게 했나 ───────────────────────────────────
+ * 체크 표시 대신 **몇 번째인지**를 적는다. 고른 순서가 곧 타일 순서라, 체크만 찍으면
+ * 시트를 닫은 뒤 "내가 왼쪽에 두려던 게 이게 아닌데"가 된다. 숫자가 그 약속을 미리 말한다.
+ *
+ * ── 왜 최대치에서 막기만 하고 밀어내지 않나 ─────────────────
+ * 가득 찬 상태에서 새로 누르면 가장 먼저 고른 것이 빠지게 할 수도 있었다. 누르는 만큼
+ * 계속 바뀌니 편하긴 한데, **내가 지우지 않은 것이 사라진다.** 대신 막고, 왜 막혔는지와
+ * 어떻게 푸는지를 같은 자리에서 말한다.
+ */
+function MetricPicker({
+  visible,
+  selected,
+  onChange,
+  onClose,
+}: {
+  visible: boolean;
+  selected: string[];
+  onChange: (keys: string[]) => void;
+  onClose: () => void;
+}) {
+  const picked = selected.filter((k) => BATTER_METRICS.some((m) => m.key === k));
+  const full = picked.length >= BATTER_METRIC_MAX;
+  const atMin = picked.length <= BATTER_METRIC_MIN;
+
+  const toggle = (key: string) => {
+    if (picked.includes(key)) {
+      if (atMin) return; // 마지막 하나는 끌 수 없다 - 빈 카드는 스스로 빠져나올 수 없다
+      onChange(picked.filter((k) => k !== key));
+      return;
+    }
+    if (full) return;
+    onChange([...picked, key]);
+  };
+
+  const isDefault =
+    picked.length === DEFAULT_BATTER_METRICS.length &&
+    picked.every((k, i) => k === DEFAULT_BATTER_METRICS[i]);
+
+  return (
+    <DetailSheet
+      visible={visible}
+      title="세부 지표"
+      subtitle={`타자 카드에 띄울 지표 · ${picked.length} / ${BATTER_METRIC_MAX}`}
+      onClose={onClose}
+      actions={
+        isDefault ? null : (
+          <SecondaryButton label="기본값으로 되돌리기" onPress={() => onChange(DEFAULT_BATTER_METRICS)} />
+        )
+      }
+    >
+      <View style={{ gap: spacing.cardGap }}>
+        <NoticeCard
+          tone={full ? 'warn' : 'muted'}
+          title={full ? '더 고르려면 하나를 빼세요' : `${BATTER_METRIC_MAX}개까지 고를 수 있습니다`}
+        >
+          <Text style={st.pickIntro}>
+            {full
+              ? '다른 지표를 넣으려면 고른 것 중 하나를 다시 눌러 빼세요. 고른 순서가 그대로 타일 순서가 됩니다.'
+              : '고른 순서가 그대로 타일 순서가 됩니다. 지표마다 값·리그 위치·표본 신뢰도가 함께 붙습니다.'}
+          </Text>
+        </NoticeCard>
+
+        <GroupCard>
+          {BATTER_METRICS.map((m, i) => {
+            const at = picked.indexOf(m.key);
+            const on = at >= 0;
+            // 더 고를 수 없어 지금은 누를 수 없는 줄. 없는 것처럼 지우지 않고 물러나게만 한다
+            const blocked = !on && full;
+            const g = GLOSSARY[m.key];
+            return (
+              <Row
+                key={m.key}
+                last={i === BATTER_METRICS.length - 1}
+                onPress={() => toggle(m.key)}
+                style={st.pickRow}
+              >
+                <View style={[st.pickMark, on && st.pickMarkOn]}>
+                  <Text style={[st.pickMarkText, on && st.pickMarkTextOn]}>
+                    {on ? String(at + 1) : ''}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[st.pickLabel, blocked && st.pickDim]}>{m.label}</Text>
+                  <Text style={[st.pickHint, blocked && st.pickDim]}>{g?.short ?? ''}</Text>
+                </View>
+              </Row>
+            );
+          })}
+        </GroupCard>
+
+        <Text style={st.pickFoot}>
+          고른 지표는 목록에 펼쳐 둔 선수와 선수 상세 양쪽에 같이 적용되고, 앱을 껐다 켜도
+          남습니다.
+        </Text>
+      </View>
+    </DetailSheet>
   );
 }
 
@@ -836,11 +1036,14 @@ function LeaderCard({
  */
 function FeaturedDetail({
   row,
+  metrics,
   profile,
   glossaryKey,
   onGlossary,
 }: {
   row: RowData;
+  /** '지표 편집'에서 고른 것. 타자에게만 쓴다 */
+  metrics: MetricOpt[];
   profile: UserProfile;
   glossaryKey: string | null;
   onGlossary: (k: string | null) => void;
@@ -853,46 +1056,18 @@ function FeaturedDetail({
   );
 
   if (batter) {
-    const st0 = batter.stat;
-    const wrc = wrcPlusOf(st0, PARK);
-    const woba = wobaOf(st0);
-    const babip = babipOf(st0);
     return (
       <>
         <PlayerFormLoop playerId={batter.id} label="타격 준비" height={170} />
-        <View style={st.metricRow}>
-          <MetricTile
-            label="wRC+"
-            value={String(wrc)}
-            statKey="wrcPlus"
-            sample={st0.pa}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'wrcPlus'}
-          />
-          <MetricTile
-            label="wOBA"
-            value={woba.toFixed(3)}
-            statKey="woba"
-            sample={st0.pa}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'woba'}
-          />
-          <MetricTile
-            label="BABIP"
-            value={babip.toFixed(3)}
-            statKey="babip"
-            sample={st0.pa}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'babip'}
-          />
-        </View>
+        <MetricTiles
+          stat={batter.stat}
+          metrics={metrics}
+          glossaryKey={glossaryKey}
+          onGlossary={onGlossary}
+        />
         {glossary}
-        <View style={{ gap: spacing.md }}>
-          <MetricGauge statKey="wrcPlus" label="wRC+" value={wrc} />
-          <MetricGauge statKey="woba" label="wOBA" value={woba} />
-          <MetricGauge statKey="babip" label="BABIP" value={babip} />
-        </View>
-        <Text style={st.note}>{batter.note}</Text>
+        <MetricGauges stat={batter.stat} metrics={metrics} />
+        <AiAnalysis batter={batter} />
       </>
     );
   }
@@ -1005,20 +1180,19 @@ function SummaryCard({
 
 function BatterDetail({
   batter,
+  metrics,
   profile,
   glossaryKey,
   onGlossary,
 }: {
   batter: Batter;
+  metrics: MetricOpt[];
   profile: UserProfile;
   glossaryKey: string | null;
   onGlossary: (k: string | null) => void;
 }) {
   const b = batter.stat;
   const war = batterWarOf(b, PARK);
-  const wrc = wrcPlusOf(b, PARK);
-  const woba = wobaOf(b);
-  const babip = babipOf(b);
   const bd = batterWarBreakdown(b, PARK);
 
   return (
@@ -1061,39 +1235,16 @@ function BatterDetail({
 
         <Divider />
 
+        {/* 목록에서 고른 지표가 여기에도 그대로 온다. 두 자리가 다른 셋을 띄우면
+            펼쳐 둔 줄에서 본 것과 눌러서 들어온 것이 어긋난다 */}
         <Label>심화 지표 · 누르면 설명이 열립니다</Label>
-        <View style={st.metricRow}>
-          <MetricTile
-            label="wRC+"
-            value={String(wrc)}
-            statKey="wrcPlus"
-            sample={b.pa}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'wrcPlus'}
-          />
-          <MetricTile
-            label="wOBA"
-            value={woba.toFixed(3)}
-            statKey="woba"
-            sample={b.pa}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'woba'}
-          />
-          <MetricTile
-            label="BABIP"
-            value={babip.toFixed(3)}
-            statKey="babip"
-            sample={b.pa}
-            onGlossary={onGlossary}
-            active={glossaryKey === 'babip'}
-          />
-        </View>
-
-        <View style={{ gap: spacing.md }}>
-          <MetricGauge statKey="wrcPlus" label="wRC+" value={wrc} />
-          <MetricGauge statKey="woba" label="wOBA" value={woba} />
-          <MetricGauge statKey="babip" label="BABIP" value={babip} />
-        </View>
+        <MetricTiles
+          stat={b}
+          metrics={metrics}
+          glossaryKey={glossaryKey}
+          onGlossary={onGlossary}
+        />
+        <MetricGauges stat={b} metrics={metrics} />
       </Card>
 
       {/* 설명은 누른 타일 **바로 아래**에 열린다. 화면 맨 끝에 뜨면 누른 것과 뜬 것을
@@ -1178,6 +1329,12 @@ function BatterDetail({
           },
         ]}
         unit="타석"
+        mainLabel="타율"
+        // 리그 타율이 오가는 폭. 평균 .270 을 한가운데 두어 선 좌우가 곧 평균 위아래가 된다
+        domain={{ low: 0.18, mid: 0.27, high: 0.36, midText: '.270' }}
+        // 좌우 스플릿은 보통 120~140타석에서 갈린다. 100 아래면 타율 하나가
+        // 안타 두어 개에 30포인트씩 흔들려, 두 쪽을 견주는 것 자체가 무리다
+        thinBelow={100}
       />
 
       <SectionTitle title="타구 유형" />
@@ -1185,19 +1342,18 @@ function BatterDetail({
         <BattedBall gb={b.gbRate} fb={b.fbRate} ld={b.ldRate} />
       </Card>
 
+      {/* 신뢰도도 **지금 보고 있는 지표**를 따라간다. 입문 수준에는 그중 가장 못 믿을
+          것 하나만 - 셋을 다 늘어놓으면 경고가 배경이 되어 아무것도 안 읽힌다 */}
       <TrustCard
         sample={b.pa}
         items={
           profile.level === 'rookie'
-            ? [{ metric: 'babip', label: 'BABIP' }]
-            : [
-                { metric: 'babip', label: 'BABIP' },
-                { metric: 'wrcPlus', label: 'wRC+' },
-              ]
+            ? worstTrustItems(metrics, b.pa)
+            : metrics.map((m) => ({ metric: m.key, label: m.label }))
         }
       />
 
-      <Text style={st.note}>{batter.note}</Text>
+      <AiAnalysis batter={batter} />
     </View>
   );
 }
@@ -1360,6 +1516,10 @@ function PitcherDetail({
         ]}
         unit="타자"
         mainLabel="삼진율"
+        domain={{ low: 0.1, mid: 0.2, high: 0.35, midText: '20%' }}
+        // 불펜은 좌우 각 50타자 남짓인 경우가 흔하다. 그 구간을 그냥 두면
+        // 삼진율 3%p 차이가 '좌타에 강한 투수'로 읽힌다
+        thinBelow={80}
       />
 
       <SectionTitle title="구종" />
@@ -1399,9 +1559,9 @@ interface SplitRow {
   /** 큰 수치 - 타자는 타율, 투수는 삼진율 */
   main: string;
   sub: string;
-  /** 이 상황을 몇 번 겪었나 (타석·상대타자). 막대 길이가 된다 */
+  /** 이 상황을 몇 번 겪었나 (타석·상대타자). 표본이 얼마나 되는지를 글로 말한다 */
   size: number;
-  /** 더 나은 쪽을 고를 때 쓰는 값 */
+  /** 막대 길이가 되는 값이자 더 나은 쪽을 고르는 값 - main 의 원본 수치 */
   rank: number;
 }
 
@@ -1411,31 +1571,53 @@ interface SplitRow {
  * 타율 하나로는 **주자를 두고 쳤을 때도 그런지**를 알 수 없다. 득점권에서만 살아나는
  * 타자와 주자가 없을 때만 치는 타자는 같은 타율을 갖고도 팀에 주는 값이 다르다.
  *
- * 두 줄 옆의 막대는 **그 상황을 몇 번 겪었는지**다(월별 추이와 같은 규칙). 좌투를
- * 80타석밖에 안 상대한 타자의 좌투 타율은 그만큼 덜 믿어야 하는데, 숫자만 있으면
- * 그 사실이 안 보인다.
+ * ── 2026-08-26 막대를 표본에서 지표로 옮긴다 ────────────────
+ * 원래 막대는 **그 상황을 몇 번 겪었는지**(타석)였다. 표본이 작은 스플릿을 덜 믿게 하려는
+ * 의도였는데, 화면에서는 정반대로 읽혔다.
+ *
+ *   주자 있음 · 224타석 · 타율 .281  → 짧은 막대
+ *   주자 없음 · 285타석 · 타율 .265  → 긴 막대
+ *
+ * 막대 바로 옆의 큰 숫자가 타율이고 **막대 색까지 타율이 좋은 쪽을 따라가는데**, 길이만
+ * 홀로 타석을 말했다. 그래서 '더 긴 막대 = 더 나쁜 타율'이 되어, 한 줄 안에서 길이와
+ * 숫자가 서로를 부정했다. 길이는 옆에 붙은 숫자를 그려야 한다.
+ *
+ * 표본은 없어진 게 아니라 **글로 옮겨 갔다** - 타석 수 옆에 기준 미만이면 '표본 적음'이
+ * 붙는다. 두 가지를 한 도형에 겹쳐 싣는 대신, 크기는 도형이 말하고 신뢰는 글이 말한다.
+ *
+ * ── 눈금을 왜 고정하나 ──────────────────────────────────────
+ * 두 줄 중 큰 값을 100%로 잡으면 .281 과 .265 가 100% 대 94% 가 되어 **차이가 안 보인다.**
+ * 대신 그 지표가 실제로 오가는 범위(domain)를 눈금으로 박고, 리그 평균 자리에 세로선을
+ * 세운다. 막대가 그 선을 넘었나 아닌가가 곧 '평균 위인가'다.
  */
 function SplitSection({
   groups,
   unit,
   mainLabel,
+  domain,
+  thinBelow,
 }: {
   groups: { title: string; rows: SplitRow[] }[];
   unit: string;
-  mainLabel?: string;
+  mainLabel: string;
+  /**
+   * 막대 눈금. `low` 가 왼쪽 끝, `high` 가 오른쪽 끝이고 `mid` 에 평균 선이 선다.
+   * 낮을수록 좋은 지표는 low > high 로 뒤집어 적는다 (gaugePosition 과 같은 규칙).
+   */
+  domain: { low: number; mid: number; high: number; midText: string };
+  /** 이 표본에 못 미치면 '표본 적음'을 붙인다 */
+  thinBelow: number;
 }) {
+  const at = (v: number) =>
+    Math.min(1, Math.max(0, (v - domain.low) / (domain.high - domain.low)));
   const live = groups.filter((g) => g.rows.length === 2 || g.rows.length === 1);
   if (live.length === 0 || live.every((g) => g.rows.length === 0)) return null;
 
   return (
     <>
-      <SectionTitle
-        title="상황별"
-        right={mainLabel ? <Text style={st.headNote}>{mainLabel}</Text> : null}
-      />
+      <SectionTitle title="상황별" right={<Text style={st.headNote}>{mainLabel}</Text>} />
       <Card>
         {live.map((g, gi) => {
-          const max = Math.max(...g.rows.map((r) => r.size), 1);
           const best = g.rows.reduce((a, b) => (b.rank > a.rank ? b : a), g.rows[0]);
           return (
             <View key={g.title} style={{ gap: spacing.sm }}>
@@ -1443,24 +1625,29 @@ function SplitSection({
               <Label>{g.title}</Label>
               {g.rows.map((r) => {
                 const on = g.rows.length > 1 && r.label === best.label;
+                // 표본이 얇으면 그 사실을 글로 말한다. 막대에 겹쳐 싣지 않는다
+                const thin = r.size < thinBelow;
                 return (
                   <View key={r.label} style={st.splitRow}>
                     <View style={st.splitLeft}>
                       <Text style={st.splitLabel}>{r.label}</Text>
-                      <Text style={st.splitSub}>
+                      <Text style={[st.splitSub, thin && st.splitThin]}>
                         {r.size}
                         {unit}
+                        {thin ? ' · 표본 적음' : ''}
                       </Text>
                       <View style={st.splitTrack}>
                         <View
                           style={[
                             st.splitFill,
                             {
-                              width: `${Math.round((r.size / max) * 100)}%`,
+                              width: `${Math.round(at(r.rank) * 100)}%`,
                               backgroundColor: on ? colors.brand : colors.dim,
                             },
                           ]}
                         />
+                        {/* 리그 평균 자리. 막대가 이 선을 넘었나가 곧 '평균 위인가'다 */}
+                        <View style={[st.splitMid, { left: `${at(domain.mid) * 100}%` }]} />
                       </View>
                     </View>
                     <View style={st.splitRight}>
@@ -1475,6 +1662,11 @@ function SplitSection({
             </View>
           );
         })}
+        {/* 눈금을 한 번 밝힌다. 세로선을 설명 없이 두면 그냥 흠집으로 읽힌다 */}
+        <Text style={st.splitLegend}>
+          막대는 {mainLabel}, 세로선이 리그 평균 {domain.midText}입니다. {unit} 수가 적은 쪽은
+          그만큼 덜 믿을 값입니다.
+        </Text>
       </Card>
     </>
   );
@@ -1638,6 +1830,79 @@ function CompareSection({ prev, rows }: { prev: unknown; rows: CompareRow[] }) {
   );
 }
 
+/**
+ * 고른 지표 타일 줄.
+ *
+ * 셋까지는 한 줄에 나란히, 넷이면 2×2 로 접는다. 넷을 억지로 한 줄에 밀어 넣으면
+ * 타일 폭이 70px 남짓이 되어 `0.360` 이 두 줄로 꺾이거나 `…` 로 잘린다 - 값이 안 읽히면
+ * 지표를 넷 고른 의미가 없다.
+ */
+function MetricTiles({
+  stat,
+  metrics,
+  glossaryKey,
+  onGlossary,
+}: {
+  stat: BatterStatLine;
+  metrics: MetricOpt[];
+  glossaryKey: string | null;
+  onGlossary: (k: string | null) => void;
+}) {
+  const wide = metrics.length === 4;
+  return (
+    <View style={st.metricRow}>
+      {metrics.map((m) => (
+        <MetricTile
+          key={m.key}
+          label={m.label}
+          value={m.format(stat)}
+          statKey={m.key}
+          sample={stat.pa}
+          onGlossary={onGlossary}
+          active={glossaryKey === m.key}
+          wide={wide}
+        />
+      ))}
+    </View>
+  );
+}
+
+/** 같은 지표를 구간 게이지로 한 번 더 - 값 옆에 '어디쯤인가'가 붙는 이 화면의 규칙 */
+function MetricGauges({ stat, metrics }: { stat: BatterStatLine; metrics: MetricOpt[] }) {
+  return (
+    <View style={{ gap: spacing.md }}>
+      {metrics.map((m) => (
+        <MetricGauge key={m.key} statKey={m.key} label={m.label} value={m.value(stat)} />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * AI 선수 분석.
+ *
+ * ── 왜 생성 방식을 같이 적나 ────────────────────────────────
+ * 이 화면은 심화 지표마다 '이 값을 믿어도 되는지'를 점으로 찍는다. 그래 놓고 정작
+ * **문장은 어디서 왔는지 안 밝히면** 앞의 규칙이 무색해진다. 자동 생성된 해설이
+ * 사람이 쓴 스카우팅 리포트처럼 보이는 순간, 사용자는 그것을 의심할 근거를 잃는다.
+ *
+ * 문장을 짓는 규칙은 src/playerAnalysis.ts 에 있다 (모델 호출이 아니라 규칙이다).
+ */
+function AiAnalysis({ batter }: { batter: Batter }) {
+  const a = analyzeBatter(batter, PARK);
+  return (
+    <View style={st.aiWrap}>
+      <View style={st.aiHead}>
+        <Text style={st.aiTitle}>AI 선수 분석</Text>
+        <Text style={st.aiSource}>{a.source}</Text>
+      </View>
+      {a.lines.map((line, i) => (
+        <RichText key={i} text={line} style={st.aiLine} />
+      ))}
+    </View>
+  );
+}
+
 function MetricTile({
   label,
   value,
@@ -1645,6 +1910,7 @@ function MetricTile({
   sample,
   onGlossary,
   active,
+  wide,
 }: {
   label: string;
   value: string;
@@ -1653,6 +1919,8 @@ function MetricTile({
   onGlossary: (k: string | null) => void;
   /** 지금 이 지표의 설명이 열려 있는가 - 어느 타일을 눌렀는지 표시한다 */
   active?: boolean;
+  /** 한 줄에 둘씩 접히는 폭 - 넷을 고른 경우 */
+  wide?: boolean;
 }) {
   const trust = trustOf(statKey, sample);
   const dot = { high: colors.trustHigh, mid: colors.trustMid, low: colors.trustLow }[trust];
@@ -1672,13 +1940,18 @@ function MetricTile({
     </>
   );
 
-  if (!explained) return <View style={st.metricTile}>{body}</View>;
+  if (!explained) return <View style={[st.metricTile, wide && st.metricTileWide]}>{body}</View>;
 
   return (
     <Pressable
       // 같은 타일을 다시 누르면 닫힌다 - 닫기 버튼을 따로 찾지 않아도 된다
       onPress={() => onGlossary(active ? null : statKey)}
-      style={({ pressed }) => [st.metricTile, active && st.metricTileOn, pressed && states.pressed]}
+      style={({ pressed }) => [
+        st.metricTile,
+        wide && st.metricTileWide,
+        active && st.metricTileOn,
+        pressed && states.pressed,
+      ]}
       accessibilityRole="button"
       accessibilityState={{ expanded: !!active }}
       accessibilityLabel={`${label} ${value} 설명 보기`}
@@ -1712,7 +1985,7 @@ function MetricGauge({ statKey, label, value }: { statKey: string; label: string
       <View style={{ flex: 1 }}>
         <RangeGauge value={pos} bands={bands} />
       </View>
-      <Text style={st.gaugeMid}>평균 {g.scale.mid}</Text>
+      <Text style={st.gaugeMid}>평균 {g.scale.midText ?? g.scale.mid}</Text>
     </View>
   );
 }
@@ -1767,6 +2040,22 @@ function BattedBall({ gb, fb, ld }: { gb: number; fb: number; ld: number }) {
  * 초록일 수 없다 - 안심하고 넘어가라는 신호가 되어 버린다.
  */
 const TRUST_RANK = { low: 0, mid: 1, high: 2 } as const;
+
+/**
+ * 고른 지표 중 **가장 못 믿을 것 하나**.
+ *
+ * 입문 수준에서 쓴다. 신뢰도 경고를 지표 수만큼 늘어놓으면 그 카드가 화면에서 가장
+ * 긴 덩어리가 되고, 정작 '무엇을 조심하라'는 말은 배경으로 밀린다.
+ */
+function worstTrustItems(metrics: MetricOpt[], sample: number) {
+  const items = metrics.map((m) => ({ metric: m.key, label: m.label }));
+  if (items.length === 0) return items;
+  return [
+    items.reduce((a, c) =>
+      TRUST_RANK[trustOf(c.metric, sample)] < TRUST_RANK[trustOf(a.metric, sample)] ? c : a,
+    ),
+  ];
+}
 
 function TrustCard({
   items,
@@ -1866,12 +2155,70 @@ const st = StyleSheet.create({
   rowChevron: { fontSize: 18, color: colors.mutedText, marginLeft: -4 },
   headNote: typography.micro,
 
+  // 머리글 오른쪽의 '지표 편집' - 작은 캡슐. 회색 글자로 두면 명수와 구분이 안 돼
+  // 누를 수 있다는 신호가 사라진다
+  editBtn: {
+    backgroundColor: colors.brandSoft,
+    borderRadius: radius.chip,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 5,
+  },
+  editBtnText: { ...typography.micro, fontSize: 12, color: colors.brandText, fontWeight: '700' },
+
+  // 지표 고르기 시트
+  pickIntro: { ...typography.caption, lineHeight: 20 },
+  pickRow: { alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  // 번호 자리 - 안 고른 줄에도 자리를 비워 둬야 라벨 시작점이 줄마다 흔들리지 않는다
+  pickMark: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: colors.dim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickMarkOn: { backgroundColor: colors.brand, borderColor: colors.brand },
+  pickMarkText: { ...typography.micro, ...tabularFigures, fontSize: 12, fontWeight: '700' },
+  pickMarkTextOn: { color: '#FFFFFF' },
+  pickLabel: { fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
+  pickHint: { ...typography.micro, lineHeight: 17 },
+  pickDim: { color: colors.mutedText },
+  pickFoot: { ...typography.micro, lineHeight: 17, paddingHorizontal: spacing.xs },
+
+  // AI 선수 분석 - 카드 안의 한 단계 낮은 면에 브랜드 선을 세운다.
+  // 면만 두면 위의 지표 타일과 같은 회색이라 어디부터가 '해설'인지 경계가 없다
+  aiWrap: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.tile,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.brand,
+    padding: spacing.md,
+    gap: 6,
+  },
+  aiHead: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  aiTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    color: colors.brandText,
+  },
+  // 생성 방식은 제목과 같은 줄에 둔다. 아래로 내리면 해설 문단과 섞여 읽힌다
+  aiSource: { ...typography.micro, fontSize: 10, flex: 1, textAlign: 'right' },
+  aiLine: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
+
   // 상황별 - 왼쪽에 라벨과 기회 막대, 오른쪽에 성적
   splitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   splitLeft: { flex: 1, gap: 3 },
   splitLabel: { ...typography.caption, color: colors.text, fontWeight: '700' },
-  splitTrack: { height: 4, borderRadius: 2, backgroundColor: colors.surface, overflow: 'hidden' },
-  splitFill: { height: 4, borderRadius: 2 },
+  // 4px 이던 것을 6px 로. 평균 선을 안에 세우려면 이만큼은 있어야 선이 점으로 안 보인다
+  splitTrack: { height: 6, borderRadius: 3, backgroundColor: colors.surface, overflow: 'hidden' },
+  splitFill: { height: 6, borderRadius: 3 },
+  // 리그 평균 눈금. 막대 위에 그려야 브랜드색 구간에서도 살아남는다(형제 순서로 해결)
+  splitMid: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: colors.mutedText },
+  // 표본이 얇은 줄 - 숫자를 지우지 않고 색으로 물러서게만 한다
+  splitThin: { color: colors.warn, fontWeight: '700' },
+  splitLegend: { ...typography.micro, lineHeight: 16, marginTop: spacing.xs },
   splitRight: { alignItems: 'flex-end', gap: 1 },
   splitMain: { ...typography.metric, ...tabularFigures, fontSize: 20, lineHeight: 24 },
   splitSub: { ...typography.micro, ...tabularFigures, fontWeight: '500' },
@@ -1961,7 +2308,7 @@ const st = StyleSheet.create({
   },
   summaryWar: { ...typography.metric, ...tabularFigures, fontSize: 30, color: colors.brandText },
 
-  metricRow: { flexDirection: 'row', gap: spacing.sm },
+  metricRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
 
   // 펼쳐 둔 줄 - 목록 안이지만 카드 안쪽 여백을 그대로 쓴다
   featured: { gap: spacing.md, paddingHorizontal: spacing.cardPad, paddingBottom: spacing.lg },
@@ -1978,6 +2325,9 @@ const st = StyleSheet.create({
     padding: spacing.md,
     gap: 2,
   },
+  // 넷을 골랐을 때 2×2 로 접는 폭. flex 를 0 으로 되돌린 뒤 basis 를 다시 준다 -
+  // flex:1 이 남아 있으면 basis 가 0 으로 눌려 넷이 한 줄에 구겨진다
+  metricTileWide: { flex: 0, flexGrow: 1, flexBasis: '46%' },
   // 열려 있는 타일은 면째로 틴트가 된다 - 어느 것을 눌러 이 설명이 떴는지
   metricTileOn: { backgroundColor: colors.brandSoft },
   metricHead: { flexDirection: 'row', alignItems: 'center', gap: 5 },

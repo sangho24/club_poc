@@ -75,6 +75,10 @@ export default function App() {
   };
 
   const setLevel = (level: KnowledgeLevel) => updateProfile({ ...profile, level });
+  // 선수 탭의 '지표 편집'. 최애 선수·알림과 같은 길로 저장소까지 간다 -
+  // 고른 세 칸이 새로고침에 날아가면 그건 편집이 아니라 그때뿐인 필터다
+  const setBatterMetrics = (batterMetrics: string[]) =>
+    updateProfile({ ...profile, batterMetrics });
   const setFavorite = (id?: string) => updateProfile({ ...profile, favoritePlayerId: id });
   const setAlert = (key: keyof UserProfile['alerts'], value: boolean) =>
     updateProfile({ ...profile, alerts: { ...profile.alerts, [key]: value } });
@@ -162,7 +166,9 @@ export default function App() {
           />
         ) : null}
         {tab === 'live' ? <LiveScreen profile={profile} /> : null}
-        {tab === 'players' ? <PlayersScreen profile={profile} /> : null}
+        {tab === 'players' ? (
+          <PlayersScreen profile={profile} onBatterMetrics={setBatterMetrics} />
+        ) : null}
         {tab === 'gameday' ? <GamedayScreen /> : null}
         {tab === 'store' ? <StoreScreen profile={profile} /> : null}
         {tab === 'my' ? (
