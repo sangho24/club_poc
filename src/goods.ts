@@ -708,48 +708,6 @@ export const MERCH: Merch[] = [
   { id: 'm-sticker', name: '스티커 팩', group: '패션', price: 7000, status: 'onsale' },
 ];
 
-/**
- * 격자 타일에 붙는 현황 한 줄.
- *
- * 아이콘과 이름만 있는 격자는 **목차**다. 목차는 한 번 읽으면 다시 볼 이유가 없다.
- * 들어가기 전에 "지금 저기서 무슨 일이 벌어지고 있는지"를 말해 줘야 격자 자체가
- * 매번 볼 값어치를 갖는다 - 오늘 카드가 나왔는지, 예약이 열렸는지, 내 사이즈가
- * 빠지고 있는지는 전부 들어가 보기 전에 알아야 할 것들이다.
- */
-export function categoryStatus(
-  c: GoodsCategory,
-  nowMs: number,
-): { text: string; tone: 'live' | 'warn' | 'brand' | 'muted' } {
-  switch (c) {
-    case 'venue': {
-      const gates = PHOTOCARDS.map((x) => photocardGate(x, nowMs));
-      if (gates.includes('pending')) return { text: '오늘 경기 카드 발행 중', tone: 'live' };
-      const open = gates.filter((g) => g === 'open').length;
-      return open > 0
-        ? { text: `내가 간 경기 ${open}건`, tone: 'brand' }
-        : { text: '구매 가능한 카드 없음', tone: 'muted' };
-    }
-    case 'milestone': {
-      const open = MILESTONES.filter((m) => milestoneProgress(m, nowMs).reserveOpen);
-      if (open.length === 0) return { text: `기록 ${MILESTONES.length}건 추적 중`, tone: 'muted' };
-      const soon = open.some((m) => milestoneProgress(m, nowMs).reserveRatio >= 0.9);
-      return {
-        text: soon ? `예약 ${open.length}건 · 마감 임박` : `예약 ${open.length}건 진행 중`,
-        tone: soon ? 'warn' : 'brand',
-      };
-    }
-    case 'uniform': {
-      const low = UNIFORMS.filter((u) => u.status === 'lowstock').length;
-      const soon = UNIFORMS.filter((u) => u.status === 'upcoming').length;
-      if (low > 0) return { text: `${UNIFORMS.length}종 · ${low}종 품절 임박`, tone: 'warn' };
-      if (soon > 0) return { text: `${UNIFORMS.length}종 · ${soon}종 발매 예정`, tone: 'brand' };
-      return { text: `${UNIFORMS.length}종 판매 중`, tone: 'muted' };
-    }
-    case 'merch':
-      return { text: `${MERCH.length}종 판매 중`, tone: 'muted' };
-  }
-}
-
 // ═════════════════════════════════════════════════════════════
 // 알림 - 무엇을 언제 밀어 줄 것인가
 // ═════════════════════════════════════════════════════════════

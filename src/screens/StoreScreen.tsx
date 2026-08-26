@@ -24,8 +24,12 @@
 //      각자 다른 화면이다 - 자격 판정과 카탈로그를 같은 트랙 안에 두면 형태가 거짓말을 한다
 //
 // 지금은 격자 넷을 눌러 **들어간다.** 이름을 온전히 쓸 자리가 생기고, 아이콘이 갈래를
-// 한눈에 가르며, 무엇보다 타일마다 **지금 저기서 무슨 일이 벌어지는지**를 한 줄로 달 수
-// 있다 - 목차는 한 번 읽으면 그만이지만 현황판은 매번 볼 값어치가 있다.
+// 글자보다 먼저 가른다.
+//
+// 격자에는 **이름 하나만** 둔다. 타일마다 현황 한 줄("오늘 경기 카드 발행 중")을 달아
+// 봤는데, 네 칸에 각각 다른 색 글이 붙으니 **격자가 목록처럼 읽혔다** - 무엇을 고르는
+// 자리인지가 흐려진다. 급한 소식은 바로 위 '놓치기 전에'가 이미 맡고 있어서, 격자는
+// 갈림길로만 남기고 현황은 그쪽에 몰아 준다.
 //
 // ⚠ 결제는 앱에서 하지 않는다 - 공식몰로 리다이렉트한다 (5번 티켓과 같은 원칙).
 import { FC, useMemo, useState } from 'react';
@@ -71,7 +75,6 @@ import {
   PhotoCard,
   Uniform,
   UNIFORMS,
-  categoryStatus,
   countdown,
   firstAvailableSize,
   formatDate,
@@ -89,7 +92,7 @@ import {
   stockTone,
 } from '../goods';
 import { UserProfile } from '../profile';
-import { colors, radius, spacing, tabularFigures, typography } from '../theme';
+import { colors, keepAll, radius, spacing, tabularFigures, typography } from '../theme';
 
 /** 시연 기준 시각 - Date.now() 를 쓰면 실행할 때마다 카운트다운이 달라진다 */
 const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
@@ -254,46 +257,32 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
 /**
  * 갈래로 들어가는 격자.
  *
- * 한 줄에 둘씩 두 줄. 타일 안은 **왼쪽에 아이콘, 오른쪽에 글**이다 - 세로로 쌓으면
- * 아이콘이 주인공이 되는데, 여기서 정작 눌러야 할 것은 이름과 그 아래 현황이다.
- * 아이콘은 갈래를 한눈에 가르는 이름표지 그림이 아니다.
+ * 한 줄에 둘씩 두 줄. 타일 안은 **왼쪽에 아이콘, 오른쪽에 이름**이다 - 세로로 쌓으면
+ * 아이콘이 주인공이 되는데, 정작 눌러야 할 것은 이름이다. 아이콘은 갈래를 글자보다
+ * 먼저 가르는 이름표지 그림이 아니므로, 틴트 면에 앉히지 않고 획만 남긴다.
  *
- * 현황 줄은 색으로도 말한다. 오늘만 살 수 있는 것은 `live`, 곧 닫히는 것은 `warn` -
- * 격자를 훑는 동안 **어디부터 들어가야 하는지**가 글자를 읽기 전에 정해진다.
+ * ⚠ **타일에는 이름 말고 아무것도 두지 않는다.** 현황 한 줄("오늘 경기 카드 발행 중")을
+ * 달아 봤더니 네 칸에 각각 다른 색 글이 붙어 **격자가 목록처럼 읽혔다.** 이 격자는 읽는
+ * 자리가 아니라 고르는 자리다. 급한 소식은 바로 위 '놓치기 전에'가 이미 맡고 있다.
  */
 function SectionGrid({ onEnter }: { onEnter: (c: GoodsCategory) => void }) {
   return (
     <View style={st.sectionGrid}>
       {CATEGORIES.map((c) => {
         const Icon = SECTION_ICONS[c.key];
-        const status = categoryStatus(c.key, DEMO_NOW);
-        const tint = {
-          live: colors.live,
-          warn: colors.warn,
-          brand: colors.brandText,
-          muted: colors.mutedText,
-        }[status.tone];
-
         return (
           <Pressable
             key={c.key}
             onPress={() => onEnter(c.key)}
             style={({ pressed }) => [st.sectionSlot, pressed && st.sectionPressed]}
             accessibilityRole="button"
-            accessibilityLabel={`${c.label} - ${status.text}`}
+            accessibilityLabel={c.label}
           >
             <View style={st.sectionTile}>
-              <View style={st.sectionIcon}>
-                <Icon width={22} height={22} color={colors.brandText} />
-              </View>
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={st.sectionName} numberOfLines={1}>
-                  {c.label}
-                </Text>
-                <Text style={[st.sectionStatus, { color: tint }]} numberOfLines={2}>
-                  {status.text}
-                </Text>
-              </View>
+              <Icon width={26} height={26} color={colors.brandText} />
+              <Text style={[st.sectionName, keepAll]} numberOfLines={2}>
+                {c.label}
+              </Text>
             </View>
           </Pressable>
         );
@@ -1209,26 +1198,21 @@ const st = StyleSheet.create({
   sectionPressed: { opacity: 0.6 },
   sectionTile: {
     flexDirection: 'row',
-    // 아이콘(34)과 두 줄 글의 높이가 엇비슷하다. 위로 붙이면 타일 아래가 통째로 빈다
     alignItems: 'center',
     gap: spacing.sm,
-    minHeight: 84,
+    minHeight: 76,
     padding: spacing.md,
     backgroundColor: colors.card,
     borderRadius: radius.card,
   },
-  // 아이콘은 이름표다. 틴트 면에 앉혀 두면 갈래마다 같은 자리에서 같은 크기로 읽힌다
-  // ⚠ 상자를 더 키우면 이름 쓸 폭이 줄어 "오프라인 한정"이 말줄임으로 잘린다
-  sectionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.tile,
-    backgroundColor: colors.brandSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionName: { ...typography.bodyStrong, fontSize: 14, letterSpacing: -0.3 },
-  sectionStatus: { ...typography.micro, fontWeight: '600', lineHeight: 15 },
+  /**
+   * 이름이 타일의 전부다.
+   *
+   * ⚠ **두 줄까지 접힌다.** "오프라인 한정"은 17pt 에서 104px 인데 좁은 기기(360)에서는
+   *   쓸 폭이 100px 이 안 된다. 말줄임으로 자르면 갈래 이름이 반쪽이 되므로 접는 쪽을 택했다
+   *   (`keepAll` 이 붙어 있어 웹에서도 낱글자가 아니라 띄어쓰기에서 꺾인다).
+   */
+  sectionName: { ...typography.cardTitle, flex: 1, lineHeight: 22 },
 
   // ── 갈래 안의 내비게이션 바 ────────────────────────────────
   navBar: {
