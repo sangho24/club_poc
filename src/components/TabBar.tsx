@@ -258,8 +258,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: tabCapsule.pad,
     borderRadius: radius.chip,
-    // shadcn TabsList 문법 - muted 트랙 위에 흰 활성 버블
-    backgroundColor: 'rgba(244,245,247,0.82)',
+    // shadcn TabsList 문법 - muted 트랙 위에 흰 활성 버블.
+    // ⚠ colors.surface(#FAF3F1) 의 82% 다. 손으로 적은 값이라 지면 hue 가 바뀔 때
+    // 여기만 남으면 탭바만 파란 회색으로 뜬다 - 실제로 그런 적이 있다
+    backgroundColor: 'rgba(250,243,241,0.82)',
     borderWidth: 1,
     borderColor: colors.border,
     // 유리는 내비게이션 층에만 (kbo_poc design.md §1). 본문이 캡슐 아래로 흐를 때

@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#F2F2F7",
+    "backgroundColor": "#F8F1EF",
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,

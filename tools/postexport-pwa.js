@@ -31,7 +31,8 @@ const url = (p) => `${BASE}/${p}`.replace(/\/{2,}/g, '/');
 
 // 앱 배경과 같은 값을 쓴다. App.tsx 가 StatusBar 를 dark-content + colors.bg 로 두므로
 // 여기만 다른 색이면 상태바와 화면 사이에 색 띠가 생긴다
-const THEME = '#F2F2F7';
+// ⚠ src/theme.ts 의 colors.bg 와 app.json 의 backgroundColor 를 손으로 맞춘 세 번째 복제본이다
+const THEME = '#F8F1EF';
 
 const MARKER = '<!-- pwa:injected -->';
 
@@ -105,6 +106,13 @@ if (html.includes(MARKER)) {
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
     <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- 번들이 마운트되기 전까지 브라우저는 자기 기본 흰색을 칠한다. 지면이 흰색에서
+         멀어질수록 그 한 프레임이 흰 섬광으로 보이므로 지면색을 먼저 깔아 둔다.
+         overscroll-behavior 는 아래로 당겼을 때 문서 밖 흰 띠가 드러나는 것도 막는다 -->
+    <style>
+      html, body { background-color: ${THEME}; overscroll-behavior: none; }
+    </style>
   </head>`;
   html = html.replace('  </head>', head);
 
