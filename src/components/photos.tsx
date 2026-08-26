@@ -169,7 +169,7 @@ interface PlayerPhoto {
 }
 
 const PLAYER_PHOTOS: Partial<Record<string, PlayerPhoto>> = {
-  ryu: { source: require('../../assets/photo/player/ryu.jpg'), aspect: 500 / 555 }, // 류현진
+  ryu: { source: require('../../assets/photo/player/ryu.jpg'), aspect: 500 / 556 }, // 류현진
   pon: { source: require('../../assets/photo/player/pon.jpg'), aspect: 500 / 700 }, // 폰세
   wei: { source: require('../../assets/photo/player/wei.jpg'), aspect: 500 / 625 }, // 와이스
   mdj: { source: require('../../assets/photo/player/mdj.jpg'), aspect: 500 / 506 }, // 문동주

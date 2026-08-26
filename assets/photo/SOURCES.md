@@ -30,8 +30,14 @@
 | `pon.jpg` | 폰세 | [Cody Joe Ponce Eagles 20240409.jpg](https://commons.wikimedia.org/wiki/File:Cody_Joe_Ponce_Eagles_20240409.jpg) | 커먼즈 기재 | CC BY-SA 4.0 | **한화 유니폼** - 구 CI(2024) |
 | `wei.jpg` | 와이스 | [Ryan Weiss 2025.jpg](https://commons.wikimedia.org/wiki/File:Ryan_Weiss_2025.jpg) | 커먼즈 기재 | CC BY-SA 4.0 | **한화 신 CI 유니폼** - 현행 일치 |
 | `mdj.jpg` | 문동주 | `kbo_poc` 에서 이관 (원 출처는 `SOURCES-kbo.md`) | 〃 | 〃 | 한화 |
-| `ryu.jpg` | 류현진 | [Hyun jin Ryu 2013 NLDS.jpg](https://commons.wikimedia.org/wiki/File:Hyun_jin_Ryu_2013_NLDS.jpg) | 커먼즈 기재 | CC BY-SA 2.0 | ⚠ **LA 다저스 시절(2013)** - 한화 유니폼이 아니다 |
+| `ryu.jpg` | 류현진 | [Ryu Hyun-jin 2025.jpg](https://commons.wikimedia.org/wiki/File:Ryu_Hyun-jin_2025.jpg) | Trainholic | CC BY-SA 4.0 | **한화 신 CI 유니폼(2025-04-11)** - 현행 일치. 3002x3002 → 상반신 크롭 후 500x556 |
 | `flo.jpg` | 플로리얼 | [Estevan Florial in 2019.png](https://commons.wikimedia.org/wiki/File:Estevan_Florial_in_2019.png) | 커먼즈 기재 | CC BY 3.0 | ⚠ **마이너리그 시절(2019)** - 얼굴 정면이라 아바타로는 적합 |
+
+> **류현진 사진을 2026-08-26 에 바꿨다.** 원래는 커먼즈에서 가장 화질이 좋은 [다저스 시절(2013)](https://commons.wikimedia.org/wiki/File:Hyun_jin_Ryu_2013_NLDS.jpg) 사진이었는데,
+> 구단 앱에서 **자기 팀 선수가 남의 유니폼을 입고 있는 것**은 화질로 갚아지지 않는다.
+> 커먼즈의 한화 시절 후보는 셋뿐이었다 - 2008년 사진은 그물망 너머로 찍혀 쓸 수 없고,
+> 2024년 사진은 촬영자 워터마크가 박혀 있다. 남은 2025년 사진이 해상도·신 CI·
+> 투구 직후 자세 세 가지를 다 만족한다.
 
 ### 확보하지 못한 선수
 
@@ -80,5 +86,5 @@
 
 1. **상용 배포 전 라이선스 재검증** - 커먼즈의 라이선스 표기는 업로더 신고에 기반하므로 원본 권리관계가 다를 수 있다
 2. **CC BY-SA 저작자 표시** - 앱 안에 고지 화면이 필요하다
-3. **소속팀·시점 불일치** - `ryu.jpg`(다저스), `flo.jpg`(마이너) 는 한화 유니폼이 아니다. 시연에서 확대하지 않는 편이 좋다
+3. **소속팀·시점 불일치** - `flo.jpg`(마이너) 는 한화 유니폼이 아니다. 시연에서 확대하지 않는 편이 좋다
 4. **엠블럼·CI** - 구단 승인 대상
