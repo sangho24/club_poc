@@ -51,6 +51,7 @@ import {
   Divider,
   ExternalButton,
   GroupCard,
+  SectionCard,
   InfoRow,
   Label,
   Row,
@@ -91,6 +92,7 @@ import {
   stockLabel,
   stockTone,
 } from '../goods';
+import { ATTENDANCE, attendanceSummary, membershipOf } from '../my';
 import { UserProfile } from '../profile';
 import { colors, keepAll, radius, spacing, tabularFigures, typography } from '../theme';
 
@@ -1365,9 +1367,21 @@ const st = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
   },
+  // 등급 안내 - 카드가 아니라 지면 위 한 줄. 카드로 세우면 굿즈보다 먼저 읽힌다
+  tierNote: { marginTop: spacing.cardGap },
+  tierNoteText: { ...typography.caption, lineHeight: 18 },
+  tierNoteStrong: { color: colors.brandText, fontWeight: '700' },
+
   itemName: { ...typography.caption, color: colors.text },
   itemLimit: { ...typography.micro, ...tabularFigures, fontWeight: '400', marginTop: 2 },
   itemPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 13.5 },
+  // 정가는 취소선으로 남긴다 - 지우면 얼마를 아꼈는지가 사라져 할인이 할인으로 안 읽힌다
+  itemPriceWas: {
+    ...typography.micro,
+    ...tabularFigures,
+    fontWeight: '400',
+    textDecorationLine: 'line-through',
+  },
 
   // ── 유니폼·기타 ────────────────────────────────────────────
   sizeRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },

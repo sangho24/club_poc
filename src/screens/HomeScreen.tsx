@@ -11,8 +11,8 @@ import {
   Card,
   CardHeading,
   Divider,
-  GroupCard,
   Row,
+  SectionCard,
   SectionTitle,
   StatTile,
 } from '../components/common';
@@ -24,27 +24,91 @@ import { liveAlerts, predictMatchup } from '../liveEngine';
 import { UserProfile } from '../profile';
 import { BATTERS, OPPONENT_PITCHERS, PITCHERS } from '../roster';
 import { batterWarOf, eraOf, fipOf, opsOf, pitcherWarOf, wrcPlusOf } from '../sabermetrics';
-import { colors, spacing, tabularFigures, typography } from '../theme';
+import { colors, radius, spacing, states, tabularFigures, typography } from '../theme';
+import type { TabKey } from '../../App';
+import ShopIcon from '../../assets/icons/shop.svg';
+import StatsIcon from '../../assets/icons/stats.svg';
+import TicketIcon from '../../assets/icons/ticket.svg';
 
 const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
+
+/**
+ * 홈에서 다른 탭으로 가는 지름길.
+ *
+ * 홈은 허브인데 이동 수단이 하단 탭뿐이었다. 그래서 홈이 답해야 할 것("오늘 뭐가
+ * 있나")을 넘어 **다른 탭의 내용까지 끌어와 늘어놓고** 있었다 - 발매 소식이 굿즈 탭과
+ * 같은 데이터를 두 번 그리는 식이다. 지름길이 생기면 그 지면을 홈이 떠안지 않아도 된다.
+ *
+ * 세로로 쌓으면 목록이 되고 목록은 위에서부터 읽게 만든다. 나란히 두면 **고르는 것**이
+ * 되어 필요한 하나만 짚고 지나간다 - 직관의 '가기 전에'와 같은 판단이라 3열도 맞췄다.
+ */
+const QUICK: { key: TabKey; label: string; icon: HomeIconName }[] = [
+  { key: 'gameday', label: '예매·직관', icon: 'ticket' },
+  { key: 'players', label: '기록', icon: 'stats' },
+  { key: 'store', label: '굿즈', icon: 'shop' },
+];
+
+const HOME_ICONS = { ticket: TicketIcon, stats: StatsIcon, shop: ShopIcon };
+type HomeIconName = keyof typeof HOME_ICONS;
+
+function QuickTiles({
+  onGo,
+  dots,
+}: {
+  onGo: (tab: TabKey) => void;
+  /** 새 소식이 있는 탭. 숫자는 쓰지 않는다 - 팬덤 앱에서 숫자 배지는 '밀린 일'로 읽힌다 */
+  dots?: Partial<Record<TabKey, boolean>>;
+}) {
+  return (
+    <View style={st.quickRow}>
+      {QUICK.map((q) => {
+        const Icon = HOME_ICONS[q.icon];
+        const hasNew = dots?.[q.key] ?? false;
+        return (
+          <Pressable
+            key={q.key}
+            onPress={() => onGo(q.key)}
+            style={({ pressed }) => [st.quickTile, pressed && states.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={hasNew ? `${q.label} - 새 소식 있음` : q.label}
+          >
+            <View>
+              <Icon width={24} height={24} color={colors.brandText} />
+              {hasNew ? <View style={st.quickDot} /> : null}
+            </View>
+            <Text style={st.quickLabel} numberOfLines={1}>
+              {q.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 export function HomeScreen({
   profile,
   onFavorite,
   onGoLive,
-  onGoStore,
+  onGo,
 }: {
   profile: UserProfile;
   onFavorite: (id?: string) => void;
   onGoLive: () => void;
-  onGoStore: () => void;
+  onGo: (tab: TabKey) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pa = PLATE_SEQUENCE[3];
   const batter = BATTERS.find((b) => b.id === pa.batterId) ?? BATTERS[0];
   const pitcher = OPPONENT_PITCHERS.find((p) => p.id === pa.pitcherId) ?? OPPONENT_PITCHERS[0];
   const pred = predictMatchup(pa.situation, batter, pitcher);
-  const alerts = liveAlerts(pa.situation, batter, pitcher);
+  /**
+   * ⚠ `liveAlerts` 는 푸시 알림용이라 문장을 통째로 담는다. 그대로 렌더하면
+   * **바로 위 '오늘 경기' 카드가 이미 말한 것을 되풀이한다** - `matchup` 알림은
+   * title=pred.headline · body=pred.reasons[0] 이라 카드의 제목·근거와 글자 그대로 같다.
+   * 라이브 화면과 같은 이유로 화면이 아직 말하지 않은 것만 남긴다.
+   */
+  const alerts = liveAlerts(pa.situation, batter, pitcher).filter((a) => a.kind !== 'matchup');
 
   const favBatter = BATTERS.find((b) => b.id === profile.favoritePlayerId);
   const favPitcher = PITCHERS.find((p) => p.id === profile.favoritePlayerId);
@@ -94,31 +158,40 @@ export function HomeScreen({
 
           <Divider />
 
-          <CardHeading label="지금 이 승부" title={pred.headline} />
+          {/* 라이브와 같은 이유로 verdict 를 쓴다. 다만 홈에는 확률을 보여줄 자리가
+              따로 없어서 라벨 옆에 붙인다 - 제목 문장 안에 넣으면 다시 길어진다 */}
+          <CardHeading
+            label="지금 이 승부"
+            title={pred.verdict}
+            right={<Text style={st.probPill}>출루 {Math.round(pred.onBaseProb * 100)}%</Text>}
+          />
           <Text style={st.reason}>{pred.reasons[0]}</Text>
           <Text style={st.more}>근거 보기 ›</Text>
         </Card>
 
-        {/* ── 감지 ───────────────────────────────────────────── */}
+        {/* 오늘 경기 바로 아래다. 팬이 홈에서 하는 일은 '경기를 본다' 아니면
+            '경기를 보러 갈 준비를 한다'인데, 후자로 가는 길이 하단 탭뿐이었다 */}
+        <QuickTiles onGo={onGo} dots={{ store: profile.alerts.goodsDrop && goods.length > 0 }} />
+
+        {/* ── 감지 ─────────────────────────────────────────────
+            아래 셋은 **묶음**이다 - 감지·팀 성적·최애 선수가 서로 독립적이고, 각각
+            안에서만 항목이 묶인다. 위 '오늘 경기'는 히어로에서 이어지는 **흐름**이라
+            머리글을 밖에 둔 채로 남긴다 - 거기까지 테두리로 가두면 첫 화면이 답답해진다 ── */}
         {alerts.length > 0 ? (
-          <>
-            <SectionTitle title="지금 눈여겨볼 것" />
-            <GroupCard>
-              {alerts.slice(0, 2).map((a, i, arr) => (
-                <Row key={i} last={i === arr.length - 1} style={st.alertRow}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={st.alertTitle}>{a.title}</Text>
-                    <Text style={st.alertBody}>{a.body}</Text>
-                  </View>
-                </Row>
-              ))}
-            </GroupCard>
-          </>
+          <SectionCard title="지금 눈여겨볼 것">
+            {alerts.slice(0, 2).map((a, i, arr) => (
+              <Row key={i} last={i === arr.length - 1} style={st.alertRow}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={st.alertTitle}>{a.title}</Text>
+                  <Text style={st.alertBody}>{a.body}</Text>
+                </View>
+              </Row>
+            ))}
+          </SectionCard>
         ) : null}
 
         {/* ── 순위 ───────────────────────────────────────────── */}
-        <SectionTitle title="2026 정규시즌" />
-        <Card>
+        <SectionCard title="2026 정규시즌" padded>
           <View style={st.tileRow}>
             <StatTile
               label="순위"
@@ -152,75 +225,63 @@ export function HomeScreen({
               );
             })}
           </View>
-        </Card>
+        </SectionCard>
 
         {/* ── 최애 선수 ─────────────────────────────────────── */}
-        <SectionTitle
+        <SectionCard
           title="최애 선수"
+          padded
           right={
             <Pressable onPress={() => setPickerOpen(true)} hitSlop={8}>
               <Text style={st.changeBtn}>변경</Text>
             </Pressable>
           }
-        />
-        {favBatter ? (
-          <Card>
-            <CardHeading
-              label={`${favBatter.back} · ${favBatter.pos}`}
-              title={favBatter.name}
-              right={<PlayerAvatar playerId={favBatter.id} size={52} />}
-            />
-            <Text style={st.favNote}>{favBatter.note}</Text>
-            <View style={st.tileRow}>
-              <StatTile
-                label="wRC+"
-                value={String(wrcPlusOf(favBatter.stat, '대전'))}
-                tone="brand"
+        >
+          {favBatter ? (
+            <>
+              <CardHeading
+                label={`${favBatter.back} · ${favBatter.pos}`}
+                title={favBatter.name}
+                right={<PlayerAvatar playerId={favBatter.id} size={52} />}
               />
-              <StatTile label="WAR" value={String(batterWarOf(favBatter.stat, '대전'))} />
-              <StatTile label="OPS" value={opsOf(favBatter.stat).toFixed(3)} />
-            </View>
-          </Card>
-        ) : favPitcher ? (
-          <Card>
-            <CardHeading
-              label={`${favPitcher.back} · ${favPitcher.role}`}
-              title={favPitcher.name}
-              right={<PlayerAvatar playerId={favPitcher.id} size={52} />}
-            />
-            <Text style={st.favNote}>{favPitcher.note}</Text>
-            <View style={st.tileRow}>
-              <StatTile label="ERA" value={eraOf(favPitcher.stat).toFixed(2)} tone="brand" />
-              <StatTile label="FIP" value={fipOf(favPitcher.stat).toFixed(2)} />
-              <StatTile label="WAR" value={String(pitcherWarOf(favPitcher.stat, '대전'))} />
-            </View>
-          </Card>
-        ) : (
-          <Card onPress={() => setPickerOpen(true)}>
-            <View style={st.favEmptyRow}>
+              <Text style={st.favNote}>{favBatter.note}</Text>
+              <View style={st.tileRow}>
+                <StatTile
+                  label="wRC+"
+                  value={String(wrcPlusOf(favBatter.stat, '대전'))}
+                  tone="brand"
+                />
+                <StatTile label="WAR" value={String(batterWarOf(favBatter.stat, '대전'))} />
+                <StatTile label="OPS" value={opsOf(favBatter.stat).toFixed(3)} />
+              </View>
+            </>
+          ) : favPitcher ? (
+            <>
+              <CardHeading
+                label={`${favPitcher.back} · ${favPitcher.role}`}
+                title={favPitcher.name}
+                right={<PlayerAvatar playerId={favPitcher.id} size={52} />}
+              />
+              <Text style={st.favNote}>{favPitcher.note}</Text>
+              <View style={st.tileRow}>
+                <StatTile label="ERA" value={eraOf(favPitcher.stat).toFixed(2)} tone="brand" />
+                <StatTile label="FIP" value={fipOf(favPitcher.stat).toFixed(2)} />
+                <StatTile label="WAR" value={String(pitcherWarOf(favPitcher.stat, '대전'))} />
+              </View>
+            </>
+          ) : (
+            <Pressable onPress={() => setPickerOpen(true)} style={st.favEmptyRow}>
               <Text style={st.favEmptyText}>최애 선수 고르기</Text>
               <Text style={st.chevron}>›</Text>
-            </View>
-          </Card>
-        )}
+            </Pressable>
+          )}
+        </SectionCard>
 
-        {/* ── 굿즈 ───────────────────────────────────────────── */}
-        {profile.alerts.goodsDrop && goods.length > 0 ? (
-          <>
-            <SectionTitle title="발매 소식" />
-            <GroupCard>
-              {goods.slice(0, 2).map((g, i, arr) => (
-                <Row key={i} last={i === arr.length - 1} onPress={onGoStore}>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={st.goodsText}>{g.message}</Text>
-                    <Text style={st.goodsNote}>{g.note}</Text>
-                  </View>
-                  <Text style={st.chevron}>›</Text>
-                </Row>
-              ))}
-            </GroupCard>
-          </>
-        ) : null}
+        {/* ── 굿즈 ─────────────────────────────────────────────
+            '발매 소식' 섹션이 여기 있었다. 굿즈 탭의 '놓치기 전에'와 **같은 데이터**
+            (dropAlerts)를 두 번 그리고 있었고, 홈이 다른 탭의 지면까지 떠안는 만큼
+            길어졌다. 위 굿즈 타일이 그 자리를 대신한다 - 소식을 요약해 보여주는 대신
+            소식이 있는 곳으로 보낸다. 안 읽은 발매가 있으면 점으로만 알린다 ── */}
       </ScrollView>
 
       {/* ── 최애 선수 선택 시트 - MY 탭과 공용 ─────────────── */}
@@ -277,7 +338,43 @@ const st = StyleSheet.create({
   favEmptyText: { ...typography.bodyStrong, fontSize: 15 },
   favNote: { ...typography.caption, lineHeight: 19 },
 
-  goodsText: { ...typography.body, flex: 1, fontSize: 13.5, lineHeight: 20 },
-  goodsNote: typography.caption,
   chevron: { fontSize: 18, color: colors.mutedText },
+
+  // 확률은 제목 옆에 조용히. 숫자를 크게 세우면 홈이 라이브 화면 흉내가 된다
+  probPill: {
+    ...typography.micro,
+    ...tabularFigures,
+    color: colors.brandText,
+    backgroundColor: colors.brandSoft,
+    borderRadius: radius.chip,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+
+  // 다른 탭으로 가는 지름길 - 직관 '가기 전에'와 같은 문법(3열·아이콘 위·라벨 아래)
+  quickRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.cardGap },
+  quickTile: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickLabel: { ...typography.bodyStrong, fontSize: 13, letterSpacing: -0.2 },
+  // 아이콘 오른쪽 위. 숫자 없이 점 하나 - 있다는 사실만 말한다
+  quickDot: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    width: 7,
+    height: 7,
+    borderRadius: radius.chip,
+    backgroundColor: colors.live,
+  },
 });

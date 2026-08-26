@@ -107,6 +107,15 @@ if (html.includes(MARKER)) {
 
     <meta name="mobile-web-app-capable" content="yes" />
 
+    <!-- ⚠ **index.html 은 캐시하지 않는다.** 번들 파일명에는 해시가 붙어 있어 내용이
+         바뀌면 이름이 바뀌지만, 그 이름을 가리키는 것이 이 파일이다. 이 파일이 캐시되면
+         **배포를 해도 브라우저가 옛 번들을 계속 불러온다** - 실제로 시연 중에 새 화면이
+         안 보여 매번 손으로 새로고침해야 했다. GitHub Pages 는 서버 헤더를 바꿀 수
+         없으므로 meta 로 막는다. 파일 하나(1.2KB)만 매번 받는 대신 배포가 곧바로 반영된다 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
     <!-- 번들이 마운트되기 전까지 브라우저는 자기 기본 흰색을 칠한다. 지면이 흰색에서
          멀어질수록 그 한 프레임이 흰 섬광으로 보이므로 지면색을 먼저 깔아 둔다.
          overscroll-behavior 는 아래로 당겼을 때 문서 밖 흰 띠가 드러나는 것도 막는다 -->
