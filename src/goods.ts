@@ -676,58 +676,261 @@ export function firstAvailableSize(u: Uniform): string | null {
 // ④ 기타 굿즈
 // ═════════════════════════════════════════════════════════════
 //
-// 상품만 보이면 되는 자리다. 앱이 얹을 판단이 없으므로 **고르는 즉시 공식몰로** 넘긴다.
-// 상세 시트를 한 겹 두면 팬은 같은 정보를 두 번 보고 나가게 된다.
+// 카탈로그다. 앱이 예측하거나 자격을 따질 것이 없고 **고를 수 있게 하는 데까지**가
+// 이 갈래의 몫이다 - 그 다음은 공식몰로 넘긴다.
+//
+// 다만 '고를 수 있게'는 이름과 값을 적어 두는 것이 아니다. 물건이 보이고 내 사이즈가
+// 남아 있는지 알 수 있어야 고른 것이다. 유니폼 갈래가 이미 그 모양이라 여기도 같게 뒀다.
 
 export type MerchGroup = '응원용품' | '모자' | '수집' | '리빙' | '패션';
 
 export const MERCH_GROUPS: MerchGroup[] = ['응원용품', '모자', '수집', '리빙', '패션'];
 
+/**
+ * 기타 굿즈.
+ *
+ * ── 왜 유니폼과 같은 모양이 되었나 (2026-08-26) ──────────────
+ * 처음에는 이름과 가격만 든 **작은 타일**이었다. "앱이 얹을 판단이 없으니 고르는 즉시
+ * 공식몰로 넘긴다"가 그 근거였는데, 화면에 세워 놓고 보니 두 가지가 어긋났다.
+ *
+ *   ① 물건이 안 보인다. 유니폼 격자를 지나 기타 굿즈로 들어오면 **그림이 사라진다** -
+ *      같은 굿즈 탭 안에서 한 갈래만 카탈로그가 아니라 재고표로 읽힌다
+ *   ② 판단이 없다는 것이 사실이 아니었다. 사이즈·색상이 있는 물건은 유니폼과 똑같이
+ *      **공식몰에 가기 전에 품절을 알아야** 한다. 후드 2XL 이 없는 것을 몰에 넘어가서
+ *      알게 되면 앱이 헛걸음시킨 것이다
+ *
+ * 그래서 자료를 유니폼과 같은 모양으로 맞췄다 - 사양(kind) · 쓰임(use) · 고를 것
+ * (options) · 설명(note). 화면도 같은 격자와 같은 상세 시트를 쓴다.
+ *
+ * 유니폼에 있고 여기 없는 것은 **마킹**뿐이다 - 선수 이름을 새기는 것은 옷의 일이다.
+ * 여기에만 있는 것은 **venueOnly**, 공식몰에 가도 없는 물건이다.
+ */
 export interface Merch {
   id: string;
   name: string;
   group: MerchGroup;
+  /** 어떤 사양의 물건인가 - 유니폼의 kind 자리 */
+  kind: string;
+  /** 언제 쓰는 물건인가 - 유니폼의 wear 자리. 고르는 진짜 기준이다 */
+  use: string;
   price: number;
+  /**
+   * 고를 것의 이름 - '사이즈' · '색상' · '구성' · '선수' 중 하나.
+   *
+   * 유니폼은 고를 것이 늘 사이즈뿐이라 이름을 적을 필요가 없었다. 여기서는 물건마다
+   * 다르다 - 머그는 색이고 키링은 선수다. **무엇을 고르는지 말하지 않으면** 칩 여섯 개가
+   * 무슨 뜻인지 팬이 추측하게 된다.
+   */
+  optionLabel?: string;
+  options?: string[];
+  /** 품절된 선택지 - 공식몰에 가기 전에 알아야 한다 */
+  soldOutOptions?: string[];
   status: StockStatus;
+  note: string;
+  /** 발매 예정이면 발매 시각 */
+  openAt?: string;
   /** 구장 MD샵에서만 파는 것 - 공식몰에 가도 없다 */
   venueOnly?: boolean;
 }
 
 /** ※ 시연용 샘플 데이터입니다. */
 export const MERCH: Merch[] = [
-  { id: 'm-balloon', name: '응원 막대풍선 (2입)', group: '응원용품', price: 5000, status: 'onsale' },
-  { id: 'm-towel', name: '응원 타월', group: '응원용품', price: 18000, status: 'onsale' },
-  { id: 'm-clapper', name: '클래퍼', group: '응원용품', price: 8000, status: 'lowstock' },
+  {
+    id: 'm-balloon',
+    name: '응원 막대풍선 (2입)',
+    group: '응원용품',
+    kind: '응원도구',
+    use: '홈 경기 · 공격 이닝',
+    price: 5000,
+    status: 'onsale',
+    note: '구장 매점에서도 같은 값에 팝니다. 공기 주입기는 응원석 입구에 있습니다.',
+  },
+  {
+    id: 'm-towel',
+    name: '응원 타월',
+    group: '응원용품',
+    kind: '응원도구',
+    use: '홈·원정 공통',
+    price: 18000,
+    optionLabel: '색상',
+    options: ['오렌지', '네이비'],
+    status: 'onsale',
+    note: '한 면에 구단 워드마크, 반대 면에 응원 구호가 들어갑니다. 40×110cm 입니다.',
+  },
+  {
+    id: 'm-clapper',
+    name: '클래퍼',
+    group: '응원용품',
+    kind: '응원도구',
+    use: '홈 경기 · 응원단상 구역',
+    price: 8000,
+    status: 'lowstock',
+    note: '막대풍선보다 소리가 크고 자리를 덜 차지합니다. 내야 상단석에서 많이 씁니다.',
+  },
 
-  { id: 'm-cap-home', name: '2026 정모 (홈)', group: '모자', price: 45000, status: 'onsale' },
-  { id: 'm-cap-orange', name: '볼캡 (오렌지)', group: '모자', price: 39000, status: 'onsale' },
-  { id: 'm-bucket', name: '버킷햇', group: '모자', price: 42000, status: 'soldout' },
+  {
+    id: 'm-cap-home',
+    name: '2026 정모 (홈)',
+    group: '모자',
+    kind: '정모',
+    use: '홈 경기 · 선수단 착용 사양',
+    price: 45000,
+    optionLabel: '사이즈',
+    options: ['55', '57', '59', '61'],
+    soldOutOptions: ['57'],
+    status: 'onsale',
+    note: '선수단이 쓰는 것과 같은 사양입니다. 챙이 곧고 뒤가 막혀 있어 실측대로 고릅니다.',
+  },
+  {
+    id: 'm-cap-orange',
+    name: '볼캡 (오렌지)',
+    group: '모자',
+    kind: '볼캡',
+    use: '일상 · 경기장 공통',
+    price: 39000,
+    optionLabel: '사이즈',
+    options: ['프리'],
+    status: 'onsale',
+    note: '뒤 조절끈이 있어 하나로 맞춥니다. 정모보다 부드러워 접어 넣어도 됩니다.',
+  },
+  {
+    id: 'm-bucket',
+    name: '버킷햇',
+    group: '모자',
+    kind: '버킷햇',
+    use: '한여름 낮 경기',
+    price: 42000,
+    optionLabel: '사이즈',
+    options: ['M', 'L'],
+    soldOutOptions: ['M', 'L'],
+    status: 'soldout',
+    note: '8월 낮 경기에서 가장 빨리 나가는 물건입니다. 재입고 일정은 미정입니다.',
+  },
 
   {
     id: 'm-keyring',
     name: '아크릴 키링 (선수 11종)',
     group: '수집',
+    kind: '수집품',
+    use: '가방 · 열쇠고리',
     price: 12000,
+    optionLabel: '선수',
+    options: ['노시환', '문동주', '최재훈', '류현진', '채은성', '김서현'],
+    soldOutOptions: ['문동주'],
     status: 'onsale',
+    note: '11종 중 6종이 공식몰에 올라와 있습니다. 나머지 5종은 구장 MD샵에 있습니다.',
   },
   {
     id: 'm-badge',
     name: '볼파크 1주년 핀 뱃지 (3종)',
     group: '수집',
+    kind: '한정 수집품',
+    use: '모자 · 가방에 다는 것',
     price: 25000,
+    optionLabel: '구성',
+    options: ['3종 세트'],
     status: 'lowstock',
     venueOnly: true,
+    note: '대전 한화생명 볼파크 개장 1주년 기념입니다. 3종을 낱개로 팔지 않습니다.',
   },
-  { id: 'm-pcpack', name: '포토카드 랜덤팩', group: '수집', price: 6000, status: 'onsale' },
+  {
+    id: 'm-pcpack',
+    name: '포토카드 랜덤팩',
+    group: '수집',
+    kind: '수집품',
+    use: '개봉 전까지 누가 나올지 모릅니다',
+    price: 6000,
+    optionLabel: '구성',
+    options: ['3장 1팩'],
+    status: 'onsale',
+    note: '한 팩에 세 장, 선수 35명 중에서 무작위입니다. 오프라인 한정 카드와는 다른 상품입니다.',
+  },
 
-  { id: 'm-tumbler', name: '보온 텀블러', group: '리빙', price: 32000, status: 'onsale' },
-  { id: 'm-mug', name: '머그컵', group: '리빙', price: 19000, status: 'onsale' },
-  { id: 'm-blanket', name: '무릎담요', group: '리빙', price: 29000, status: 'upcoming' },
+  {
+    id: 'm-tumbler',
+    name: '보온 텀블러',
+    group: '리빙',
+    kind: '리빙',
+    use: '사계절 · 구장 반입 가능',
+    price: 32000,
+    optionLabel: '색상',
+    options: ['네이비', '오렌지', '실버'],
+    soldOutOptions: ['오렌지'],
+    status: 'onsale',
+    note: '473ml. 밀폐 뚜껑이라 가방에 눕혀도 됩니다. 구장에 들고 들어갈 수 있는 용기입니다.',
+  },
+  {
+    id: 'm-mug',
+    name: '머그컵',
+    group: '리빙',
+    kind: '리빙',
+    use: '사무실 · 집',
+    price: 19000,
+    optionLabel: '색상',
+    options: ['화이트', '네이비'],
+    status: 'onsale',
+    note: '350ml. 전자레인지와 식기세척기를 씁니다.',
+  },
+  {
+    id: 'm-blanket',
+    name: '무릎담요',
+    group: '리빙',
+    kind: '리빙',
+    use: '9월 이후 야간 경기',
+    price: 29000,
+    status: 'upcoming',
+    openAt: '2026-09-01T14:00:00+09:00',
+    note: '가을 야간 경기를 앞두고 나옵니다. 70×100cm 로 무릎에 덮는 크기입니다.',
+  },
 
-  { id: 'm-hoodie', name: '후드 집업', group: '패션', price: 89000, status: 'onsale' },
-  { id: 'm-tee', name: '반팔 티셔츠', group: '패션', price: 39000, status: 'onsale' },
-  { id: 'm-sticker', name: '스티커 팩', group: '패션', price: 7000, status: 'onsale' },
+  {
+    id: 'm-hoodie',
+    name: '후드 집업',
+    group: '패션',
+    kind: '아우터',
+    use: '봄·가을 경기 · 일상',
+    price: 89000,
+    optionLabel: '사이즈',
+    options: ['S', 'M', 'L', 'XL', '2XL'],
+    soldOutOptions: ['L', '2XL'],
+    status: 'lowstock',
+    note: '기모가 없는 봄가을용입니다. 유니폼 위에 덧입을 수 있게 품이 넉넉합니다.',
+  },
+  {
+    id: 'm-tee',
+    name: '반팔 티셔츠',
+    group: '패션',
+    kind: '상의',
+    use: '여름 경기 · 일상',
+    price: 39000,
+    optionLabel: '사이즈',
+    options: ['S', 'M', 'L', 'XL', '2XL'],
+    status: 'onsale',
+    note: '가슴에 모자 마크만 작게 들어갑니다. 경기장 밖에서도 입을 수 있는 쪽으로 뺐습니다.',
+  },
+  {
+    id: 'm-sticker',
+    name: '스티커 팩',
+    group: '패션',
+    kind: '수집품',
+    use: '노트북 · 텀블러에 붙이는 것',
+    price: 7000,
+    optionLabel: '구성',
+    options: ['12장 1팩'],
+    status: 'onsale',
+    note: '방수 재질이라 텀블러에 붙여도 됩니다. 열두 장 한 팩.',
+  },
 ];
+
+/** 유니폼의 sizeSoldOut 과 같은 일을 한다 - 이름만 사이즈에서 선택지로 바뀐다 */
+export function merchOptionSoldOut(m: Merch, option: string): boolean {
+  return (m.soldOutOptions ?? []).includes(option);
+}
+
+/** 고를 수 있는 첫 선택지 - 상세를 열 때 미리 잡아 둘 값 */
+export function firstMerchOption(m: Merch): string | null {
+  return (m.options ?? []).find((o) => !merchOptionSoldOut(m, o)) ?? null;
+}
 
 // ═════════════════════════════════════════════════════════════
 // 알림 - 무엇을 언제 밀어 줄 것인가

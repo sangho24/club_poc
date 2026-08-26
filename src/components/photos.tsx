@@ -359,6 +359,45 @@ const ps = StyleSheet.create({
   },
 });
 
+// ── 굿즈 사진 ─────────────────────────────────────────────────
+// 선수 사진과 같은 규칙이다 - **폴더가 곧 지도다.** 파일 이름을 굿즈 id 로 두면
+// (`assets/photo/goods/m-tee.jpg`) 코드를 고치지 않고 붙는다.
+// 넣는 것은 tools/ingest-goods-photos.js 가 한다.
+//
+// `_` 로 시작하는 파일은 상품이 아니다 - 출처 기록(_sources.json)이 같은 폴더에 산다.
+// 사진과 출처를 떼어 놓으면 한쪽만 옮겨지는 사고가 나므로 접두사 하나로 가른다.
+// (검수용 대조표는 무겁고 상품도 아니라 .tmp 에 쓴다 - 여기 두면 번들에 실린다)
+//
+// 거르는 자리가 **정규식**인 것이 중요하다. require.context 는 걸린 파일을 전부
+// 번들에 넣으므로, 읽은 뒤에 코드로 건너뛰면 화면에 안 나오면서 용량만 먹는다.
+// 대조표 한 장이 상품 사진 열다섯 장보다 크다.
+//
+// ⚠ **이 사진들은 한화 굿즈가 아니다.** 같은 종류의 일반 상품 사진이고, 자리와 크기와
+//   격자 리듬을 증명하는 것이 목적이다. 출처·저작자·라이선스는 SOURCES.md 가 갖는다 -
+//   CC BY·CC BY-SA 는 저작자 표시가 **의무**다. 실서비스에서는 구단 촬영본으로 전부
+//   갈아 끼운다.
+const GOODS_FILES = require.context(
+  '../../assets/photo/goods',
+  false,
+  /^\.\/[^_].*\.(jpg|jpeg|png|webp)$/,
+);
+
+const GOODS_PHOTOS: Partial<Record<string, ImageSourcePropType>> = {};
+for (const key of GOODS_FILES.keys()) {
+  const base = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
+  GOODS_PHOTOS[base] = GOODS_FILES<ImageSourcePropType>(key);
+}
+
+/**
+ * 굿즈 사진 - 없으면 undefined 다.
+ *
+ * 폴백을 여기서 정하지 않는다. 격자 타일과 상세는 빈 자리를 다르게 메워야 하는데,
+ * 여기서 하나로 정해 버리면 쓰는 쪽이 그것을 되돌릴 방법이 없다.
+ */
+export function goodsPhoto(id: string): ImageSourcePropType | undefined {
+  return GOODS_PHOTOS[id];
+}
+
 // ── 유니폼 그림 ───────────────────────────────────────────────
 /**
  * 유니폼 앞판.
@@ -540,7 +579,14 @@ const s = StyleSheet.create({
  * ⚠ 실서비스에서는 이 자리에 360° 촬영본이 들어간다. 자동차·패션 커머스에서 오래 쓰인
  * 방식이고 촬영 비용도 크지 않다. 지금은 확보한 자산(모자·엠블럼)으로 자리만 증명한다.
  */
-export function GoodsShowcase({ kind = 'emblem' }: { kind?: 'cap' | 'emblem' }) {
+export function GoodsShowcase({
+  goodsId,
+  kind = 'emblem',
+}: {
+  /** 이 굿즈의 사진을 돌린다. 사진이 없으면 아래 kind 의 자산으로 떨어진다 */
+  goodsId?: string;
+  kind?: 'cap' | 'emblem';
+}) {
   const [t] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
@@ -563,20 +609,25 @@ export function GoodsShowcase({ kind = 'emblem' }: { kind?: 'cap' | 'emblem' }) 
   });
   const bob = t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -4, 0] });
 
+  const photo = goodsId ? GOODS_PHOTOS[goodsId] : undefined;
+
   return (
     <View style={gs.stage}>
       {/* 받침 그림자 - 물체가 옆면을 지날 때 같이 좁아진다 */}
       <Animated.View style={[gs.shadow, { transform: [{ scaleX: turn }] }]} />
       <Animated.Image
         source={
-          kind === 'cap'
+          photo ??
+          (kind === 'cap'
             ? require('../../assets/logo/cap-2025.png')
-            : require('../../assets/logo/emblem-2025.png')
+            : require('../../assets/logo/emblem-2025.png'))
         }
         resizeMode="contain"
         style={[gs.item, { transform: [{ scaleX: turn }, { translateY: bob }] }]}
       />
-      <Text style={gs.hint}>360° 전시</Text>
+      {/* 실제 촬영본이 오기 전까지 도는 것은 한 컷이다. 사진이 들어와 있는 자리에서
+          '360° 전시'라고 쓰면 화면이 자기 능력을 부풀린다 */}
+      <Text style={gs.hint}>{photo ? '상품 이미지' : '360° 전시'}</Text>
     </View>
   );
 }

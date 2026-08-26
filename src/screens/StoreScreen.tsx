@@ -33,7 +33,7 @@
 //
 // ⚠ 결제는 앱에서 하지 않는다 - 공식몰로 리다이렉트한다 (5번 티켓과 같은 원칙).
 import { FC, useMemo, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { SvgProps } from 'react-native-svg';
 
 import GridIcon from '../../assets/icons/goods-grid.svg';
@@ -64,6 +64,7 @@ import {
   PlayerAvatar,
   PlayerShot,
   TeamEmblem,
+  goodsPhoto,
   stadiumPhoto,
 } from '../components/photos';
 import {
@@ -86,6 +87,7 @@ import {
   UNIFORMS,
   countdown,
   firstAvailableSize,
+  firstMerchOption,
   formatDate,
   formatDateTime,
   formatKstDate,
@@ -93,6 +95,7 @@ import {
   gateBadge,
   gateReason,
   goodsAlerts,
+  merchOptionSoldOut,
   milestoneProgress,
   photocardCloseAt,
   photocardGate,
@@ -113,7 +116,8 @@ const shop = () => void Linking.openURL(OFFICIAL_SHOP);
 type Sheet =
   | { kind: 'card'; id: string }
   | { kind: 'milestone'; id: string }
-  | { kind: 'uniform'; id: string };
+  | { kind: 'uniform'; id: string }
+  | { kind: 'merch'; id: string };
 
 /** 격자 타일의 픽토그램. TabBar 와 같은 규칙 - 24 격자 · 굵기 1.75 · 색은 밖에서 온다 */
 const SECTION_ICONS: Record<GoodsCategory, FC<SvgProps>> = {
@@ -137,6 +141,12 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
   const [bought, setBought] = useState<Record<string, boolean>>({});
   const [reserved, setReserved] = useState<Record<string, boolean>>({});
   const [alerts, setAlerts] = useState<Record<string, boolean>>({});
+  /**
+   * 상세에서 고른 값 - 유니폼의 사이즈이자 기타 굿즈의 색상·구성이다.
+   *
+   * 상세는 한 번에 하나만 열리므로 칸을 둘로 나누지 않는다. 나누면 늘 한쪽이 지난번에
+   * 보던 상품의 값을 들고 남는다.
+   */
   const [size, setSize] = useState<string | null>(null);
 
   const notices = useMemo(
@@ -147,6 +157,18 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
   const openUniform = (u: Uniform) => {
     setSize(firstAvailableSize(u));
     setSheet({ kind: 'uniform', id: u.id });
+  };
+
+  /**
+   * 유니폼과 같은 자리다 - 열면서 **고를 수 있는 첫 값**을 미리 잡아 둔다.
+   * 아무것도 선택되지 않은 채로 열리면 팬은 칩 줄을 보고 "골라야 하나"를 먼저 판단한다.
+   *
+   * 선택값을 사이즈와 한 칸에 담는다. 상세는 한 번에 하나만 열리므로 두 칸으로 나누면
+   * 늘 한쪽이 낡은 값을 들고 있게 된다.
+   */
+  const openMerch = (m: Merch) => {
+    setSize(firstMerchOption(m));
+    setSheet({ kind: 'merch', id: m.id });
   };
 
   /** 알림 → 해당 갈래로 들어가고 그 항목을 펼친다. 갈래만 열면 다시 찾게 만든다 */
@@ -223,7 +245,7 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
           />
         ) : null}
         {section === 'uniform' ? <UniformTab onOpen={openUniform} /> : null}
-        {section === 'merch' ? <MerchTab /> : null}
+        {section === 'merch' ? <MerchTab onOpen={openMerch} /> : null}
       </ScrollView>
 
       <CardSheet
@@ -253,6 +275,15 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
         size={size}
         alerted={alerts}
         onSize={setSize}
+        onToggleAlert={(id) => setAlerts((a) => ({ ...a, [id]: !a[id] }))}
+        onClose={() => setSheet(null)}
+      />
+
+      <MerchSheet
+        item={sheet?.kind === 'merch' ? (MERCH.find((m) => m.id === sheet.id) ?? null) : null}
+        option={size}
+        alerted={alerts}
+        onOption={setSize}
         onToggleAlert={(id) => setAlerts((a) => ({ ...a, [id]: !a[id] }))}
         onClose={() => setSheet(null)}
       />
@@ -1257,7 +1288,7 @@ function UniformSheet({
 // ④ 기타 굿즈
 // ═════════════════════════════════════════════════════════════
 
-function MerchTab() {
+function MerchTab({ onOpen }: { onOpen: (m: Merch) => void }) {
   return (
     <View>
       {MERCH_GROUPS.map((g) => {
@@ -1268,7 +1299,7 @@ function MerchTab() {
             <SectionTitle title={g} />
             <View style={st.grid}>
               {items.map((m) => (
-                <MerchTile key={m.id} item={m} />
+                <MerchTile key={m.id} item={m} onOpen={onOpen} />
               ))}
             </View>
           </View>
@@ -1278,7 +1309,7 @@ function MerchTab() {
       <View style={{ marginTop: spacing.xl }}>
         <ExternalButton
           label={`${OFFICIAL_SHOP_NAME}에서 전체 보기`}
-          sub="상품을 누르면 공식몰의 해당 상품으로 이동합니다."
+          sub="결제는 공식몰에서 이루어집니다."
           onPress={shop}
         />
       </View>
@@ -1287,39 +1318,190 @@ function MerchTab() {
 }
 
 /**
- * 상품 타일.
+ * 상품 타일 - 유니폼 타일과 같은 서식이다(UniformTile 주석 참조).
  *
  * 배지는 **판매 중이 아닐 때만** 붙는다. 전부에 붙이면 그 줄이 상품 이름보다 먼저 읽혀
- * 카탈로그가 상태 목록이 된다. 구장 한정 상품은 누를 곳이 없다 - 공식몰에 가도 없는
- * 물건을 링크로 걸면 그게 헛걸음이다.
+ * 카탈로그가 상태 목록이 된다.
+ *
+ * 사양 줄에 갈래 이름(`item.group`)을 쓰지 않는다 - 바로 위 머리글이 이미 '모자'라고
+ * 말하고 있어서 타일마다 그것을 되풀이하면 한 줄이 통째로 버려진다. 대신 유니폼과 같이
+ * **사양 · 쓰임**을 둔다. 팬이 모자 넷 사이에서 고를 때 필요한 것이 그것이다.
  */
-function MerchTile({ item }: { item: Merch }) {
+function MerchTile({ item, onOpen }: { item: Merch; onOpen: (m: Merch) => void }) {
   const badge = item.venueOnly
     ? { text: '구장 MD샵 한정', tone: 'brand' as const }
     : item.status !== 'onsale'
       ? { text: stockLabel(item.status), tone: stockTone(item.status) }
       : null;
 
-  const body = (
-    <View style={st.tile}>
-      <View style={st.tileTop}>{badge ? <Badge text={badge.text} tone={badge.tone} /> : null}</View>
-      <Text style={st.tileName} numberOfLines={2}>
-        {item.name}
-      </Text>
-      <Text style={st.tilePrice}>{item.price.toLocaleString()}원</Text>
-    </View>
-  );
+  // 사진이 붙는 순간 이 격자는 재고표에서 카탈로그가 된다. 유니폼·포토카드와 같은
+  // 서식을 쓴다 - 같은 탭 안에서 갈래마다 타일이 다르게 생기면 그 차이가 뜻으로 읽힌다
+  const photo = goodsPhoto(item.id);
+  const out = item.soldOutOptions ?? [];
+  // 발매 전이면 남은 시간이, 판매 중이면 선택지 사정이 팬이 다음에 물을 것이다
+  const meta =
+    item.status === 'upcoming'
+      ? (countdown(item.openAt ?? '', DEMO_NOW) ?? '곧 발매')
+      : out.length > 0
+        ? `${out.join('·')} 품절`
+        : (item.options?.length ?? 0) > 1
+          ? `${item.optionLabel ?? '선택'} ${item.options?.length}종`
+          : item.venueOnly
+            ? '구장에서만 판매'
+            : '판매 중';
 
-  if (item.venueOnly) return <View style={st.tileSlot}>{body}</View>;
   return (
     <Pressable
-      onPress={shop}
+      onPress={() => onOpen(item)}
       style={({ pressed }) => [st.tileSlot, pressed && { opacity: 0.6 }]}
-      accessibilityRole="link"
-      accessibilityLabel={`${item.name} - 공식몰에서 보기`}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name} ${item.price.toLocaleString()}원`}
     >
-      {body}
+      <View style={st.gridStage}>
+        {photo ? (
+          <Image source={photo} style={st.gridPhoto} resizeMode="cover" />
+        ) : (
+          <TeamEmblem team="HH" size={46} />
+        )}
+        {badge ? (
+          <View style={st.gridBadge}>
+            <Badge text={badge.text} tone={badge.tone} />
+          </View>
+        ) : null}
+      </View>
+      <Text style={st.gridKind} numberOfLines={1}>
+        {item.kind} · {item.use}
+      </Text>
+      <Text style={st.gridName} numberOfLines={2}>
+        {item.name}
+      </Text>
+      <Text style={st.gridPrice}>{item.price.toLocaleString()}원</Text>
+      <Text style={st.gridMeta} numberOfLines={1}>
+        {meta}
+      </Text>
     </Pressable>
+  );
+}
+
+/**
+ * 상품 상세.
+ *
+ * ── 왜 상세를 한 겹 뒀나 (2026-08-26) ────────────────────────
+ * 처음에는 타일을 누르면 곧장 공식몰이었다. "앱이 얹을 판단이 없으니 같은 정보를 두 번
+ * 보여줄 이유가 없다"는 것이 근거였는데, 사이즈와 색상이 자료에 들어오면서 그 근거가
+ * 무너졌다. **후드 L 이 품절인 것을 몰에 넘어가서 알게 되면 앱이 헛걸음시킨 것**이다.
+ * 유니폼 상세가 존재하는 이유와 정확히 같아서, 시트도 같은 것을 쓴다.
+ *
+ * 고를 것이 없는 물건(막대풍선·클래퍼)에는 선택 구역이 통째로 빠진다 - 칸을 비워 두면
+ * 팬은 무엇을 고르다 만 것인지 찾게 된다.
+ *
+ * ⚠ 구장 MD샵 한정 상품은 **공식몰 버튼을 주지 않는다.** 가도 없는 물건을 링크로 걸면
+ *   그게 헛걸음이다. 대신 어디 가면 있는지를 말한다.
+ */
+function MerchSheet({
+  item,
+  option,
+  alerted,
+  onOption,
+  onToggleAlert,
+  onClose,
+}: {
+  item: Merch | null;
+  option: string | null;
+  alerted: Record<string, boolean>;
+  onOption: (o: string) => void;
+  onToggleAlert: (id: string) => void;
+  onClose: () => void;
+}) {
+  const out = item?.soldOutOptions ?? [];
+
+  return (
+    <DetailSheet
+      visible={!!item}
+      title={item?.name ?? ''}
+      subtitle={item ? `${item.kind} · ${stockLabel(item.status)}` : ''}
+      onClose={onClose}
+      actions={
+        item ? (
+          item.venueOnly ? (
+            <View style={{ flex: 1 }}>
+              <Button label="확인" onPress={onClose} />
+            </View>
+          ) : item.status === 'upcoming' ? (
+            <>
+              <AlertToggle compact on={!!alerted[item.id]} onPress={() => onToggleAlert(item.id)} />
+              <View style={{ flex: 1.4 }}>
+                <ExternalButton label="공식몰 보기" onPress={shop} />
+              </View>
+            </>
+          ) : (
+            <View style={{ flex: 1 }}>
+              <ExternalButton label="공식몰에서 구매" onPress={shop} />
+            </View>
+          )
+        ) : null
+      }
+    >
+      {item ? (
+        <>
+          <GoodsShowcase goodsId={item.id} kind="cap" />
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <Card>
+              {item.status === 'upcoming' && item.openAt ? (
+                <Text style={st.etaLine}>
+                  {countdown(item.openAt, DEMO_NOW) ?? '발매되었습니다'}
+                </Text>
+              ) : null}
+              <Text style={st.body}>{item.note}</Text>
+            </Card>
+          </View>
+
+          {/* 고를 것이 있을 때만 - 유니폼의 사이즈 구역과 같은 자리다 */}
+          {item.options && item.options.length > 1 ? (
+            <View style={{ marginTop: spacing.cardGap }}>
+              <SectionTitle title={item.optionLabel ?? '선택'} />
+              <View style={st.sizeRow}>
+                {item.options.map((o) => (
+                  <Chip
+                    key={o}
+                    label={o}
+                    selected={option === o}
+                    disabled={merchOptionSoldOut(item, o)}
+                    onPress={() => onOption(o)}
+                  />
+                ))}
+              </View>
+              <Text style={st.footNote}>
+                {out.length > 0
+                  ? `${out.join('·')} 는 품절입니다. 고른 것은 공식몰로 넘어갈 때 함께 전달됩니다.`
+                  : '고른 것은 공식몰로 넘어갈 때 함께 전달됩니다.'}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={{ marginTop: spacing.cardGap }}>
+            <GroupCard style={{ paddingHorizontal: spacing.cardPad }}>
+              <InfoRow label="종류" value={item.kind} />
+              <InfoRow label="쓰임" value={item.use} />
+              <InfoRow label="가격" value={`${item.price.toLocaleString()}원`} />
+              {item.openAt ? <InfoRow label="발매" value={formatDateTime(item.openAt)} /> : null}
+              <InfoRow
+                label="판매처"
+                value={item.venueOnly ? '대전 한화생명 볼파크 MD샵' : OFFICIAL_SHOP_NAME}
+                last
+              />
+            </GroupCard>
+          </View>
+
+          {item.venueOnly ? (
+            <Text style={st.footNote}>
+              공식몰에서는 팔지 않습니다. 경기 당일 중앙 게이트 옆 MD샵에서 살 수 있습니다.
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+    </DetailSheet>
   );
 }
 
@@ -1569,6 +1751,7 @@ const st = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: spacing.sm,
   },
+  gridPhoto: { width: '100%', height: '100%' },
   gridBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm },
   gridKind: { ...typography.micro, fontWeight: '400', color: colors.mutedText },
   gridName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19, marginTop: 2 },
