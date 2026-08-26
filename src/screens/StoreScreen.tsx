@@ -64,6 +64,7 @@ import {
   PhotoHeader,
   PlayerAvatar,
   PlayerShot,
+  hasPlayerPhoto,
   TeamEmblem,
   stadiumPhoto,
 } from '../components/photos';
@@ -104,8 +105,9 @@ import {
   stockTone,
 } from '../goods';
 import { ATTENDANCE, attendanceSummary, membershipOf } from '../my';
+import { BATTERS, Batter } from '../roster';
 import { UserProfile } from '../profile';
-import { colors, keepAll, radius, spacing, tabularFigures, typography } from '../theme';
+import { colors, keepAll, palette, radius, spacing, tabularFigures, typography } from '../theme';
 
 /** 시연 기준 시각 - Date.now() 를 쓰면 실행할 때마다 카운트다운이 달라진다 */
 const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
@@ -748,28 +750,155 @@ function CardSheet({
  * 카드의 형태(세로 비율 · 오렌지 머리띠 · 아래쪽 장면 글자)를 그대로 세워 두는 편이
  * 실물을 더 정확히 말한다.
  */
+/** 포지션 약어를 카드에 적을 말로. 인쇄물에 'RF' 라고 적히면 그건 팬의 말이 아니다 */
+const POS_KO: Record<string, string> = {
+  C: '포수',
+  '1B': '1루수',
+  '2B': '2루수',
+  '3B': '3루수',
+  SS: '유격수',
+  LF: '좌익수',
+  CF: '중견수',
+  RF: '우익수',
+  DH: '지명타자',
+  SP: '선발투수',
+  RP: '구원투수',
+  CP: '마무리투수',
+};
+
+/** 시안의 판형(280×433). 실물 트레이딩 카드 63×88mm 와 같은 비율이다 */
+const CARD_W = 260;
+const CARD_H = Math.round((CARD_W * 433) / 280);
+/** 사진 우물의 높이. 시안의 340/433 을 그대로 옮겼다 - 카드의 78% 가 사진이다 */
+const WELL_H = Math.round(CARD_H * 0.785);
+
 function PhotoCardPreview({ card }: { card: PhotoCard }) {
+  const player = card.moment ? BATTERS.find((b) => b.id === card.moment?.playerId) : undefined;
+  const back = player ? String(player.back).padStart(2, '0') : '--';
+
   return (
-    <View style={st.preview}>
-      <View style={st.previewCard}>
-        <View style={st.previewTop}>
-          <Text style={st.previewDate}>
-            {gameKey(card)} vs {card.opponent}
+    <View style={{ gap: spacing.sm }}>
+      {/* 두 면을 세로로 쌓지 않고 옆으로 넘긴다. 쌓으면 시트 한 화면을 카드 둘이
+          전부 먹어 아래의 자격·발행 정보가 스크롤 밖으로 밀려난다 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={st.cardRow}
+      >
+        <View style={{ gap: 8 }}>
+          <CardFront card={card} player={player} back={back} />
+          <Text style={st.cardFace}>앞면</Text>
+        </View>
+        <View style={{ gap: 8 }}>
+          <CardBack card={card} player={player} back={back} />
+          <Text style={st.cardFace}>뒷면</Text>
+        </View>
+      </ScrollView>
+      <Text style={st.previewHint}>실물 카드 시안 · 옆으로 밀면 뒷면</Text>
+    </View>
+  );
+}
+
+/**
+ * 앞면 - 사진이 거의 전부다.
+ *
+ * 오렌지 띠가 사진과 글자 사이를 비스듬히 가른다(skewY -3°). 수평선으로 자르면 카드가
+ * 두 칸짜리 표로 읽히는데, 한 번 기울이면 사진이 띠 아래로 이어지는 것처럼 보인다.
+ *
+ * 등번호를 오른쪽 아래에 크게 둔다 - 관중석에서 선수를 가리키는 것이 등번호다.
+ */
+function CardFront({ card, player, back }: { card: PhotoCard; player?: Batter; back: string }) {
+  return (
+    <View style={st.faceFront}>
+      {/* 사진 자리. 촬영본이 있으면 그 자리에 들어가고, 없으면 시안 그대로
+          '여기에 사진이 온다'를 남긴다 - 빈 칸으로 두면 도안이 미완성으로 읽힌다 */}
+      <View style={st.frontWell}>
+        {card.moment && hasPlayerPhoto(card.moment.playerId) ? (
+          <PlayerShot playerId={card.moment.playerId} height={WELL_H} />
+        ) : (
+          <View style={st.frontSlot}>
+            <Text style={st.frontSlotText}>사진 배치 영역</Text>
+            <Text style={st.frontSlotSize}>240 × 300 px · 누끼 권장</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={st.frontBand} />
+
+      <View style={st.frontDate}>
+        <Text style={st.frontDateText}>{card.gameAt.slice(0, 10).replace(/-/g, '.')}</Text>
+      </View>
+
+      <View style={st.frontFoot}>
+        <View style={{ flex: 1 }}>
+          <Text style={st.frontName} numberOfLines={1}>
+            {card.moment?.playerName ?? '도안 확정 전'}
+          </Text>
+          <Text style={st.frontSub} numberOfLines={1}>
+            Hanwha Eagles{player ? ` · ${POS_KO[player.pos] ?? player.pos}` : ''}
           </Text>
         </View>
-        <View style={st.previewBody}>
-          {card.moment ? (
-            <PlayerAvatar playerId={card.moment.playerId} team="HH" size={76} />
-          ) : (
-            <TeamEmblem team="HH" size={54} />
-          )}
-          <Text style={st.previewName}>{card.moment?.playerName ?? '도안 확정 전'}</Text>
-          <Text style={st.previewLine} numberOfLines={2}>
-            {card.moment?.line ?? '경기 종료 후 그날의 장면이 들어갑니다'}
-          </Text>
+        <Text style={st.frontBack}>{back}</Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * 뒷면 - 카드가 무엇을 증명하는가.
+ *
+ * 앞면이 장면이라면 뒷면은 **증서**다. 그래서 표와 일련번호와 홀로그램 자리가 있다.
+ * 한정판에서 일련번호는 장식이 아니라 그 카드가 몇 번째인지를 말하는 유일한 값이다.
+ *
+ * 타수·안타·타점은 비워 둔다 - 앱은 그날의 개인 박스스코어를 갖고 있지 않다.
+ * 없는 값을 지어내 채우면 시안이 아니라 거짓 도안이 된다.
+ */
+function CardBack({ card, player, back }: { card: PhotoCard; player?: Batter; back: string }) {
+  const rows: [string, string][] = [
+    ['선수', card.moment?.playerName ?? '—'],
+    ['등번호', back],
+    ['포지션', player ? (POS_KO[player.pos] ?? player.pos) : '—'],
+    ['경기일', `${card.gameAt.slice(0, 4)}년 ${formatDate(card.gameAt)}`],
+    ['구장', card.stadium],
+  ];
+
+  return (
+    <View style={st.faceBack}>
+      <View style={st.backHead}>
+        <Text style={st.backHeadText}>{card.gameAt.slice(0, 4)} 시즌 기념 포토카드</Text>
+      </View>
+
+      <View style={st.backBody}>
+        {rows.map(([label, value]) => (
+          <View key={label} style={st.backRow}>
+            <Text style={st.backLabel}>{label}</Text>
+            <Text style={st.backValue} numberOfLines={1}>
+              {value}
+            </Text>
+          </View>
+        ))}
+
+        <View style={st.backSplit}>
+          <Text style={st.backLabel}>기록 영역</Text>
+          <View style={st.backTiles}>
+            {['타수', '안타', '타점'].map((t) => (
+              <View key={t} style={st.backTile}>
+                <Text style={st.backTileLabel}>{t}</Text>
+                <Text style={st.backTileValue}>—</Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
-      <Text style={st.previewHint}>실물 카드 시안</Text>
+
+      <View style={st.backFoot}>
+        <Text style={st.backSerial}>
+          NO. {gameKey(card).replace('.', '')} / {(card.issued ?? 0).toLocaleString()}
+        </Text>
+        <View style={st.backHolo}>
+          <Text style={st.backHoloText}>홀로</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -1598,29 +1727,156 @@ const st = StyleSheet.create({
   gateHead: { flexDirection: 'row' },
   doneNote: { ...typography.caption, textAlign: 'center', lineHeight: 18 },
 
-  preview: { alignItems: 'center', gap: spacing.sm },
-  previewCard: {
-    width: 168,
-    borderRadius: radius.tile,
-    backgroundColor: colors.card,
+  // ── 포토카드 시안 (앞면·뒷면) ──────────────────────────────
+  //
+  // 받은 시안은 #FF6600 / #f6f4ef / #101010 이었다. 여기서는 **같은 자리의 우리 토큰**으로
+  // 바꿔 놓았다 - 오렌지는 구단 CI 값(#FC4E00)이고 밝은 면은 지면과 같은 따뜻한 흰색이다.
+  // 시안의 색을 그대로 박으면 이 카드만 앱에서 다른 브랜드로 보인다.
+  //
+  // 어두운 면은 시안의 중성 검정 대신 navy-900 을 쓴다 - 이 앱의 어두운 면은 전부 이 값이라
+  // 여기만 순검정이면 카드가 화면에서 떠 보인다.
+  cardRow: { gap: spacing.cardGap, paddingHorizontal: 2, paddingVertical: 2 },
+  cardFace: { ...typography.micro, textAlign: 'center' },
+  previewHint: { ...typography.micro, textAlign: 'center' },
+
+  faceFront: {
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: palette.navy[900],
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.navy[800],
+  },
+  frontWell: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: WELL_H,
+    backgroundColor: palette.navy[800],
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
-  previewTop: {
-    backgroundColor: colors.brand,
-    paddingVertical: 7,
+  frontSlot: {
+    width: '86%',
+    height: '88%',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: palette.navy[600],
+    borderRadius: 4,
     alignItems: 'center',
-  },
-  previewDate: { ...typography.micro, ...tabularFigures, color: colors.onBrand, fontWeight: '700' },
-  previewBody: {
-    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
   },
-  previewName: { ...typography.cardTitle, fontSize: 15 },
-  previewLine: { ...typography.caption, fontSize: 11, lineHeight: 16, textAlign: 'center' },
-  previewHint: typography.micro,
+  frontSlotText: { ...typography.micro, fontWeight: '400', color: palette.navy[400] },
+  frontSlotSize: { fontSize: 10, color: palette.navy[500] },
+  // 비스듬한 오렌지 띠 - 사진과 글자 사이를 가른다. 수평으로 자르면 두 칸짜리 표가 된다
+  frontBand: {
+    position: 'absolute',
+    top: Math.round(CARD_H * 0.693),
+    left: -6,
+    right: -6,
+    height: Math.round(CARD_H * 0.102),
+    backgroundColor: colors.brand,
+    transform: [{ skewY: '-3deg' }],
+  },
+  frontDate: {
+    position: 'absolute',
+    top: 17,
+    left: 17,
+    backgroundColor: colors.brand,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+  },
+  frontDateText: {
+    ...tabularFigures,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: palette.orange[900],
+  },
+  frontFoot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 17,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
+  frontName: { fontSize: 20, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.3 },
+  // 중성 흰색의 투명도로 낮춘다 - navy 계단(navy-400)을 쓰면 이 줄만 파랗게 뜬다
+  frontSub: { fontSize: 10.5, color: 'rgba(255,255,255,0.62)', marginTop: 2 },
+  frontBack: {
+    ...tabularFigures,
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: '800',
+    color: colors.brand,
+  },
+
+  faceBack: {
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  backHead: { backgroundColor: colors.brand, paddingVertical: 13, paddingHorizontal: 17 },
+  backHeadText: { fontSize: 12, fontWeight: '700', color: palette.orange[900] },
+  backBody: { padding: 17 },
+  backRow: { flexDirection: 'row', paddingVertical: 6 },
+  // 이름표 열은 40% 고정이다 - 값이 길고 짧음에 따라 열이 흔들리면 표로 안 읽힌다
+  backLabel: { ...typography.micro, fontWeight: '400', color: colors.mutedText, width: '40%' },
+  backValue: { fontSize: 11.5, color: colors.text, flex: 1 },
+  backSplit: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    marginTop: 6,
+    paddingTop: 12,
+    gap: 6,
+  },
+  backTiles: { flexDirection: 'row', gap: 8 },
+  backTile: {
+    flex: 1,
+    backgroundColor: colors.dim,
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: 'center',
+    gap: 2,
+  },
+  backTileLabel: { fontSize: 10, color: colors.mutedText },
+  backTileValue: { ...tabularFigures, fontSize: 15, fontWeight: '700', color: colors.text },
+  backFoot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 17,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  backSerial: { ...tabularFigures, fontSize: 10, color: colors.mutedText },
+  // 홀로그램 자리 - 인쇄에서 붙는 것이라 도안에는 자리만 남는다
+  backHolo: {
+    width: 34,
+    height: 34,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.mutedText,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backHoloText: { fontSize: 9, color: colors.mutedText },
 
   // ── 마일스톤 ───────────────────────────────────────────────
   progressHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
