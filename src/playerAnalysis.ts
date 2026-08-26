@@ -80,12 +80,17 @@ function axes(b: Batter['stat']) {
 }
 
 /**
- * ⚠ 숫자 뒤에는 은/는·이/가·으로 를 붙이지 않는다.
+ * ⚠ 숫자 뒤에 붙일 수 있는 조사는 정해져 있다.
  *
- * 한국어 조사는 앞 글자의 받침을 따르는데, 숫자는 **읽는 소리**로 받침이 갈린다 -
+ * 한국어 조사는 앞 글자의 받침을 따르는데, 숫자는 **읽는 소리**로 받침이 갈린다.
  * WAR 2.4 는 "이 점 사"라 받침이 없고 3.0 은 "삼 점 영"이라 받침이 있다. korean.ts 의
- * josa() 는 한글 음절만 보므로 숫자에는 쓸 수 없다. 그래서 값 뒤는 `-` 나 `·` 로 끊고,
- * 조사가 필요한 자리에는 한글 낱말(장타·컨택 같은)만 놓아 josa() 로 붙인다.
+ * josa() 는 한글 음절만 보므로 숫자에는 쓸 수 없다.
+ *
+ *   쓸 수 있다 : 까지 · 도 · 보다 · 에 · 부터 · 입니다 (받침을 타지 않는다)
+ *   쓸 수 없다 : 은/는 · 이/가 · 을/를 · 으로/로 · 와/과
+ *
+ * 단위가 붙으면 받침이 고정되므로 자유롭다 - `%`(퍼센트·받침 없음)는 는/가/로,
+ * `이닝`·`명`은 은/이/으로, `개`는 는/가/로.
  */
 export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   const b = batter.stat;
@@ -98,36 +103,38 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   // ── ① 어떤 타자인가 ────────────────────────────────────────
   // 구단이 적어 둔 한 줄(스탯이 말하지 못하는 맥락)을 먼저 두고, 종합 수치를 붙인다.
   // 순서를 뒤집으면 숫자가 사람보다 앞에 서서 선수 소개가 아니라 성적표가 된다
+  // 등급은 낱말이 아니라 **문장**으로 둔다. '확실한 주전급' 뒤에 입니다를 붙이는 틀은
+  // 선수가 누구든 같은 자리에서 같은 소리를 내서, 몇 명만 봐도 서식으로 읽힌다
   const tier =
     wrc >= 150
-      ? '리그 최상위 타격'
+      ? '리그에서 손에 꼽는 타격입니다.'
       : wrc >= 130
-        ? '팀 중심타선 몫'
+        ? '중심타선을 맡을 만합니다.'
         : wrc >= 110
-          ? '평균 이상의 생산력'
+          ? '평균을 웃도는 생산력입니다.'
           : wrc >= 90
-            ? '평균권'
-            : '주전으로 쓰기엔 아쉬운 생산력';
+            ? '평균권에 있습니다.'
+            : '주전으로 쓰기에는 아쉽습니다.';
   const warWord =
     war >= 5
-      ? '올스타급'
+      ? '올스타를 다투는 자리까지 올라섰습니다.'
       : war >= 3
-        ? '확실한 주전급'
+        ? '주전 자리를 확실히 지켰습니다.'
         : war >= 2
-          ? '주전급'
+          ? '주전으로 한 시즌을 채웠습니다.'
           : war >= 1
-            ? '준주전급'
-            : '대체 선수와 큰 차이가 없는 수준';
+            ? '주전과 백업 사이에 서 있습니다.'
+            : '대체 선수와 벌린 거리가 크지 않습니다.';
   const diff = wrc - 100;
   const vsLeague =
     diff === 0
       ? '리그 평균 타자와 꼭 같은 만큼 득점을 만들었습니다'
       : diff > 0
-        ? `리그 평균 타자보다 **${diff}% 더** 득점을 만들었습니다`
-        : `리그 평균 타자보다 **${-diff}% 적게** 득점을 만들었습니다`;
+        ? `리그 평균 타자보다 ${diff}% 더 많은 득점을 만들었습니다`
+        : `리그 평균 타자보다 ${-diff}% 적은 득점을 만들었습니다`;
   lines.push(
-    `${batter.note}. wRC+ **${wrc}** - ${vsLeague}. ${tier}입니다. ` +
-      `수비·주루까지 더한 WAR **${war.toFixed(1)}** - ${warWord}입니다.`,
+    `${batter.note}. 올해 wRC+ **${wrc}**, ${vsLeague}. ${tier} ` +
+      `수비와 주루를 더한 WAR는 ${war.toFixed(1)}. ${warWord}`,
   );
 
   // ── ② 무엇이 이 성적을 만들었나 ────────────────────────────
@@ -138,14 +145,14 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   const worst = sorted[sorted.length - 1];
   const grade = (z: number) =>
     z >= 1.2
-      ? '리그 상위'
+      ? '리그 상위권'
       : z >= 0.4
         ? '평균 이상'
         : z >= -0.4
           ? '평균권'
           : z >= -1.2
             ? '평균 이하'
-            : '리그 하위';
+            : '리그 하위권';
   // 셋이 서로 가까우면 '강점과 약점'이라는 틀 자체가 거짓말이 된다
   const balanced = best.z - worst.z < 0.8;
   // 가장 약한 축조차 평균 위면 '반대로 ~은 약합니다'가 성립하지 않는다.
@@ -154,20 +161,23 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   // ⚠ 고르다는 것이 언제나 칭찬은 아니다. 셋이 나란히 평균 아래인 선수에게
   //   "한 축이 흔들려도 무너지지 않는 유형"이라고 하면 칭찬으로 읽힌다
   const evenlyLow = balanced && best.z < -0.4;
+  // 성적이 리그 아래인 선수에게 '성적을 끌어올린 쪽'은 칭찬으로 읽힌다.
+  // 가장 나은 축조차 평균 아래면 들어올리는 말을 쓰지 않는다
+  const lead = best.z >= 0.4 ? '성적을 끌어올린 쪽은 ' : '세 축 가운데 그나마 앞선 쪽은 ';
   lines.push(
     evenlyLow
-      ? `장타·선구·컨택 세 축이 고르게 처져 있습니다 - ${sorted.map((a) => a.text).join(' · ')}. ` +
+      ? `장타·선구·컨택 세 축이 고르게 처져 있습니다. ${sorted.map((a) => a.text).join(' · ')}. ` +
           `한 군데가 특별히 나쁜 것이 아니라 셋이 나란히 리그 평균 아래입니다.`
       : balanced
-        ? `장타·선구·컨택 세 축이 고르게 붙어 있습니다 - ${sorted.map((a) => a.text).join(' · ')}. ` +
-          `어느 하나에 기대는 성적이 아니라서 한 축이 식어도 크게 무너지지 않는 유형입니다.`
+        ? `장타·선구·컨택 세 축이 고르게 붙어 있습니다. ${sorted.map((a) => a.text).join(' · ')}. ` +
+          `어느 하나에 기대는 성적이 아니라, 한 축이 식어도 크게 무너지지 않습니다.`
         : noWeakness
-          ? `이 성적을 떠받치는 것은 **${best.label}**입니다 - ${best.text}, ${grade(best.z)}. ` +
-            `가장 처지는 ${josa(worst.label, '이/가')} ${worst.text}로 ${grade(worst.z)}이니 ` +
-            `뚜렷한 약점은 없는 유형입니다.`
-          : `이 성적을 떠받치는 것은 **${best.label}**입니다 - ${best.text}, ${grade(best.z)}. ` +
-            `반대로 ${josa(worst.label, '은/는')} ${worst.text}, ${grade(worst.z)}입니다. ` +
-            `${josa(best.label, '이/가')} 식으면 성적이 같이 내려앉는 구조입니다.`,
+          ? `${lead}**${best.label}**입니다. ${best.text}, ${grade(best.z)}. ` +
+            `가장 처지는 ${worst.label}도 ${worst.text}, ${grade(worst.z)}입니다. ` +
+            `뚜렷한 약점이 보이지 않습니다.`
+          : `${lead}**${best.label}**입니다. ${best.text}, ${grade(best.z)}. ` +
+            `대신 ${josa(worst.label, '은/는')} ${worst.text}, ${grade(worst.z)}에 머뭅니다. ` +
+            `${josa(best.label, '이/가')} 식으면 성적도 같이 내려앉습니다.`,
   );
 
   // ── ③ 무엇을 조심하나 ──────────────────────────────────────
@@ -181,15 +191,15 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   const gap = babip - REF.babip;
   const regress =
     gap >= 0.03
-      ? `BABIP **${dec3(babip)}** - 리그 평균 ${REF.babip}보다 한참 높습니다. ` +
+      ? `BABIP **${dec3(babip)}**. 리그 평균 ${REF.babip}보다 한참 높습니다. ` +
         `지금 타율 ${dec3(avgOf(b))}에는 타구가 야수 사이로 떨어져 준 몫이 섞여 있어, ` +
-        `남은 경기에서 내려올 여지가 있습니다.`
+        `남은 경기에서 내려앉을 수 있습니다.`
       : gap <= -0.03
-        ? `BABIP **${dec3(babip)}** - 리그 평균 ${REF.babip}보다 낮습니다. ` +
-          `타율 ${dec3(avgOf(b))} 자체가 실력보다 눌려 있다는 뜻이라, 타구질이 그대로면 ` +
-          `앞으로 오를 여지가 있습니다.`
-        : `BABIP **${dec3(babip)}** - 리그 평균 ${REF.babip} 언저리입니다. ` +
-          `타율 ${dec3(avgOf(b))}에 운이 크게 섞여 있지는 않다는 뜻입니다.`;
+        ? `BABIP **${dec3(babip)}**. 리그 평균 ${REF.babip}보다 낮습니다. ` +
+          `타율 ${dec3(avgOf(b))} 자체가 실력보다 눌려 있다는 신호입니다. ` +
+          `타구질만 그대로면 앞으로 올라올 자리가 남았습니다.`
+        : `BABIP **${dec3(babip)}**. 리그 평균 ${REF.babip} 언저리입니다. ` +
+          `타율 ${dec3(avgOf(b))}에 운이 크게 섞이지는 않았습니다.`;
   lines.push(regress);
 
   // ── ④ 타구 유형이 특이하면 한 줄 더 ────────────────────────
@@ -197,15 +207,15 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   const extra: string[] = [];
   if (b.fbRate >= 0.42 && b.gdp >= 12) {
     extra.push(
-      `뜬공 비중 ${pct(b.fbRate)}에 병살 ${b.gdp}개 - 당겨친 타구가 많아 홈런과 병살이 ` +
-        `같이 늘어나는 유형입니다`,
+      `뜬공 비중 ${pct(b.fbRate)}에 병살 ${b.gdp}개. 당겨친 타구가 많아 홈런과 병살이 ` +
+        `같이 늘어납니다`,
     );
   } else if (b.gbRate >= 0.5) {
-    extra.push(`땅볼 비중이 ${pct(b.gbRate)}까지 올라가, 장타보다 출루로 값을 만드는 타구질입니다`);
+    extra.push(`땅볼 비중이 ${pct(b.gbRate)}까지 올라, 장타보다 출루로 값을 만듭니다`);
   }
   if (b.sb >= 15) {
     const rate = b.sb + b.cs > 0 ? Math.round((b.sb / (b.sb + b.cs)) * 100) : 0;
-    extra.push(`도루 ${b.sb}개(성공률 ${rate}%) - 타석 밖에서도 득점을 만듭니다`);
+    extra.push(`도루 ${b.sb}개를 성공률 ${rate}%로 챙겨, 타석 밖에서도 득점을 만듭니다`);
   }
   if (extra.length > 0) lines.push(`${extra.join('. ')}.`);
 
@@ -237,7 +247,7 @@ function pitcherAxes(p: Pitcher['stat']) {
 }
 
 /**
- * ⚠ 타자 쪽과 같은 규칙 - 숫자 뒤에는 조사를 두지 않는다.
+ * ⚠ 숫자 뒤 조사 규칙은 타자 쪽(analyzeBatter 위)과 같다.
  *
  * 표본 경고는 **규정선 대비**로만 붙인다. '안정화 표본에 못 미친다'로 쓰면 불펜은
  * 전원이 예외 없이 걸려서, 늘 붙는 줄이 되어 아무도 읽지 않는다(타자 쪽에서 한 번
@@ -253,39 +263,44 @@ export function analyzePitcher(pitcher: Pitcher, park: string, qualBF: number): 
   const lines: string[] = [];
 
   // ── ① 어떤 투수인가 ────────────────────────────────────────
+  // 좋다/나쁘다는 판정을 매 줄 되풀이하지 않는다. ERA 는 낮을수록 좋다는 것을 이미
+  // 화면이 여러 번 말했고, 여기서는 리그 평균과의 위치만 사실대로 적는다
   const vsLeague =
     era <= LEAGUE.ERA - 1.2
-      ? `리그 평균 ${LEAGUE.ERA} 보다 한참 좋습니다`
+      ? `리그 평균 ${LEAGUE.ERA}보다 한참 낮습니다`
       : era <= LEAGUE.ERA - 0.3
-        ? `리그 평균 ${LEAGUE.ERA} 보다 좋습니다`
+        ? `리그 평균 ${LEAGUE.ERA}보다 낮습니다`
         : era <= LEAGUE.ERA + 0.3
           ? `리그 평균 ${LEAGUE.ERA} 언저리입니다`
-          : `리그 평균 ${LEAGUE.ERA} 보다 나쁩니다`;
+          : `리그 평균 ${LEAGUE.ERA}보다 높습니다`;
+  // 등급은 낱말이 아니라 문장으로 둔다 (타자 쪽과 같은 이유)
   const warWord =
     war >= 5
-      ? '에이스급'
+      ? '리그 에이스로 꼽을 만합니다.'
       : war >= 3
-        ? '로테이션의 축'
+        ? '로테이션의 축을 맡았습니다.'
         : war >= 1.5
-          ? '1군 전력의 한 축'
+          ? '1군 선발의 한 자리를 지켰습니다.'
           : war >= 0.5
-            ? '보직을 맡을 만한'
-            : '대체 선수와 큰 차이가 없는';
-  // 불펜에게 '로테이션의 축'은 말이 안 된다. 보직에 맞는 낱말로 갈아 끼운다
+            ? '보직을 맡을 만합니다.'
+            : '대체 선수와 벌린 거리가 크지 않습니다.';
+  // 불펜에게 '로테이션의 축'은 말이 안 된다. 보직에 맞는 문장으로 갈아 끼운다
   const roleWord =
     pitcher.role === '선발'
       ? warWord
       : war >= 2
-        ? '필승조 핵심'
+        ? '필승조의 핵심으로 썼습니다.'
         : war >= 1
-          ? '믿고 올릴 만한'
+          ? '믿고 올릴 만합니다.'
           : war >= 0.3
-            ? '보직을 맡을 만한'
-            : '대체 선수와 큰 차이가 없는';
-  lines.push(
-    `${pitcher.note}. ERA **${era.toFixed(2)}** - ${vsLeague}. ` +
-      `${ipLabel(p.ipOuts)}이닝을 던져 WAR **${war.toFixed(1)}** - ${roleWord} 수준입니다.`,
-  );
+            ? '보직을 맡을 만합니다.'
+            : '대체 선수와 벌린 거리가 크지 않습니다.';
+  // WAR 가 음수면 '쌓았습니다'가 성립하지 않는다 - 깎아먹은 값이다
+  const warClause =
+    war >= 0
+      ? `${ipLabel(p.ipOuts)}이닝을 던지며 WAR ${war.toFixed(1)}까지 쌓았습니다.`
+      : `${ipLabel(p.ipOuts)}이닝을 던졌지만 WAR는 ${war.toFixed(1)}에 머물렀습니다.`;
+  lines.push(`${pitcher.note}. ERA **${era.toFixed(2)}**, ${vsLeague}. ${warClause} ${roleWord}`);
 
   // ── ② 무엇이 이 성적을 만들었나 ────────────────────────────
   const sorted = pitcherAxes(p)
@@ -295,33 +310,34 @@ export function analyzePitcher(pitcher: Pitcher, park: string, qualBF: number): 
   const worst = sorted[sorted.length - 1];
   const grade = (z: number) =>
     z >= 1.2
-      ? '리그 상위'
+      ? '리그 상위권'
       : z >= 0.4
         ? '평균 이상'
         : z >= -0.4
           ? '평균권'
           : z >= -1.2
             ? '평균 이하'
-            : '리그 하위';
+            : '리그 하위권';
   const balanced = best.z - worst.z < 0.8;
   const noWeakness = worst.z >= 0.4;
   // ⚠ 고르다는 것이 언제나 칭찬은 아니다. 셋이 나란히 평균 아래인 선수에게
   //   "한 축이 흔들려도 무너지지 않는 유형"이라고 하면 칭찬으로 읽힌다
   const evenlyLow = balanced && best.z < -0.4;
+  const lead = best.z >= 0.4 ? '성적을 떠받친 쪽은 ' : '세 축 가운데 그나마 앞선 쪽은 ';
   lines.push(
     evenlyLow
-      ? `구위·제구·장타 억제 세 축이 고르게 처져 있습니다 - ${sorted.map((a) => a.text).join(' · ')}. ` +
+      ? `구위·제구·장타 억제 세 축이 고르게 처져 있습니다. ${sorted.map((a) => a.text).join(' · ')}. ` +
           `한 군데가 특별히 나쁜 것이 아니라 셋이 나란히 리그 평균 아래입니다.`
       : balanced
-        ? `구위·제구·장타 억제 세 축이 고르게 붙어 있습니다 - ${sorted.map((a) => a.text).join(' · ')}. ` +
-          `어느 하나로 버티는 투구가 아니라서 한 축이 흔들려도 크게 무너지지 않는 유형입니다.`
+        ? `구위·제구·장타 억제 세 축이 고르게 붙어 있습니다. ${sorted.map((a) => a.text).join(' · ')}. ` +
+          `어느 하나로 버티는 투구가 아니라, 한 축이 흔들려도 크게 무너지지 않습니다.`
         : noWeakness
-          ? `이 성적을 떠받치는 것은 **${best.label}**입니다 - ${best.text}, ${grade(best.z)}. ` +
-            `가장 처지는 ${josa(worst.label, '이/가')} ${worst.text}로 ${grade(worst.z)}이니 ` +
-            `뚜렷한 약점은 없는 유형입니다.`
-          : `이 성적을 떠받치는 것은 **${best.label}**입니다 - ${best.text}, ${grade(best.z)}. ` +
-            `반대로 ${josa(worst.label, '은/는')} ${worst.text}, ${grade(worst.z)}입니다. ` +
-            `${josa(best.label, '이/가')} 무너지는 날 성적이 크게 흔들리는 구조입니다.`,
+          ? `${lead}**${best.label}**입니다. ${best.text}, ${grade(best.z)}. ` +
+            `가장 처지는 ${worst.label}도 ${worst.text}, ${grade(worst.z)}입니다. ` +
+            `뚜렷한 약점이 보이지 않습니다.`
+          : `${lead}**${best.label}**입니다. ${best.text}, ${grade(best.z)}. ` +
+            `대신 ${josa(worst.label, '은/는')} ${worst.text}, ${grade(worst.z)}에 머뭅니다. ` +
+            `${josa(best.label, '이/가')} 흔들리는 날 성적도 같이 흔들립니다.`,
   );
 
   // ── ③ 무엇을 조심하나 - ERA 와 FIP 의 거리 ─────────────────
@@ -330,21 +346,21 @@ export function analyzePitcher(pitcher: Pitcher, park: string, qualBF: number): 
   const gap = era - fip;
   const gapLine =
     gap >= 0.4
-      ? `FIP **${fip.toFixed(2)}** - ERA 보다 ${gap.toFixed(2)} 낮습니다. 삼진·볼넷·피홈런만 ` +
-        `보면 실점보다 잘 던졌다는 뜻이라, 수비나 타구 운이 따르지 않은 몫이 섞여 있습니다.`
+      ? `FIP **${fip.toFixed(2)}**. ERA보다 ${gap.toFixed(2)} 낮습니다. 삼진과 볼넷, 피홈런만 ` +
+        `놓고 보면 실점보다 잘 던졌습니다. 수비와 타구 운이 따르지 않은 몫이 섞여 있습니다.`
       : gap <= -0.4
-        ? `FIP **${fip.toFixed(2)}** - ERA 보다 ${(-gap).toFixed(2)} 높습니다. 실점이 적었지만 ` +
-          `그 이유가 투수 본인의 결과만으로는 설명되지 않아, 지금 성적이 그대로 이어지기는 어렵습니다.`
-        : `FIP **${fip.toFixed(2)}** - ERA 와 거의 같습니다. 지금까지의 실점이 야수의 도움이나 ` +
-          `운을 크게 빌리지 않은, 본인 투구 그대로였다는 뜻입니다.`;
+        ? `FIP **${fip.toFixed(2)}**. ERA보다 ${(-gap).toFixed(2)} 높습니다. 실점은 적었지만 ` +
+          `그 이유를 투수 본인의 결과만으로 설명하기 어렵습니다. 지금 성적이 그대로 이어지기는 쉽지 않습니다.`
+        : `FIP **${fip.toFixed(2)}**. ERA와 거의 같습니다. 야수의 도움도 타구 운도 크게 빌리지 않고, ` +
+          `던진 만큼 막았습니다.`;
   const babGap = bab - REF.babipAllowed;
   const babLine =
     babGap >= 0.03
-      ? ` 피BABIP **${bab.toFixed(3)}** 도 리그 평균 ${REF.babipAllowed} 보다 높아, 맞은 타구가 ` +
-        `안타로 이어진 몫이 앞으로 줄어들 여지가 있습니다.`
+      ? ` 피BABIP ${bab.toFixed(3)}도 리그 평균 ${REF.babipAllowed}보다 높아, 맞은 타구가 ` +
+        `안타로 이어진 몫은 앞으로 줄어들 수 있습니다.`
       : babGap <= -0.03
-        ? ` 다만 피BABIP **${bab.toFixed(3)}** - 리그 평균 ${REF.babipAllowed} 보다 낮습니다. ` +
-          `투수가 오래 붙들 수 있는 값이 아니라 평균 쪽으로 돌아올 가능성을 함께 봐야 합니다.`
+        ? ` 다만 피BABIP ${bab.toFixed(3)}도 리그 평균 ${REF.babipAllowed}보다 낮습니다. ` +
+          `투수가 오래 붙들 수 있는 값이 아니라, 평균 쪽으로 돌아올 자리를 함께 봐야 합니다.`
         : '';
   lines.push(gapLine + babLine);
 
@@ -355,16 +371,14 @@ export function analyzePitcher(pitcher: Pitcher, park: string, qualBF: number): 
   // 뒤에서 되풀이하면 분석이 아니라 서식으로 읽힌다
   if (p.bf < qualBF * 0.5 && !pitcher.note.includes('표본')) {
     extra.push(
-      `상대한 타자가 ${p.bf}명으로 규정 ${qualBF}타자의 절반에 못 미칩니다 - ` +
-        `ERA 와 FIP 를 결론처럼 읽기에는 이른 표본입니다`,
+      `상대한 타자가 ${p.bf}명으로 규정 ${qualBF}타자의 절반에 못 미칩니다. ` +
+        `ERA와 FIP를 결론처럼 읽기에는 이른 표본입니다`,
     );
   }
   if (p.gbRate >= 0.5) {
-    extra.push(
-      `땅볼 비중이 ${pct(p.gbRate)}까지 올라가, 주자를 두고도 병살로 끊을 수 있는 유형입니다`,
-    );
+    extra.push(`땅볼 비중이 ${pct(p.gbRate)}까지 올라, 주자를 두고도 병살로 끊을 수 있습니다`);
   } else if (p.fbRate >= 0.42) {
-    extra.push(`뜬공 비중 ${pct(p.fbRate)} - 주자가 쌓이면 한 방에 크게 내주는 쪽에 가깝습니다`);
+    extra.push(`뜬공 비중이 ${pct(p.fbRate)}라, 주자가 쌓이면 한 방에 크게 내줄 수 있습니다`);
   }
   if (p.sv >= 10) extra.push(`세이브 ${p.sv}개로 뒷문을 맡고 있습니다`);
   else if (p.hld >= 10) extra.push(`홀드 ${p.hld}개로 중간을 이어 왔습니다`);
