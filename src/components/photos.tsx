@@ -19,9 +19,9 @@
 // 키를 하나씩 나열한다. Record 로 두면 구단이 빠졌을 때 타입에러로 잡힌다.
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, ClipPath, G, Path } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Ellipse, G, Path, Rect } from 'react-native-svg';
 
-import type { Colorway } from '../goods';
+import type { Colorway, MerchShape, MerchTone } from '../goods';
 import { BATTERS, OPPONENT_PITCHERS, PITCHERS } from '../roster';
 import { colors, palette, radius, spacing, typography } from '../theme';
 
@@ -359,45 +359,6 @@ const ps = StyleSheet.create({
   },
 });
 
-// ── 굿즈 사진 ─────────────────────────────────────────────────
-// 선수 사진과 같은 규칙이다 - **폴더가 곧 지도다.** 파일 이름을 굿즈 id 로 두면
-// (`assets/photo/goods/m-tee.jpg`) 코드를 고치지 않고 붙는다.
-// 넣는 것은 tools/ingest-goods-photos.js 가 한다.
-//
-// `_` 로 시작하는 파일은 상품이 아니다 - 출처 기록(_sources.json)이 같은 폴더에 산다.
-// 사진과 출처를 떼어 놓으면 한쪽만 옮겨지는 사고가 나므로 접두사 하나로 가른다.
-// (검수용 대조표는 무겁고 상품도 아니라 .tmp 에 쓴다 - 여기 두면 번들에 실린다)
-//
-// 거르는 자리가 **정규식**인 것이 중요하다. require.context 는 걸린 파일을 전부
-// 번들에 넣으므로, 읽은 뒤에 코드로 건너뛰면 화면에 안 나오면서 용량만 먹는다.
-// 대조표 한 장이 상품 사진 열다섯 장보다 크다.
-//
-// ⚠ **이 사진들은 한화 굿즈가 아니다.** 같은 종류의 일반 상품 사진이고, 자리와 크기와
-//   격자 리듬을 증명하는 것이 목적이다. 출처·저작자·라이선스는 SOURCES.md 가 갖는다 -
-//   CC BY·CC BY-SA 는 저작자 표시가 **의무**다. 실서비스에서는 구단 촬영본으로 전부
-//   갈아 끼운다.
-const GOODS_FILES = require.context(
-  '../../assets/photo/goods',
-  false,
-  /^\.\/[^_].*\.(jpg|jpeg|png|webp)$/,
-);
-
-const GOODS_PHOTOS: Partial<Record<string, ImageSourcePropType>> = {};
-for (const key of GOODS_FILES.keys()) {
-  const base = key.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
-  GOODS_PHOTOS[base] = GOODS_FILES<ImageSourcePropType>(key);
-}
-
-/**
- * 굿즈 사진 - 없으면 undefined 다.
- *
- * 폴백을 여기서 정하지 않는다. 격자 타일과 상세는 빈 자리를 다르게 메워야 하는데,
- * 여기서 하나로 정해 버리면 쓰는 쪽이 그것을 되돌릴 방법이 없다.
- */
-export function goodsPhoto(id: string): ImageSourcePropType | undefined {
-  return GOODS_PHOTOS[id];
-}
-
 // ── 유니폼 그림 ───────────────────────────────────────────────
 /**
  * 유니폼 앞판.
@@ -505,6 +466,221 @@ export function JerseyArt({ colorway, height = 132 }: { colorway: Colorway; heig
 }
 
 /**
+ * 굿즈 그림 - 기타 굿즈 열다섯 칸.
+ *
+ * ── 왜 사진이 아닌가 ────────────────────────────────────────
+ * 한때 커먼즈에서 같은 종류의 일반 상품 사진을 받아 넣었다. 자리와 크기는 증명됐지만
+ * **열다섯 칸이 전부 남의 물건**이었다 - 배경도 조명도 각도도 제각각이라 격자가 한 벌로
+ * 묶이지 않고, 무엇보다 우리 굿즈로 읽히지 않았다.
+ *
+ * 유니폼과 같은 결론으로 돌아온다. **형태는 지어내는 것이 아니고**(타월은 타월이고
+ * 머그는 머그다) 색은 구단 CI 다. 그리면 거짓이 되지 않으면서 열다섯 칸이 같은 손으로
+ * 그린 한 벌이 된다 - 카탈로그에서 그 통일감이 곧 브랜드다.
+ *
+ * ⚠ 실서비스에서는 상품 촬영본으로 갈아 끼운다. 그때도 shape·tone 은 자료에 남는다.
+ */
+interface MerchPaint {
+  body: string;
+  trim: string;
+  /** 밝은 물건에만 - 흰 물건을 밝은 면에 두면 형태가 사라진다 */
+  edge?: string;
+}
+
+const MERCH_TONES: Record<MerchTone, MerchPaint> = {
+  brand: { body: colors.brand, trim: palette.navy[900] },
+  navy: { body: palette.navy[900], trim: colors.brand },
+  white: { body: '#FFFFFF', trim: colors.brand, edge: palette.navy[200] },
+};
+
+/** 밝은 물건의 외곽선. 색이 없으면 stroke 를 아예 걸지 않는다 */
+function edgeOf(c: MerchPaint) {
+  return c.edge ? { stroke: c.edge, strokeWidth: 1.5 } : {};
+}
+
+function MerchShapeArt({ shape, c }: { shape: MerchShape; c: MerchPaint }) {
+  const e = edgeOf(c);
+  switch (shape) {
+    // ── 응원용품 ───────────────────────────────────────────
+    case 'balloon':
+      // 한 짝을 그려 두 번 놓는다. 막대풍선은 늘 두 개가 한 벌이다
+      return (
+        <>
+          {[
+            { x: 42, y: 46, fill: c.body },
+            { x: 78, y: 52, fill: c.trim },
+          ].map((b) => (
+            <G key={b.x} transform={'translate(' + b.x + ' ' + b.y + ')'}>
+              <Path d="M0 -34c9 0 15 12 15 30S9 26 0 26-15 14-15-4-9-34 0-34z" fill={b.fill} />
+              <Path d="M-5 25h10l-5 12z" fill={b.fill} />
+              <Path d="M0 37v28" stroke={b.fill} strokeWidth={3} strokeLinecap="round" />
+            </G>
+          ))}
+        </>
+      );
+    case 'towel':
+      return (
+        <>
+          <Rect x={22} y={28} width={76} height={58} rx={6} fill={c.body} {...e} />
+          <Rect x={22} y={46} width={76} height={13} fill={c.trim} />
+          {/* 술 - 수건이 아니라 응원 타월로 읽게 하는 것이 이 일곱 가닥이다 */}
+          {[28, 38, 48, 58, 68, 78, 88].map((x) => (
+            <Path
+              key={x}
+              d={'M' + x + ' 86v10'}
+              stroke={c.trim}
+              strokeWidth={3}
+              strokeLinecap="round"
+            />
+          ))}
+        </>
+      );
+    case 'clapper':
+      return (
+        <>
+          <G transform="rotate(-11 60 98)">
+            <Rect x={34} y={26} width={22} height={72} rx={11} fill={c.body} {...e} />
+          </G>
+          <G transform="rotate(11 60 98)">
+            <Rect x={64} y={26} width={22} height={72} rx={11} fill={c.trim} />
+          </G>
+        </>
+      );
+
+    // ── 모자 ───────────────────────────────────────────────
+    case 'cap':
+      return (
+        <>
+          <Path d="M26 72a34 32 0 0 1 68 0z" fill={c.body} {...e} />
+          <Circle cx={60} cy={42} r={4} fill={c.trim} />
+          <Rect x={26} y={72} width={68} height={7} fill={c.trim} />
+          {/* 챙이 없으면 그냥 반구다. 야구모자를 야구모자로 만드는 것은 챙이다 */}
+          <Path d="M94 72c10 0 16 3 16 7s-6 7-16 7H64c0-9 12-14 30-14z" fill={c.trim} />
+        </>
+      );
+    case 'bucket':
+      return (
+        <>
+          <Path d="M38 32h44l7 46H31z" fill={c.body} {...e} />
+          <Ellipse cx={60} cy={82} rx={45} ry={11} fill={c.trim} />
+        </>
+      );
+
+    // ── 수집 ───────────────────────────────────────────────
+    case 'keyring':
+      return (
+        <>
+          <Circle cx={60} cy={28} r={13} fill="none" stroke={c.trim} strokeWidth={5} />
+          <Rect x={38} y={44} width={44} height={52} rx={9} fill={c.body} {...e} />
+          <Circle cx={60} cy={55} r={4.5} fill={c.trim} />
+        </>
+      );
+    case 'badge':
+      return (
+        <>
+          <Circle cx={60} cy={58} r={32} fill={c.body} {...e} />
+          <Circle cx={60} cy={58} r={23} fill="none" stroke={c.trim} strokeWidth={4} />
+          <Circle cx={60} cy={58} r={9} fill={c.trim} />
+        </>
+      );
+    case 'pack':
+      return (
+        <>
+          <Path d="M32 30h56v60a8 8 0 0 1 -8 8H40a8 8 0 0 1 -8-8z" fill={c.body} {...e} />
+          {/* 뜯는 자리 - 랜덤팩은 뜯기 전까지 모르는 것이 물건의 성질이다 */}
+          <Rect x={32} y={30} width={56} height={12} fill={c.trim} />
+          <Rect x={44} y={50} width={32} height={40} rx={4} fill={c.trim} opacity={0.35} />
+        </>
+      );
+    case 'sticker':
+      return (
+        <>
+          <Rect x={24} y={26} width={72} height={68} rx={9} fill={c.body} {...e} />
+          <Circle cx={45} cy={47} r={11} fill={c.trim} />
+          <Rect x={64} y={38} width={22} height={19} rx={5} fill={c.trim} opacity={0.55} />
+          <Path d="M38 68h20l-10 16z" fill={c.trim} opacity={0.75} />
+          <Rect x={64} y={66} width={22} height={16} rx={4} fill={c.trim} opacity={0.35} />
+        </>
+      );
+
+    // ── 리빙 ───────────────────────────────────────────────
+    case 'tumbler':
+      return (
+        <>
+          <Path d="M42 36h36l-5 62a8 8 0 0 1 -8 8H55a8 8 0 0 1 -8-8z" fill={c.body} {...e} />
+          <Rect x={38} y={24} width={44} height={15} rx={7} fill={c.trim} />
+          <Rect x={44} y={58} width={32} height={11} fill={c.trim} opacity={0.35} />
+        </>
+      );
+    case 'mug':
+      return (
+        <>
+          <Path d="M32 34h46v52a12 12 0 0 1 -12 12H44a12 12 0 0 1 -12-12z" fill={c.body} {...e} />
+          <Path
+            d="M78 48h7a15 15 0 0 1 0 30h-7"
+            fill="none"
+            stroke={c.trim}
+            strokeWidth={8}
+            strokeLinecap="round"
+          />
+          <Rect x={32} y={34} width={46} height={11} fill={c.trim} />
+        </>
+      );
+    case 'blanket':
+      // 접힌 결이 없으면 그냥 네모다. 담요는 '접혀 있는 것'으로 알아본다
+      return (
+        <>
+          <Rect x={22} y={38} width={76} height={20} rx={7} fill={c.trim} {...e} />
+          <Rect x={26} y={55} width={68} height={21} rx={7} fill={c.body} {...e} />
+          <Rect x={30} y={73} width={60} height={21} rx={7} fill={c.trim} {...e} />
+        </>
+      );
+
+    // ── 패션 ───────────────────────────────────────────────
+    case 'hoodie':
+      return (
+        <>
+          <Path d={JERSEY_BODY} fill={c.body} {...e} strokeLinejoin="round" />
+          {/* 후드가 목 뒤로 넘어가 있다. 이것 하나로 티셔츠와 갈린다 */}
+          <Path d="M44 21Q60 2 76 21Q60 33 44 21z" fill={c.trim} />
+          <Path d="M60 30V104" stroke={c.trim} strokeWidth={3} strokeLinecap="round" />
+          <Circle cx={52} cy={41} r={2.6} fill={c.trim} />
+          <Circle cx={68} cy={41} r={2.6} fill={c.trim} />
+        </>
+      );
+    case 'tee':
+      return (
+        <>
+          <Path d={JERSEY_BODY} fill={c.body} {...e} strokeLinejoin="round" />
+          {/* 라운드넥 - 유니폼의 칼라와 같은 자리지만 앞섶이 없다 */}
+          <Path
+            d={JERSEY_COLLAR}
+            fill="none"
+            stroke={c.trim}
+            strokeWidth={7}
+            strokeLinecap="round"
+          />
+        </>
+      );
+  }
+}
+
+export function MerchArt({
+  shape,
+  tone,
+  height = 116,
+}: {
+  shape: MerchShape;
+  tone: MerchTone;
+  height?: number;
+}) {
+  return (
+    <Svg width={height} height={height} viewBox="0 0 120 120">
+      <MerchShapeArt shape={shape} c={MERCH_TONES[tone]} />
+    </Svg>
+  );
+}
+
+/**
  * 구장 히어로 - 사진 위에 글자를 얹는 자리.
  *
  * 사진 위 텍스트는 사진이 밝든 어둡든 읽혀야 하므로 어두운 오버레이를 깐다.
@@ -580,11 +756,14 @@ const s = StyleSheet.create({
  * 방식이고 촬영 비용도 크지 않다. 지금은 확보한 자산(모자·엠블럼)으로 자리만 증명한다.
  */
 export function GoodsShowcase({
-  goodsId,
+  shape,
+  tone,
   kind = 'emblem',
 }: {
   /** 이 굿즈의 사진을 돌린다. 사진이 없으면 아래 kind 의 자산으로 떨어진다 */
-  goodsId?: string;
+  /** 굿즈면 그 형태와 색 - 그림을 돌린다 */
+  shape?: MerchShape;
+  tone?: MerchTone;
   kind?: 'cap' | 'emblem';
 }) {
   const [t] = useState(() => new Animated.Value(0));
@@ -609,25 +788,28 @@ export function GoodsShowcase({
   });
   const bob = t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -4, 0] });
 
-  const photo = goodsId ? GOODS_PHOTOS[goodsId] : undefined;
+  const art = shape !== undefined && tone !== undefined;
 
   return (
     <View style={gs.stage}>
       {/* 받침 그림자 - 물체가 옆면을 지날 때 같이 좁아진다 */}
       <Animated.View style={[gs.shadow, { transform: [{ scaleX: turn }] }]} />
-      <Animated.Image
-        source={
-          photo ??
-          (kind === 'cap'
-            ? require('../../assets/logo/cap-2025.png')
-            : require('../../assets/logo/emblem-2025.png'))
-        }
-        resizeMode="contain"
-        style={[gs.item, { transform: [{ scaleX: turn }, { translateY: bob }] }]}
-      />
-      {/* 실제 촬영본이 오기 전까지 도는 것은 한 컷이다. 사진이 들어와 있는 자리에서
-          '360° 전시'라고 쓰면 화면이 자기 능력을 부풀린다 */}
-      <Text style={gs.hint}>{photo ? '상품 이미지' : '360° 전시'}</Text>
+      {art ? (
+        <Animated.View style={{ transform: [{ scaleX: turn }, { translateY: bob }] }}>
+          <MerchArt shape={shape} tone={tone} height={128} />
+        </Animated.View>
+      ) : (
+        <Animated.Image
+          source={
+            kind === 'cap'
+              ? require('../../assets/logo/cap-2025.png')
+              : require('../../assets/logo/emblem-2025.png')
+          }
+          resizeMode="contain"
+          style={[gs.item, { transform: [{ scaleX: turn }, { translateY: bob }] }]}
+        />
+      )}
+      <Text style={gs.hint}>360° 전시</Text>
     </View>
   );
 }

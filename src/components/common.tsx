@@ -123,6 +123,7 @@ export function SectionCard({
   padded,
   children,
   style,
+  fold,
 }: {
   title: string;
   right?: ReactNode;
@@ -131,17 +132,46 @@ export function SectionCard({
   padded?: boolean;
   children: ReactNode;
   style?: ViewStyle;
+  /**
+   * 눌러서 여는 카드로 만든다. `'closed'` 면 접힌 채로 시작한다.
+   *
+   * 카드가 스스로 접힘 상태를 갖는다 - 쓰는 쪽에 useState 를 하나씩 두면 화면마다
+   * 여닫는 규칙이 조금씩 달라지고, 그 차이가 **뜻으로 읽힌다.**
+   */
+  fold?: 'open' | 'closed';
 }) {
+  const [open, setOpen] = useState(fold !== 'closed');
+  const shown = fold === undefined || open;
+
+  const head = (
+    <View style={s.sectionCardHead}>
+      <View style={s.sectionTitleWrap}>
+        <Text style={s.sectionTitle}>{title}</Text>
+        {presenter ? <Text style={s.presenter}>presented by {presenter}</Text> : null}
+      </View>
+      {right}
+      {/* 꺾쇠는 오른쪽 끝이다. right 앞에 두면 값과 손잡이가 뒤섞여 무엇을 누르는
+          것인지 흐려진다 */}
+      {fold ? <Text style={s.foldCaret}>{open ? '⌃' : '⌄'}</Text> : null}
+    </View>
+  );
+
   return (
     <View style={[s.sectionCard, style]}>
-      <View style={s.sectionCardHead}>
-        <View style={s.sectionTitleWrap}>
-          <Text style={s.sectionTitle}>{title}</Text>
-          {presenter ? <Text style={s.presenter}>presented by {presenter}</Text> : null}
-        </View>
-        {right}
-      </View>
-      <View style={padded ? s.sectionCardBody : undefined}>{children}</View>
+      {fold ? (
+        <Pressable
+          onPress={() => setOpen((v) => !v)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={`${title} ${open ? '접기' : '펼치기'}`}
+          style={({ pressed }) => (pressed ? states.pressed : undefined)}
+        >
+          {head}
+        </Pressable>
+      ) : (
+        head
+      )}
+      {shown ? <View style={padded ? s.sectionCardBody : undefined}>{children}</View> : null}
     </View>
   );
 }
@@ -1291,6 +1321,7 @@ const s = StyleSheet.create({
   sectionCardBody: { padding: spacing.cardPad, gap: spacing.md },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitleWrap: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, flexWrap: 'wrap' },
+  foldCaret: { ...typography.micro, fontSize: 13, width: 12, textAlign: 'center' },
   sectionTitle: typography.sectionHeader,
   presenter: { ...typography.micro, marginLeft: spacing.sm },
 

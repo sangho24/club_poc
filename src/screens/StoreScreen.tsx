@@ -33,7 +33,7 @@
 //
 // ⚠ 결제는 앱에서 하지 않는다 - 공식몰로 리다이렉트한다 (5번 티켓과 같은 원칙).
 import { FC, useMemo, useState } from 'react';
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { SvgProps } from 'react-native-svg';
 
 import GridIcon from '../../assets/icons/goods-grid.svg';
@@ -60,11 +60,11 @@ import {
 import {
   GoodsShowcase,
   JerseyArt,
+  MerchArt,
   PhotoHeader,
   PlayerAvatar,
   PlayerShot,
   TeamEmblem,
-  goodsPhoto,
   stadiumPhoto,
 } from '../components/photos';
 import {
@@ -399,13 +399,10 @@ function VenueTab({
         />
         <Text style={st.body}>
           {checkedIn
-            ? '오늘 경기 입장이 확인되었습니다. 오늘의 카드를 선점할 수 있습니다.'
-            : '오늘의 카드는 경기장에 온 분만 살 수 있습니다. 입장 게이트에서 찍은 티켓과 현재 위치로 확인합니다.'}
+            ? '오늘 경기 입장이 확인되었습니다.'
+            : '오프라인 경기 인증자만 구매 가능합니다.'}
         </Text>
         {checkedIn ? null : <Button label="구장에서 입장 인증" onPress={onCheckIn} full />}
-        <Text style={st.footNote}>
-          지난 경기 카드는 인증이 필요 없습니다 - MY 탭의 직관 기록이 그날 자리를 대신 증명합니다.
-        </Text>
       </Card>
 
       {today.length > 0 ? (
@@ -1336,7 +1333,6 @@ function MerchTile({ item, onOpen }: { item: Merch; onOpen: (m: Merch) => void }
 
   // 사진이 붙는 순간 이 격자는 재고표에서 카탈로그가 된다. 유니폼·포토카드와 같은
   // 서식을 쓴다 - 같은 탭 안에서 갈래마다 타일이 다르게 생기면 그 차이가 뜻으로 읽힌다
-  const photo = goodsPhoto(item.id);
   const out = item.soldOutOptions ?? [];
   // 발매 전이면 남은 시간이, 판매 중이면 선택지 사정이 팬이 다음에 물을 것이다
   const meta =
@@ -1358,11 +1354,7 @@ function MerchTile({ item, onOpen }: { item: Merch; onOpen: (m: Merch) => void }
       accessibilityLabel={`${item.name} ${item.price.toLocaleString()}원`}
     >
       <View style={st.gridStage}>
-        {photo ? (
-          <Image source={photo} style={st.gridPhoto} resizeMode="cover" />
-        ) : (
-          <TeamEmblem team="HH" size={46} />
-        )}
+        <MerchArt shape={item.shape} tone={item.tone} height={116} />
         {badge ? (
           <View style={st.gridBadge}>
             <Badge text={badge.text} tone={badge.tone} />
@@ -1444,7 +1436,7 @@ function MerchSheet({
     >
       {item ? (
         <>
-          <GoodsShowcase goodsId={item.id} kind="cap" />
+          <GoodsShowcase shape={item.shape} tone={item.tone} />
 
           <View style={{ marginTop: spacing.cardGap }}>
             <Card>
@@ -1751,7 +1743,6 @@ const st = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: spacing.sm,
   },
-  gridPhoto: { width: '100%', height: '100%' },
   gridBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm },
   gridKind: { ...typography.micro, fontWeight: '400', color: colors.mutedText },
   gridName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19, marginTop: 2 },

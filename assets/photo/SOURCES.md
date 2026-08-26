@@ -78,54 +78,6 @@
 
 ---
 
-## 굿즈 사진 (`goods/`) - **데모 대체 이미지**
-
-키는 `src/goods.ts` 의 굿즈 id 다. 파일 이름만 맞으면 붙는다(`GOODS_PHOTOS`, `src/components/photos.tsx`).
-
-> ### ⚠ 이 사진들은 한화 굿즈가 아니다
->
-> **전부 같은 종류의 일반 상품 사진이다.** 한화 굿즈의 자유 라이선스 촬영본은 커먼즈에 없고,
-> 구단 상품 컷은 저작권이 구단에 있어 받지 않았다(이 문서 맨 위의 수집 규칙).
->
-> 이 사진들이 증명하는 것은 **상품이 아니라 자리**다 - 격자에 사진이 들어갔을 때의 리듬과
-> 크기, 상세 시트의 전시 자리. 시연에서 "이게 실제 굿즈냐"는 질문이 나오면 아니라고 답해야 한다.
->
-> 실서비스에서는 구단 촬영본으로 **파일만 갈아 끼운다** - 코드는 고치지 않는다.
-
-수집·크롭은 [`tools/ingest-goods-photos.js`](../../tools/ingest-goods-photos.js) 가 한다.
-검색 1등을 그대로 쓰지 않고 **사람이 지목한 파일**을 받는다(도구의 `PICKS`) - 커먼즈 검색은
-"towel" 에 두루마리 화장지를, "orange cap" 에 주황색 버섯 갓과 동명이인의 초상을 물어 왔다.
-가운데 기준으로 정사각 크롭 후 420x420, 품질 82.
-
-| 파일 | 굿즈 | 무엇이 찍혔나 | 출처 | 저작자 | 라이선스 |
-|---|---|---|---|---|---|
-| `m-balloon.jpg` | 응원 막대풍선 | 일본 야구장의 제트풍선 - KBO 막대풍선과 같은 물건 | [ジェット風船 待機中 (27456227231).jpg](https://commons.wikimedia.org/wiki/File:%E3%82%B8%E3%82%A7%E3%83%83%E3%83%88%E9%A2%A8%E8%88%B9_%E5%BE%85%E6%A9%9F%E4%B8%AD_(27456227231).jpg) | Masahiro TAKAGI | CC BY 2.0 |
-| `m-towel.jpg` | 응원 타월 | 개어 놓은 수건 | [Good morning towels.jpg](https://commons.wikimedia.org/wiki/File:Good_morning_towels.jpg) | ProjectManhattan | CC BY-SA 3.0 |
-| `m-clapper.jpg` | 클래퍼 | 응원 도구 모음 (호루라기·마라카스) | [Noisemakers.jpg](https://commons.wikimedia.org/wiki/File:Noisemakers.jpg) | Hyaya | CC BY-SA 4.0 |
-| `m-cap-home.jpg` | 2026 정모 (홈) | 무지 야구모자 | [Baseball cap.jpg](https://commons.wikimedia.org/wiki/File:Baseball_cap.jpg) | TexasRebel | Public domain |
-| `m-cap-orange.jpg` | 볼캡 (오렌지) | 붉은 계열 야구모자 | [Baseball-Cap-c.jpg](https://commons.wikimedia.org/wiki/File:Baseball-Cap-c.jpg) | Me | CC0 |
-| `m-bucket.jpg` | 버킷햇 | 버킷햇 | [Bucket Hat.jpg](https://commons.wikimedia.org/wiki/File:Bucket_Hat.jpg) | Motoguo20 | CC BY-SA 4.0 |
-| `m-keyring.jpg` | 아크릴 키링 | 아크릴 키링 | [Key ring 1.jpg](https://commons.wikimedia.org/wiki/File:Key_ring_1.jpg) | NNU-11-Zaclee | CC BY-SA 3.0 |
-| `m-badge.jpg` | 핀 뱃지 | 에나멜 핀 뱃지 | [CCS Pin Badge.jpg](https://commons.wikimedia.org/wiki/File:CCS_Pin_Badge.jpg) | Barry rimmer | CC BY-SA 3.0 |
-| `m-pcpack.jpg` | 포토카드 랜덤팩 | 1909년 야구 카드 (Honus Wagner) | [HonusWagnerCard.jpg](https://commons.wikimedia.org/wiki/File:HonusWagnerCard.jpg) | Published by the American Tobacco Compan… | Public domain |
-| `m-tumbler.jpg` | 보온 텀블러 | 보온병 | [Thermos closed - Thermos fermé.JPG](https://commons.wikimedia.org/wiki/File:Thermos_closed_-_Thermos_ferm%C3%A9.JPG) | Migmoug | CC BY-SA 4.0 |
-| `m-mug.jpg` | 머그컵 | 도자 머그컵 | [Ceramic mug antisky ceramic.jpg](https://commons.wikimedia.org/wiki/File:Ceramic_mug_antisky_ceramic.jpg) | Ethan8808 | CC BY-SA 4.0 |
-| `m-blanket.jpg` | 무릎담요 | 니트 담요 | [Grey knitted blanket.jpg](https://commons.wikimedia.org/wiki/File:Grey_knitted_blanket.jpg) | Hannah Clover | CC BY-SA 4.0 |
-| `m-hoodie.jpg` | 후드 집업 | 매장에 걸린 후드 | [Bookstore - Hoodies for sale - Tulane University 2008.jpg](https://commons.wikimedia.org/wiki/File:Bookstore_-_Hoodies_for_sale_-_Tulane_University_2008.jpg) | Tulane Public Relations | CC BY 2.0 |
-| `m-tee.jpg` | 반팔 티셔츠 | 흰 반팔 티셔츠 | [White simple T-shirt made by COQ manufacture.jpg](https://commons.wikimedia.org/wiki/File:White_simple_T-shirt_made_by_COQ_manufacture.jpg) | COQ Brand | CC BY-SA 4.0 |
-| `m-sticker.jpg` | 스티커 팩 | 스티커 시트 | [3D-Aufkleber Gel-Aufkleber.jpg](https://commons.wikimedia.org/wiki/File:3D-Aufkleber_Gel-Aufkleber.jpg) | PhilipposZ | CC0 |
-
-기계가 읽을 원본은 [`goods/_sources.json`](goods/_sources.json) 이다. 도구가 돌 때마다 다시 쓴다.
-
-### 눈으로 걸러 낸 것
-
-- **오렌지 볼캡**: 자유 라이선스 오렌지 모자 상품 컷이 커먼즈에 없다. 가장 가까운 붉은 계열로
-  자리만 채웠다 - **색이 상품명과 어긋난다.** 실제 촬영본이 들어오면 가장 먼저 갈아야 할 한 장이다.
-- **클래퍼**: 처음 고른 썬더스틱 사진은 농구장 관중석이 화면의 9할이라 물건이 아니라 장면으로
-  읽혔다. 격자 타일에서는 상품 컷이어야 한다.
-- **모자·후드·티셔츠**: 다른 학교·브랜드의 마크가 찍혀 있다. 데모로는 넘어가지만
-  **외부 공개 자료에는 쓰지 않는다.**
-
 ## 구장 사진 (`stadium/`)
 
 `kbo_poc` 에서 이관했다. 원 출처 기록은 [`SOURCES-kbo.md`](SOURCES-kbo.md) 에 있다.

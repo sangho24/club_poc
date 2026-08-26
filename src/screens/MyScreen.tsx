@@ -107,6 +107,10 @@ function TicketCard({
       title={`${shortDate(ticket.date)} (${weekdayOf(ticket.date)}) ${game.opponent}전`}
       right={<Text style={st.dday}>{ddayLabel(ticket.date, nowMs)}</Text>}
       padded
+      /* 접힌 채로 시작한다. 표가 급한 것은 **경기 당일**이고 그날은 D-0 만 보면 된다 -
+         평소에 바코드와 게이트와 쿠폰까지 펼쳐 두면 MY 를 열 때마다 그 세 덩어리가
+         프로필보다 먼저 온다. 머리에 날짜·상대·D-day 가 이미 있어 접혀도 표는 보인다 */
+      fold="closed"
     >
       <View style={st.ticketHead}>
         <View style={{ flex: 1, gap: 2 }}>
@@ -331,8 +335,11 @@ export function MyScreen({
           ) : null}
         </SectionCard>
 
-        {/* ── 알림 - 온보딩 STEP 3 와 같은 부품 ──────────────── */}
-        <SectionCard title="알림">
+        {/* ── 알림 - 온보딩 STEP 3 와 같은 부품 ────────────────
+            스위치 셋을 펼쳐 두면 **바꿀 일이 없는 날에도** 늘 자리를 차지한다.
+            알림은 온보딩에서 한 번 정하고 그 뒤로는 거의 안 건드리는 값이라,
+            평소에는 제목 한 줄로 접어 두고 누른 사람에게만 연다 ── */}
+        <SectionCard title="알림" fold="closed">
           <Row>
             <View style={{ flex: 1 }}>
               <AlertToggle
@@ -431,9 +438,13 @@ export function MyScreen({
                 </Text>
                 <Text style={st.gameSeat}>{r.seat}</Text>
               </View>
-              <Text style={[st.gameResult, { color: r.result === 'W' ? colors.win : colors.lose }]}>
-                {r.result === 'W' ? '승' : '패'}
-              </Text>
+              <View style={st.gameResultBox}>
+                <Text
+                  style={[st.gameResult, { color: r.result === 'W' ? colors.win : colors.lose }]}
+                >
+                  {r.result === 'W' ? '승' : '패'}
+                </Text>
+              </View>
             </View>
           ))}
         </GroupCard>
@@ -594,8 +605,19 @@ const st = StyleSheet.create({
   logRow: { paddingHorizontal: 0, paddingVertical: 0 },
   logLabel: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
 
-  gameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 10 },
+  // ⚠ GroupCard 에는 좌우 여백이 없다 - Row 가 paddingHorizontal 로 대신 준다.
+  // 이 행은 Row 가 아니라 View 라 그것을 직접 주지 않으면 날짜와 승/패가 카드 양 끝에
+  // 그대로 붙는다
+  gameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.cardPad,
+    paddingVertical: 10,
+  },
   gameDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  // 승/패는 폭이 흔들리지 않아야 한다 - 한 글자라도 오른쪽 끝이 들쭉날쭉하면 목록이 흔들린다
+  gameResultBox: { minWidth: 20, alignItems: 'flex-end' },
   gameDate: { ...typography.caption, ...tabularFigures, width: 40 },
   gameTitle: { ...typography.bodyStrong, fontSize: 14 },
   gameSeat: typography.micro,

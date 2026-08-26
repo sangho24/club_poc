@@ -560,6 +560,36 @@ export function milestoneProgress(m: Milestone, nowMs: number): MilestoneProgres
  */
 export type Colorway = 'home' | 'away' | 'alt' | 'heritage' | 'youth';
 
+/**
+ * 굿즈 그림의 형태와 색.
+ *
+ * 유니폼의 `colorway` 와 같은 자리다 - **그림이 아니라 자료가 갖는다.** 물건의
+ * 생김새는 상품의 사실이고, 실서비스에서 촬영본으로 바뀌어도 "무엇처럼 생겼나"는
+ * 그대로 남는다.
+ *
+ * 사진을 받아 쓰지 않는 이유는 유니폼과 같다 - 주워 온 사진은 전부 **남의 물건**이라
+ * 격자에서 우리 굿즈로 읽히지 않는다. 형태는 지어내는 것이 아니고(타월은 타월이다)
+ * 색은 구단 CI 라, 그리면 거짓이 되지 않으면서 열다섯 칸이 한 벌로 묶인다.
+ */
+export type MerchShape =
+  | 'balloon'
+  | 'towel'
+  | 'clapper'
+  | 'cap'
+  | 'bucket'
+  | 'keyring'
+  | 'badge'
+  | 'pack'
+  | 'sticker'
+  | 'tumbler'
+  | 'mug'
+  | 'blanket'
+  | 'hoodie'
+  | 'tee';
+
+/** 굿즈 그림의 바탕색. 열다섯 칸이 전부 오렌지면 격자가 한 덩어리로 뭉친다 */
+export type MerchTone = 'brand' | 'navy' | 'white';
+
 export interface Uniform {
   id: string;
   name: string;
@@ -713,6 +743,9 @@ export interface Merch {
   kind: string;
   /** 언제 쓰는 물건인가 - 유니폼의 wear 자리. 고르는 진짜 기준이다 */
   use: string;
+  /** 격자·상세에 그릴 형태와 색 */
+  shape: MerchShape;
+  tone: MerchTone;
   price: number;
   /**
    * 고를 것의 이름 - '사이즈' · '색상' · '구성' · '선수' 중 하나.
@@ -741,6 +774,8 @@ export const MERCH: Merch[] = [
     group: '응원용품',
     kind: '응원도구',
     use: '홈 경기 · 공격 이닝',
+    shape: 'balloon',
+    tone: 'brand',
     price: 5000,
     status: 'onsale',
     note: '구장 매점에서도 같은 값에 팝니다. 공기 주입기는 응원석 입구에 있습니다.',
@@ -751,6 +786,8 @@ export const MERCH: Merch[] = [
     group: '응원용품',
     kind: '응원도구',
     use: '홈·원정 공통',
+    shape: 'towel',
+    tone: 'white',
     price: 18000,
     optionLabel: '색상',
     options: ['오렌지', '네이비'],
@@ -763,6 +800,8 @@ export const MERCH: Merch[] = [
     group: '응원용품',
     kind: '응원도구',
     use: '홈 경기 · 응원단상 구역',
+    shape: 'clapper',
+    tone: 'brand',
     price: 8000,
     status: 'lowstock',
     note: '막대풍선보다 소리가 크고 자리를 덜 차지합니다. 내야 상단석에서 많이 씁니다.',
@@ -774,6 +813,8 @@ export const MERCH: Merch[] = [
     group: '모자',
     kind: '정모',
     use: '홈 경기 · 선수단 착용 사양',
+    shape: 'cap',
+    tone: 'white',
     price: 45000,
     optionLabel: '사이즈',
     options: ['55', '57', '59', '61'],
@@ -787,6 +828,8 @@ export const MERCH: Merch[] = [
     group: '모자',
     kind: '볼캡',
     use: '일상 · 경기장 공통',
+    shape: 'cap',
+    tone: 'brand',
     price: 39000,
     optionLabel: '사이즈',
     options: ['프리'],
@@ -799,6 +842,8 @@ export const MERCH: Merch[] = [
     group: '모자',
     kind: '버킷햇',
     use: '한여름 낮 경기',
+    shape: 'bucket',
+    tone: 'navy',
     price: 42000,
     optionLabel: '사이즈',
     options: ['M', 'L'],
@@ -813,6 +858,8 @@ export const MERCH: Merch[] = [
     group: '수집',
     kind: '수집품',
     use: '가방 · 열쇠고리',
+    shape: 'keyring',
+    tone: 'brand',
     price: 12000,
     optionLabel: '선수',
     options: ['노시환', '문동주', '최재훈', '류현진', '채은성', '김서현'],
@@ -826,6 +873,8 @@ export const MERCH: Merch[] = [
     group: '수집',
     kind: '한정 수집품',
     use: '모자 · 가방에 다는 것',
+    shape: 'badge',
+    tone: 'navy',
     price: 25000,
     optionLabel: '구성',
     options: ['3종 세트'],
@@ -839,6 +888,8 @@ export const MERCH: Merch[] = [
     group: '수집',
     kind: '수집품',
     use: '개봉 전까지 누가 나올지 모릅니다',
+    shape: 'pack',
+    tone: 'navy',
     price: 6000,
     optionLabel: '구성',
     options: ['3장 1팩'],
@@ -852,6 +903,8 @@ export const MERCH: Merch[] = [
     group: '리빙',
     kind: '리빙',
     use: '사계절 · 구장 반입 가능',
+    shape: 'tumbler',
+    tone: 'navy',
     price: 32000,
     optionLabel: '색상',
     options: ['네이비', '오렌지', '실버'],
@@ -865,6 +918,8 @@ export const MERCH: Merch[] = [
     group: '리빙',
     kind: '리빙',
     use: '사무실 · 집',
+    shape: 'mug',
+    tone: 'white',
     price: 19000,
     optionLabel: '색상',
     options: ['화이트', '네이비'],
@@ -877,6 +932,8 @@ export const MERCH: Merch[] = [
     group: '리빙',
     kind: '리빙',
     use: '9월 이후 야간 경기',
+    shape: 'blanket',
+    tone: 'brand',
     price: 29000,
     status: 'upcoming',
     openAt: '2026-09-01T14:00:00+09:00',
@@ -889,6 +946,8 @@ export const MERCH: Merch[] = [
     group: '패션',
     kind: '아우터',
     use: '봄·가을 경기 · 일상',
+    shape: 'hoodie',
+    tone: 'navy',
     price: 89000,
     optionLabel: '사이즈',
     options: ['S', 'M', 'L', 'XL', '2XL'],
@@ -902,6 +961,8 @@ export const MERCH: Merch[] = [
     group: '패션',
     kind: '상의',
     use: '여름 경기 · 일상',
+    shape: 'tee',
+    tone: 'white',
     price: 39000,
     optionLabel: '사이즈',
     options: ['S', 'M', 'L', 'XL', '2XL'],
@@ -914,6 +975,8 @@ export const MERCH: Merch[] = [
     group: '패션',
     kind: '수집품',
     use: '노트북 · 텀블러에 붙이는 것',
+    shape: 'sticker',
+    tone: 'brand',
     price: 7000,
     optionLabel: '구성',
     options: ['12장 1팩'],
