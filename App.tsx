@@ -14,7 +14,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
 
-import { GamedayScreen } from './src/screens/GamedayScreen';
+import { GamedayScreen, Sub } from './src/screens/GamedayScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LiveScreen } from './src/screens/LiveScreen';
 import { MyScreen } from './src/screens/MyScreen';
@@ -54,6 +54,8 @@ const TABS: { key: TabKey; label: string; icon: TabIconName }[] = [
 
 export default function App() {
   const [tab, setTab] = useState<TabKey>('home');
+  // 직관 탭의 서브탭. MY 의 쿠폰이 후원의 집을 바로 열 수 있어야 해서 여기 둔다
+  const [gamedaySub, setGamedaySub] = useState<Sub>('go');
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   // 저장소를 읽기 전에 온보딩이 번쩍이면 안 된다 - 읽기가 끝날 때까지 자리표시자를 그린다
   const [boot, setBoot] = useState<'loading' | 'onboarding' | 'ready'>('loading');
@@ -163,10 +165,14 @@ export default function App() {
         ) : null}
         {tab === 'live' ? <LiveScreen profile={profile} /> : null}
         {tab === 'players' ? <PlayersScreen profile={profile} /> : null}
-        {tab === 'gameday' ? <GamedayScreen /> : null}
+        {tab === 'gameday' ? <GamedayScreen sub={gamedaySub} onSub={setGamedaySub} /> : null}
         {tab === 'store' ? <StoreScreen profile={profile} /> : null}
         {tab === 'my' ? (
           <MyScreen
+            onGoPartners={() => {
+              setGamedaySub('eat');
+              setTab('gameday');
+            }}
             profile={profile}
             onLevel={setLevel}
             onFavorite={setFavorite}

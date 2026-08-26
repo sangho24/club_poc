@@ -20,6 +20,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  StyleProp,
   Switch,
   Text,
   TextStyle,
@@ -176,7 +177,14 @@ export function Row({
   children: ReactNode;
   last?: boolean;
   onPress?: () => void;
-  style?: ViewStyle;
+  /**
+   * ⚠ `ViewStyle` 이 아니라 `StyleProp<ViewStyle>` 이다.
+   *
+   * 행에 **상태를 얹는 자리**(선택된 경기, 지난 경기)가 생기면서 `[base, on && onStyle]`
+   * 배열을 넘겨야 하는데, 좁은 타입은 그걸 막는다. 호출부가 스프레드로 우회하기 시작하면
+   * StyleSheet 가 등록한 스타일이 익명 객체로 풀려 매 렌더 새 객체가 된다.
+   */
+  style?: StyleProp<ViewStyle>;
 }) {
   const inner = <View style={[s.row, !last && s.rowDivider, style]}>{children}</View>;
   if (!onPress) return inner;

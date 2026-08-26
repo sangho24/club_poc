@@ -11,6 +11,7 @@
 //
 // 대전 한화생명 볼파크는 2025년 개장한 신구장이라 팬들이 아직 주차 요령을 모른다.
 // 그래서 이 기능의 가치가 다른 구장보다 크다.
+import { ScheduledGame, dateOf } from './game';
 
 export interface ParkingLot {
   id: string;
@@ -167,8 +168,43 @@ export const SEAT_GRADES = [
 /** 등급 id - 등급마다 하나씩 짝이 있어야 하는 표(좌석 시야 등)의 열쇠 */
 export type SeatGradeId = (typeof SEAT_GRADES)[number]['id'];
 
-/** 예매 오픈까지 남은 시간 - 시연 기준일 고정 */
-export const TICKET_OPEN_AT = '2026-08-14T14:00:00+09:00';
+/**
+ * 예매 오픈 시각 - 규칙을 계산으로 옮긴 것.
+ *
+ * 전에는 `TICKET_OPEN_AT = '2026-08-14T14:00'` 하나가 박혀 있었다. 일정이 목록으로만
+ * 있고 아무것도 누를 수 없을 때는 그걸로 충분했지만, **경기를 골라 예매로 넘어가게
+ * 되자 상수 하나로는 답할 수 없다** - 어느 경기를 눌러도 같은 날짜를 말하면 그건
+ * 규칙이 아니라 장식이다.
+ *
+ * 규칙 자체는 이미 `TICKET_CHANNEL.openRule` 에 글로 적혀 있었다(홈경기 7일 전 오후 2시).
+ * 글과 값이 따로 놀면 둘 중 무엇이 맞는지 알 수 없으므로 **값을 규칙에서 뽑는다.**
+ *
+ * ⚠ 원정 경기는 `null` 이다. 상대 구단이 파는 표라 우리 앱이 오픈 시각을 알지 못한다.
+ * '아직 안 열림'과 '우리가 팔지 않음'은 화면에서 다른 말을 해야 한다.
+ */
+export const TICKET_OPEN_LEAD_DAYS = 7;
+export const TICKET_OPEN_HOUR = 14;
+
+export function ticketOpenAt(g: ScheduledGame): number | null {
+  if (!g.home) return null;
+  const d = dateOf(g.date);
+  d.setDate(d.getDate() - TICKET_OPEN_LEAD_DAYS);
+  d.setHours(TICKET_OPEN_HOUR, 0, 0, 0);
+  return d.getTime();
+}
+
+export function isTicketOpen(g: ScheduledGame, nowMs: number): boolean {
+  const at = ticketOpenAt(g);
+  return at !== null && at <= nowMs;
+}
+
+/** '8월 18일 오후 2시' - 아직 열리지 않은 경기의 오픈 시각 */
+export function ticketOpenLabel(g: ScheduledGame): string | null {
+  const at = ticketOpenAt(g);
+  if (at === null) return null;
+  const d = new Date(at);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 오후 ${TICKET_OPEN_HOUR - 12}시`;
+}
 
 // ─────────────────────────────────────────────────────────────
 // 입장 - 구장에 도착한 뒤

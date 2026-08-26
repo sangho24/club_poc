@@ -11,7 +11,7 @@
 // ── 서브탭으로 나눈 이유 ─────────────────────────────────────
 // 처음에는 하나의 긴 스크롤이었고 그 결과 후원의 집(6번)이 최하단에 묻혀 구현 자체가
 // 안 된 것처럼 보였다. 동선은 하나지만 목적은 둘이라(오늘 갈 준비 / 어디서 먹지) 갈랐다.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -45,16 +45,26 @@ import {
   ParkingSort,
   SEAT_GRADES,
   TICKET_CHANNEL,
-  TICKET_OPEN_AT,
   TRANSIT,
+  isTicketOpen,
   kakaoMapUrl,
   minutesToStart,
   naverMapUrl,
   parkingAdvice,
   telUrl,
+  ticketOpenAt,
+  ticketOpenLabel,
 } from '../gameday';
 import { SEAT_VIEWS, SEAT_VIEW_CAPTION, seatViewUrl } from '../seatView';
-import { SCHEDULE, TODAY_GAME } from '../game';
+import {
+  DEMO_NOW,
+  SCHEDULE,
+  ScheduledGame,
+  TODAY_GAME,
+  dateOf,
+  shortDate,
+  weekdayOf,
+} from '../game';
 import { countdown } from '../goods';
 import { Partner, TIER_SPEC, couponCode, sortedPartners, todayPerks } from '../partners';
 import BringIcon from '../../assets/icons/bring.svg';
@@ -62,7 +72,14 @@ import GateIcon from '../../assets/icons/gate.svg';
 import TransitIcon from '../../assets/icons/transit.svg';
 import { colors, radius, spacing, states, tabularFigures, typography } from '../theme';
 
-type Sub = 'go' | 'eat';
+/**
+ * 서브탭.
+ *
+ * 상태를 화면 안이 아니라 App 이 든다. MY 의 조기 예매 쿠폰이 **후원의 집으로**
+ * 보내야 하는데, 화면이 스스로 'go' 로 시작해 버리면 쿠폰을 들고 넘어온 팬이
+ * 주차 안내 앞에 떨어진다 - 쓸 자리로 못 가는 쿠폰은 지갑 속 종이와 같다.
+ */
+export type Sub = 'go' | 'eat';
 
 /**
  * 눌러서 여는 참고 지면.
@@ -163,11 +180,197 @@ function GamedayIcon({ name, color }: { name: InfoKey; color: string }) {
   return <Icon width={24} height={24} color={color} />;
 }
 
-/** 시연 기준 시각 - Date.now() 를 쓰면 실행할 때마다 카운트다운이 달라진다 */
-const DEMO_NOW = Date.parse('2026-08-11T15:00:00+09:00');
+/**
+ * 일정 - 목록과 달력.
+ *
+ * ── 왜 둘 다인가 ────────────────────────────────────────────
+ * 두 화면이 아니라 **두 질문**이다. 목록은 "다음 경기가 언제지"에 답하고 순서대로 읽힌다.
+ * 달력은 "이번 달 언제 갈 수 있지"에 답한다 - 주말이 어디 있는지, 원정 구간이 며칠인지는
+ * 격자로 놓여야 보인다. 목록으로 그 질문에 답하려면 열일곱 줄을 세어야 한다.
+ *
+ * 그래서 목록은 **다음 여섯 경기**만 보여 준다. 열일곱 줄을 다 세우면 아래 예매 카드가
+ * 화면 두 개만큼 밀려나 정작 이 화면의 동선(일정 → 예매 → 주차)이 끊긴다. 잘라낸 것을
+ * 숨기지 않고 마지막 행에 적어 두고, 그 행이 달력을 여는 문이 된다.
+ */
+type ScheduleView = 'list' | 'calendar';
 
-export function GamedayScreen() {
-  const [sub, setSub] = useState<Sub>('go');
+const LIST_LIMIT = 6;
+
+const SCHEDULE_VIEWS: { key: ScheduleView; label: string }[] = [
+  { key: 'list', label: '목록' },
+  { key: 'calendar', label: '달력' },
+];
+
+function ScheduleSection({
+  view,
+  onView,
+  picked,
+  onPick,
+  nowMs,
+}: {
+  view: ScheduleView;
+  onView: (v: ScheduleView) => void;
+  picked: string;
+  onPick: (date: string) => void;
+  nowMs: number;
+}) {
+  const shown = SCHEDULE.slice(0, LIST_LIMIT);
+  const hidden = SCHEDULE.length - shown.length;
+
+  return (
+    <SectionCard
+      title="경기 일정"
+      right={<Text style={st.headNote}>{dateOf(SCHEDULE[0].date).getMonth() + 1}월</Text>}
+    >
+      <View style={st.viewToggle}>
+        <Segmented options={SCHEDULE_VIEWS} value={view} onChange={onView} />
+      </View>
+
+      {view === 'calendar' ? (
+        <MonthCalendar picked={picked} onPick={onPick} />
+      ) : (
+        <>
+          {shown.map((g, i) => {
+            const on = g.date === picked;
+            const open = isTicketOpen(g, nowMs);
+            return (
+              <Row
+                key={g.date}
+                last={i === shown.length - 1 && hidden === 0}
+                style={[st.gameRow, on && st.gameRowOn]}
+                onPress={() => onPick(g.date)}
+              >
+                <Text style={[st.gameDate, !g.home && st.gameAway, on && st.gameDateOn]}>
+                  {shortDate(g.date)}
+                  <Text style={st.gameDay}> {weekdayOf(g.date)}</Text>
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.gameOpp, !g.home && st.gameAway]}>
+                    {g.home ? `${g.opponent}전` : `${g.opponent}전 (원정)`}
+                  </Text>
+                  <Text style={st.gameTime}>
+                    {g.startTime}
+                    {g.home ? ' · 대전' : ''}
+                  </Text>
+                </View>
+                {/* ⚠ 배지는 **예외에만** 단다.
+                    처음에는 열린 경기에 '예매 중'을 달았는데, 오픈 규칙(7일 전)을 실제로
+                    계산하고 보니 가까운 홈경기는 **거의 다 열려 있다.** 다수에 배지를 달면
+                    그건 배지가 아니라 배경이고, 정작 눈이 찾아야 할 예외(아직 못 사는 날)가
+                    묻힌다. 그래서 '아직 안 열린 홈경기'만 언제 열리는지 말한다 */}
+                {g.home && !open ? (
+                  <Badge text={`${ticketOpenLabel(g)} 오픈`} tone="muted" />
+                ) : null}
+              </Row>
+            );
+          })}
+
+          {/* 잘라낸 것을 조용히 감추지 않는다. 몇 경기를 접었는지 적고,
+              그 행이 곧 달력을 여는 문이다 */}
+          {hidden > 0 ? (
+            <Row last style={st.moreRow} onPress={() => onView('calendar')}>
+              <Text style={st.moreText}>남은 {hidden}경기는 달력에서 ›</Text>
+            </Row>
+          ) : null}
+        </>
+      )}
+    </SectionCard>
+  );
+}
+
+/**
+ * 월간 달력.
+ *
+ * ── 칸에 무엇을 넣는가 ──────────────────────────────────────
+ * 날짜와 **상대 팀 약칭**만이다. 시각까지 넣으면 45px 칸에 세 줄이 들어가 아무것도 안
+ * 읽힌다. 시각은 칸을 눌렀을 때 아래 예매 카드가 말한다.
+ *
+ * 홈은 구단 색 틴트, 원정은 회색이다. 이 화면의 예매·주차는 홈경기의 것이라
+ * **갈 수 있는 날과 없는 날**이 색으로 갈려야 한다.
+ *
+ * ⚠ 오렌지 면을 채우고 흰 글자를 얹지 않는다. 칸의 글자는 10pt 인데 토큰 규칙상
+ * 오렌지 면 위의 흰 글자는 14pt 굵게 이상에서만 허용된다. 선택은 **테두리**로 말한다.
+ *
+ * ⚠ 요일 머리글에 빨강을 쓰지 않았다. 달력 관습으로는 일요일이 빨강이지만 이 앱에서
+ * 빨강은 '진행 중'이다. 관습을 따르려고 상태색을 빌리면 그 색이 두 가지를 뜻하게 된다.
+ */
+const WEEKDAY_HEADS = ['일', '월', '화', '수', '목', '금', '토'];
+
+function MonthCalendar({ picked, onPick }: { picked: string; onPick: (date: string) => void }) {
+  const anchor = dateOf(SCHEDULE[0].date);
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth();
+  const lead = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  const rows = Math.ceil((lead + days) / 7);
+
+  const byDay = new Map<number, ScheduledGame>();
+  for (const g of SCHEDULE) byDay.set(dateOf(g.date).getDate(), g);
+  const liveDay = dateOf(TODAY_GAME.date).getDate();
+
+  return (
+    <View style={st.calWrap}>
+      <View style={st.calRow}>
+        {WEEKDAY_HEADS.map((w) => (
+          <Text key={w} style={st.calHead}>
+            {w}
+          </Text>
+        ))}
+      </View>
+
+      {Array.from({ length: rows }, (_, r) => (
+        <View key={r} style={st.calRow}>
+          {Array.from({ length: 7 }, (_, c) => {
+            const day = r * 7 + c - lead + 1;
+            if (day < 1 || day > days) return <View key={c} style={st.calCell} />;
+
+            const g = byDay.get(day);
+            const live = day === liveDay;
+            const on = !!g && g.date === picked;
+
+            const cell = (
+              <View
+                style={[st.calCell, g ? (g.home ? st.calHome : st.calAway) : null, on && st.calOn]}
+              >
+                <Text style={[st.calDay, g?.home && st.calDayHome, on && st.calDayOn]}>{day}</Text>
+                {g ? (
+                  <Text style={[st.calOpp, !g.home && st.calOppAway]} numberOfLines={1}>
+                    {g.opponent}
+                  </Text>
+                ) : live ? (
+                  /* 오늘 경기는 SCHEDULE('다가오는 경기')에 없다. 그런데 달력에서 오늘이
+                     비어 있으면 "오늘은 경기가 없다"로 읽힌다 */
+                  <View style={st.calLive}>
+                    <View style={st.calLiveDot} />
+                    <Text style={st.calLiveText}>LIVE</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+
+            return g ? (
+              <Pressable
+                key={c}
+                onPress={() => onPick(g.date)}
+                style={st.calTouch}
+                accessibilityRole="button"
+                accessibilityLabel={`${dateOf(g.date).getMonth() + 1}월 ${day}일 ${g.opponent}전 ${g.home ? '홈' : '원정'}`}
+              >
+                {cell}
+              </Pressable>
+            ) : (
+              <View key={c} style={st.calTouch}>
+                {cell}
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function GamedayScreen({ sub, onSub }: { sub: Sub; onSub: (s: Sub) => void }) {
   const [sort, setSort] = useState<ParkingSort>('near');
   // 렌더마다 new Date() 를 부르면 순수하지 않다. 화면이 열린 시각을 한 번만 잡는다
   const [now] = useState(() => new Date());
@@ -175,20 +378,54 @@ export function GamedayScreen() {
   const [won, setWon] = useState(true);
   const [openLot, setOpenLot] = useState<ParkingLot | null>(null);
   const [openPartner, setOpenPartner] = useState<Partner | null>(null);
-  const [ticketAlert, setTicketAlert] = useState(false);
+  // 알림은 경기별로 켠다 - 스위치 하나로 두면 어느 경기 알림인지 알 수 없다
+  const [ticketAlert, setTicketAlert] = useState<Record<string, boolean>>({});
+  const [scheduleView, setScheduleView] = useState<ScheduleView>('list');
+  const [picked, setPicked] = useState(SCHEDULE[0].date);
   const [info, setInfo] = useState<InfoKey | null>(null);
   const [coupons, setCoupons] = useState<Record<string, boolean>>({});
+  const scrollRef = useRef<ScrollView>(null);
+  const bodyY = useRef(0);
+  const ticketY = useRef(0);
 
   const advice = parkingAdvice(minutes, sort);
   // 전부 만차면 목록은 순위가 아니라 '다 늦었다'는 사실을 말하는 것이다
   const allFull = advice.every((a) => a.status === 'late');
   const perks = todayPerks(won);
   const partners = sortedPartners();
-  const openIn = countdown(TICKET_OPEN_AT, DEMO_NOW);
+  const pickedGame = SCHEDULE.find((g) => g.date === picked) ?? SCHEDULE[0];
+  const pickedOpen = isTicketOpen(pickedGame, DEMO_NOW);
+  // 원정 구간에서 고르면 다음 홈경기는 그 뒤의 첫 홈경기다. 같은 달 안이라 문자열 비교로 충분하다
+  const nextHome = SCHEDULE.find((g) => g.home && g.date > picked) ?? SCHEDULE.find((g) => g.home);
+  const pickedOpenAt = ticketOpenAt(pickedGame);
+  // countdown 은 ISO 문자열을 받는다(굿즈 드롭과 같은 규칙). 규칙을 복제하지 않으려고 ms 를 되돌린다
+  const openIn =
+    pickedOpenAt !== null && !pickedOpen
+      ? countdown(new Date(pickedOpenAt).toISOString(), DEMO_NOW)
+      : null;
+
+  /**
+   * 경기를 고르면 예매 카드로 데려간다.
+   *
+   * 선택만 바뀌고 화면이 그대로면 **아래에서 무슨 일이 일어났는지 모른다.** 일정 카드가
+   * 길 때는 예매 카드가 화면 밖에 있어서 누른 보람이 아무 데도 나타나지 않는다.
+   * 좌표는 두 조각을 더한다 - 예매 카드의 y 는 좌우 여백을 가진 본문 View 기준이라
+   * 그 View 자신의 y 를 알아야 스크롤 좌표가 된다.
+   */
+  const pickGame = (date: string) => {
+    setPicked(date);
+    scrollRef.current?.scrollTo({
+      // 카드의 위 여백(sectionTop)을 목표에서 되돌린다 - 그러지 않으면 상단 바 밑으로
+      // 제목이 들어가 "예매"라는 글자가 안 보인 채로 좌석표만 뜬다(실측으로 잡았다)
+      y: Math.max(0, bodyY.current + ticketY.current - spacing.sectionTop - spacing.xl),
+      animated: true,
+    });
+  };
 
   return (
     <>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: spacing.scrollBottom }}
       >
@@ -199,11 +436,14 @@ export function GamedayScreen() {
               { key: 'eat' as const, label: '후원의 집' },
             ]}
             value={sub}
-            onChange={setSub}
+            onChange={onSub}
           />
         </View>
 
-        <View style={{ paddingHorizontal: spacing.screenX }}>
+        <View
+          style={{ paddingHorizontal: spacing.screenX }}
+          onLayout={(e) => (bodyY.current = e.nativeEvent.layout.y)}
+        >
           {sub === 'go' ? (
             <>
               <View style={{ marginTop: spacing.md }}>
@@ -222,117 +462,165 @@ export function GamedayScreen() {
                   **"언제 갈까"** 하나이고, 정하면 곧바로 예매와 주차가 필요하다.
                   그래서 여기 맨 위에 두어 **일정 → 예매 → 주차**가 한 화면에서 이어진다.
 
-                  원정 경기도 지운다 - 못 가는 날인지 아는 것도 정보다. 다만 예매·주차가
-                  걸리지 않으므로 회색으로 물리고 '원정'을 명시한다 ── */}
-              <SectionCard title="다가오는 경기" right={<Text style={st.headNote}>8월</Text>}>
-                {SCHEDULE.map((g, i) => (
-                  <Row key={g.date} last={i === SCHEDULE.length - 1} style={st.gameRow}>
-                    <Text style={[st.gameDate, !g.home && st.gameAway]}>
-                      {g.date}
-                      <Text style={st.gameDay}> {g.day}</Text>
-                    </Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[st.gameOpp, !g.home && st.gameAway]}>
-                        {g.home ? `${g.opponent}전` : `${g.opponent}전 (원정)`}
-                      </Text>
-                      <Text style={st.gameTime}>
-                        {g.startTime}
-                        {g.home ? ' · 대전' : ''}
-                      </Text>
-                    </View>
-                    {/* 예매가 열린 홈경기만 배지를 단다 - 전부 달면 배지가 배경이 된다 */}
-                    {g.home && g.ticketOpen ? <Badge text="예매 중" tone="brand" /> : null}
-                  </Row>
-                ))}
-              </SectionCard>
+                  전에는 목록이 **눌러도 아무 일도 일어나지 않는 정적인 표**여서, 세 단계가
+                  나란히 놓여 있을 뿐 실제로 이어지지는 않았다. 경기를 고르면 아래 예매
+                  카드가 그 경기로 바뀌고 그 자리로 스크롤한다 - 그래야 동선이 된다 ── */}
+              <ScheduleSection
+                view={scheduleView}
+                onView={setScheduleView}
+                picked={picked}
+                onPick={pickGame}
+                nowMs={DEMO_NOW}
+              />
 
               {/* ── 예매 ───────────────────────────────────────
                   예매·주차·혜택은 각각 **묶음**이다. 셋 다 "가기 전에 정하는 것"이지만
                   서로 다른 결정이고, 한 화면에 흰 카드로 나란히 서면 어디서 하나가
                   끝나고 다음이 시작하는지 사라진다 ── */}
-              <SectionCard
-                title="예매"
-                padded
-                right={openIn ? <Text style={st.headNote}>{openIn}</Text> : null}
-              >
-                <CardHeading label={TICKET_CHANNEL.channel} title="8월 14일 오후 2시 오픈" />
+              <View onLayout={(e) => (ticketY.current = e.nativeEvent.layout.y)}>
+                <SectionCard
+                  title="예매"
+                  padded
+                  right={
+                    openIn ? (
+                      <Text style={st.headNote}>{openIn}</Text>
+                    ) : pickedOpen ? (
+                      <Text style={st.headNoteOn}>예매 중</Text>
+                    ) : null
+                  }
+                >
+                  {/* 어느 경기의 예매인지가 제목 자리에 온다. 좌석표만 있고 경기가 없으면
+                      위에서 무엇을 골랐는지가 화면에서 사라진다 */}
+                  <CardHeading
+                    label={`${TICKET_CHANNEL.channel} · ${shortDate(pickedGame.date)}(${weekdayOf(
+                      pickedGame.date,
+                    )}) ${pickedGame.startTime}`}
+                    title={
+                      !pickedGame.home
+                        ? `${pickedGame.opponent} 원정 경기`
+                        : pickedOpen
+                          ? `${pickedGame.opponent}전 예매 중`
+                          : `${ticketOpenLabel(pickedGame)} 오픈`
+                    }
+                  />
 
-                <View>
-                  {SEAT_GRADES.map((g, i) => {
-                    const view = SEAT_VIEWS[g.id];
-                    return (
-                      <View
-                        key={g.id}
-                        style={[st.seatRow, i < SEAT_GRADES.length - 1 && st.divider]}
-                      >
-                        {/* 그림이 이름 왼쪽에 붙는다 - 목록을 훑을 때 눈이 글자를 읽기
-                            전에 자리부터 잡는다 */}
-                        <SeatSpot x={view.spot.x} y={view.spot.y} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={st.seatName}>{g.name}</Text>
-                          <Text style={st.seatNote}>{g.note}</Text>
-                          {/* 구역 표기와 링크를 한 줄로 합쳤다. 행에는 이미 이름·설명·
-                              가격·잔여가 있어서, 구역을 따로 적고 링크를 또 버튼으로
-                              세우면 한 등급이 다섯 조각으로 흩어진다. 구역 번호 자체가
-                              누를 수 있는 것이 되면 "저기를 보여준다"가 한 번에 읽힌다.
-                              작은 글자라 표적이 모자라므로 hitSlop 으로 벌린다 */}
-                          <Pressable
-                            onPress={() => Linking.openURL(seatViewUrl(view.scene))}
-                            hitSlop={10}
-                            accessibilityRole="link"
-                            accessibilityLabel={`${view.zoneLabel} 대표 구역 360도 시야 보기`}
-                            style={({ pressed }) => [st.seatViewLink, pressed && states.pressed]}
-                          >
-                            {/* 구역 번호는 사실이고 '시야 ›' 만 행동이다. 줄 전체를 구단
-                                색으로 칠했더니 좌석 다섯 줄이 오렌지로 반복되어, 정작
-                                이 카드가 답해야 하는 가격·잔여보다 먼저 눈에 들어왔다.
-                                누를 수 있다는 신호는 꺾쇠 쪽에만 남긴다 */}
-                            <Text style={st.seatViewText}>
-                              {view.zoneLabel}
-                              <Text style={st.seatViewCta}> · 시야 ›</Text>
-                            </Text>
-                          </Pressable>
-                        </View>
-                        <View style={st.seatRight}>
-                          <Text style={st.seatPrice}>{g.price.toLocaleString()}원</Text>
-                          {/* 내부 비율(%)은 관리자 대시보드의 단위다. 팬에게는 판단만 말한다 */}
-                          <Text
-                            style={[
-                              st.seatRemain,
-                              g.remainRatio <= 0.05
-                                ? { color: colors.live, fontWeight: '700' }
-                                : g.remainRatio <= 0.25
-                                  ? { color: colors.warn, fontWeight: '600' }
-                                  : null,
-                            ]}
-                          >
-                            {g.remainRatio <= 0.05
-                              ? '매진 임박'
-                              : g.remainRatio <= 0.25
-                                ? '잔여 적음'
-                                : '여유'}
-                          </Text>
-                        </View>
+                  {!pickedGame.home ? (
+                    /* ⚠ '아직 안 열림'과 '우리가 팔지 않음'은 다른 말이다. 원정 경기에
+                       카운트다운을 붙이면 기다리면 열린다는 뜻이 되어 거짓말이 된다.
+                       팬이 여기서 할 수 있는 일은 홈경기로 돌아가는 것 하나뿐이다 */
+                    <View style={{ gap: spacing.md }}>
+                      <Text style={st.awayNote}>
+                        원정 경기표는 상대 구단 예매처에서 판매합니다. 이 앱의 좌석·주차 안내는 대전
+                        홈경기 기준입니다.
+                      </Text>
+                      {nextHome ? (
+                        <SecondaryButton
+                          label={`다음 홈경기 · ${shortDate(nextHome.date)} ${nextHome.opponent}전`}
+                          onPress={() => pickGame(nextHome.date)}
+                        />
+                      ) : null}
+                    </View>
+                  ) : (
+                    <>
+                      <View>
+                        {SEAT_GRADES.map((g, i) => {
+                          const view = SEAT_VIEWS[g.id];
+                          return (
+                            <View
+                              key={g.id}
+                              style={[st.seatRow, i < SEAT_GRADES.length - 1 && st.divider]}
+                            >
+                              {/* 그림이 이름 왼쪽에 붙는다 - 목록을 훑을 때 눈이 글자를 읽기
+                                  전에 자리부터 잡는다 */}
+                              <SeatSpot x={view.spot.x} y={view.spot.y} />
+                              <View style={{ flex: 1 }}>
+                                <Text style={st.seatName}>{g.name}</Text>
+                                <Text style={st.seatNote}>{g.note}</Text>
+                                {/* 구역 표기와 링크를 한 줄로 합쳤다. 행에는 이미 이름·설명·
+                                    가격·잔여가 있어서, 구역을 따로 적고 링크를 또 버튼으로
+                                    세우면 한 등급이 다섯 조각으로 흩어진다. 구역 번호 자체가
+                                    누를 수 있는 것이 되면 "저기를 보여준다"가 한 번에 읽힌다.
+                                    작은 글자라 표적이 모자라므로 hitSlop 으로 벌린다 */}
+                                <Pressable
+                                  onPress={() => Linking.openURL(seatViewUrl(view.scene))}
+                                  hitSlop={10}
+                                  accessibilityRole="link"
+                                  accessibilityLabel={`${view.zoneLabel} 대표 구역 360도 시야 보기`}
+                                  style={({ pressed }) => [
+                                    st.seatViewLink,
+                                    pressed && states.pressed,
+                                  ]}
+                                >
+                                  {/* 구역 번호는 사실이고 '시야 ›' 만 행동이다. 줄 전체를 구단
+                                      색으로 칠했더니 좌석 다섯 줄이 오렌지로 반복되어, 정작
+                                      이 카드가 답해야 하는 가격·잔여보다 먼저 눈에 들어왔다.
+                                      누를 수 있다는 신호는 꺾쇠 쪽에만 남긴다 */}
+                                  <Text style={st.seatViewText}>
+                                    {view.zoneLabel}
+                                    <Text style={st.seatViewCta}> · 시야 ›</Text>
+                                  </Text>
+                                </Pressable>
+                              </View>
+                              <View style={st.seatRight}>
+                                <Text style={st.seatPrice}>{g.price.toLocaleString()}원</Text>
+                                {/* ⚠ 잔여는 **예매가 열린 경기만** 갖는 값이다. 아직 팔지도
+                                    않은 경기에 '잔여 적음'을 붙이면 없는 사실을 지어내는 것이고,
+                                    팬이 한 번 알아채면 이 카드의 다른 수치도 안 믿는다.
+                                    내부 비율(%)은 관리자 대시보드의 단위라 판단만 말한다 */}
+                                {pickedOpen ? (
+                                  <Text
+                                    style={[
+                                      st.seatRemain,
+                                      g.remainRatio <= 0.05
+                                        ? { color: colors.live, fontWeight: '700' }
+                                        : g.remainRatio <= 0.25
+                                          ? { color: colors.warn, fontWeight: '600' }
+                                          : null,
+                                    ]}
+                                  >
+                                    {g.remainRatio <= 0.05
+                                      ? '매진 임박'
+                                      : g.remainRatio <= 0.25
+                                        ? '잔여 적음'
+                                        : '여유'}
+                                  </Text>
+                                ) : (
+                                  <Text style={st.seatRemain}>오픈 전</Text>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
-                    );
-                  })}
-                </View>
 
-                {/* 캡션은 카드에 한 번만. 행마다 붙이면 다섯 줄짜리 경고문이 되어
-                    정작 가격·잔여가 안 읽힌다 */}
-                <Text style={st.seatViewCaption}>{SEAT_VIEW_CAPTION}</Text>
+                      {/* 캡션은 카드에 한 번만. 행마다 붙이면 다섯 줄짜리 경고문이 되어
+                          정작 가격·잔여가 안 읽힌다 */}
+                      <Text style={st.seatViewCaption}>{SEAT_VIEW_CAPTION}</Text>
 
-                <AlertToggle
-                  on={ticketAlert}
-                  onPress={() => setTicketAlert((v) => !v)}
-                  label="예매 오픈 알림"
-                />
-
-                <ExternalButton
-                  label="티켓링크에서 예매"
-                  onPress={() => Linking.openURL(TICKET_CHANNEL.url)}
-                />
-              </SectionCard>
+                      {pickedOpen ? (
+                        <ExternalButton
+                          label="티켓링크에서 예매"
+                          onPress={() => Linking.openURL(TICKET_CHANNEL.url)}
+                        />
+                      ) : (
+                        /* 알림은 **경기별로** 켠다. 하나의 스위치로 두면 8월 25일 알림을
+                           켜 둔 사람이 8월 28일 경기를 보러 왔을 때 이미 켜진 것처럼
+                           보이고, 정작 그 경기 알림은 오지 않는다 */
+                        <AlertToggle
+                          on={!!ticketAlert[pickedGame.date]}
+                          onPress={() =>
+                            setTicketAlert((v) => ({
+                              ...v,
+                              [pickedGame.date]: !v[pickedGame.date],
+                            }))
+                          }
+                          label={`${shortDate(pickedGame.date)} 예매 오픈 알림`}
+                        />
+                      )}
+                    </>
+                  )}
+                </SectionCard>
+              </View>
 
               {/* ── 주차 ───────────────────────────────────────
                   남은 시간은 앱이 안다. 팬이 고르는 것은 **무엇을 아쉬워할 것인가**다 */}
@@ -815,6 +1103,53 @@ const st = StyleSheet.create({
   gameTime: { ...typography.micro, ...tabularFigures, fontWeight: '400', marginTop: 1 },
   // 원정은 예매·주차가 걸리지 않는 날이다. 지우지 않고 물린다 - 못 가는 날도 정보다
   gameAway: { color: colors.mutedText },
+  // 고른 경기 - 틴트 면은 흰 카드 안이라 대비가 유지된다(theme.soft 참고)
+  gameRowOn: { backgroundColor: colors.brandSoft },
+  gameDateOn: { color: colors.brandText },
+  moreRow: { justifyContent: 'center' },
+  moreText: { ...typography.caption, color: colors.brandText, fontWeight: '700' },
+
+  // ── 일정 뷰 전환 ─────────────────────────────────────────
+  // 세그먼트는 행 목록과 달리 카드 끝까지 닿으면 안 된다 - 컨트롤이지 항목이 아니다
+  viewToggle: { paddingHorizontal: spacing.cardPad, paddingTop: spacing.md },
+
+  // ── 월간 달력 ────────────────────────────────────────────
+  // 칸 높이 46 - 날짜 한 줄 + 상대 팀 한 줄이 들어가는 최소치다. 더 낮추면 글자가 붙는다
+  calWrap: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.lg },
+  calRow: { flexDirection: 'row' },
+  calHead: {
+    ...typography.micro,
+    fontSize: 11,
+    width: '14.28%',
+    textAlign: 'center',
+    paddingBottom: 6,
+  },
+  calTouch: { width: '14.28%', padding: 1.5 },
+  calCell: {
+    height: 46,
+    borderRadius: radius.tile,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  calHome: { backgroundColor: colors.brandSoft },
+  calAway: { backgroundColor: colors.surface },
+  // 선택은 테두리로 말한다 - 오렌지 면 위 흰 글자는 14pt 굵게 이상에서만 허용된다
+  calOn: { borderColor: colors.brand },
+  calDay: { ...typography.micro, ...tabularFigures, fontSize: 12 },
+  calDayHome: { color: colors.text, fontWeight: '600' },
+  calDayOn: { color: colors.brandText, fontWeight: '700' },
+  calOpp: { fontSize: 10, fontWeight: '600', color: colors.brandText },
+  calOppAway: { color: colors.mutedText, fontWeight: '400' },
+  calLive: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  calLiveDot: { width: 5, height: 5, borderRadius: radius.chip, backgroundColor: colors.live },
+  calLiveText: { fontSize: 9, fontWeight: '700', color: colors.live, letterSpacing: 0.4 },
+
+  // ── 예매 ─────────────────────────────────────────────────
+  headNoteOn: { ...typography.micro, color: colors.brandText, fontWeight: '600' },
+  awayNote: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
 
   // 셋을 여는 타일 - 한 줄에 나란히. 각자 곡률 사각형을 등에 지고 서로 갈린다
   infoRow: { flexDirection: 'row', gap: spacing.sm },

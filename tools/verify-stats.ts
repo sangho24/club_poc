@@ -4,7 +4,9 @@
 // "디자인 문제"로 오인하게 되고, 무엇보다 시연 중에 파트너가 값을 물었을 때 답할 수 없다.
 //
 // 실행: npx tsc -p tools/tsconfig.verify.json && node .tmp/tools/verify-stats.js
-import { PLATE_SEQUENCE } from '../src/game';
+import { LINEUP, PLATE_SEQUENCE } from '../src/game';
+import { GAME_LOG, LG_ORDER } from '../src/gameLog';
+import { EXPECTED_SCORE, FINAL_STEP, lineScoreAt, scoreAt } from '../src/liveFeed';
 import { JosaKind, josa } from '../src/korean';
 import { BATTERS, OPPONENT_PITCHERS, PITCHERS, verifyRoster } from '../src/roster';
 import {
@@ -83,6 +85,105 @@ for (const [i, pa] of PLATE_SEQUENCE.entries()) {
   }
 }
 if (failed === 0) console.log(`  ✓ ${PLATE_SEQUENCE.length}개 타석 전부 명단·문장과 맞는다`);
+
+/**
+ * 중계 원자료가 야구적으로 말이 되는가.
+ *
+ * ── 왜 기계가 세야 하는가 ───────────────────────────────────
+ * 문자중계가 마흔 행이 넘고, 거기서 **라인스코어가 파생된다.** 3회말에 2점이 찍혀 있는데
+ * 그 이닝 중계에 득점이 없으면 앱이 같은 화면 안에서 자기 말을 뒤집는다. 눈으로 세는
+ * 것으로는 이닝 열여섯 개를 매번 확인할 수 없다.
+ *
+ * 검사 넷:
+ *   ① 각 하프이닝의 행 득점 합 = 그 이닝 득점
+ *   ② 경기 전체 득점 합 = TODAY_GAME 의 점수 (화면 맨 위 3:4 와 표가 어긋나지 않는다)
+ *   ③ 타순이 이닝을 넘어 이어지고, GAME_LOG 의 마지막 한화 타자 다음이
+ *      PLATE_SEQUENCE 의 첫 타자다 - 여기가 어긋나면 라인업 카드가 중계를 반박한다
+ *   ④ 라인업 아홉 명과 PLATE_SEQUENCE 의 타자가 같은 명단에서 나온다
+ */
+console.log('\n═══ 1-c. 문자중계 ↔ 라인스코어 ═══');
+
+for (const h of GAME_LOG) {
+  const label = `${h.inning}회${h.half === 'top' ? '초' : '말'}`;
+  const rowRuns = h.rows.reduce((a, r) => a + (r.runs ?? 0), 0);
+  if (rowRuns !== h.runs) {
+    bad(`${label} 이닝 득점은 ${h.runs}인데 타석 득점 합은 ${rowRuns}이다`);
+  }
+}
+
+const finalScore = scoreAt(FINAL_STEP);
+if (finalScore.away !== EXPECTED_SCORE.away || finalScore.home !== EXPECTED_SCORE.home) {
+  bad(
+    `중계 합산은 ${finalScore.away}:${finalScore.home} 인데 TODAY_GAME 은 ` +
+      `${EXPECTED_SCORE.away}:${EXPECTED_SCORE.home} 이다`,
+  );
+}
+
+// 타순 연속성 - 한화(말)는 BATTERS 앞 아홉, LG(초)는 LG_ORDER
+const orderOf = (names: string[], name: string) => names.indexOf(name);
+const HH_ORDER = LINEUP.order.map((id) => BATTERS.find((b) => b.id === id)?.name ?? '?');
+
+for (const [names, half] of [
+  [HH_ORDER, 'bottom'],
+  [LG_ORDER, 'top'],
+] as const) {
+  let expect = -1;
+  for (const h of GAME_LOG.filter((x) => x.half === half)) {
+    for (const r of h.rows) {
+      if (r.kind === 'sub') continue;
+      const idx = orderOf(names, r.name);
+      if (idx < 0) {
+        bad(`${h.inning}회${half === 'top' ? '초' : '말'} '${r.name}' 이 타순 명단에 없다`);
+        continue;
+      }
+      if (expect >= 0 && idx !== expect) {
+        bad(
+          `${h.inning}회${half === 'top' ? '초' : '말'} 타순이 끊겼다 - ` +
+            `${names[expect]}(${expect + 1}번) 차례인데 ${r.name}(${idx + 1}번)이 나왔다`,
+        );
+      }
+      expect = (idx + 1) % names.length;
+    }
+  }
+  // GAME_LOG 가 끝난 자리에서 PLATE_SEQUENCE 로 넘어간다 (한화만)
+  if (half === 'bottom') {
+    const firstSeq = BATTERS.find((b) => b.id === PLATE_SEQUENCE[0].batterId)?.name ?? '?';
+    if (orderOf(names, firstSeq) !== expect) {
+      bad(
+        `7회말 다음은 ${names[expect]}(${expect + 1}번)인데 ` +
+          `PLATE_SEQUENCE 는 ${firstSeq} 로 시작한다`,
+      );
+    }
+  }
+}
+
+// PLATE_SEQUENCE 안에서도 타순이 이어지는가
+{
+  let expect = orderOf(HH_ORDER, BATTERS.find((b) => b.id === PLATE_SEQUENCE[0].batterId)!.name);
+  for (const [i, pa] of PLATE_SEQUENCE.entries()) {
+    const name = BATTERS.find((b) => b.id === pa.batterId)?.name ?? '?';
+    const idx = orderOf(HH_ORDER, name);
+    if (idx < 0) {
+      bad(
+        `PLATE_SEQUENCE[${i}] ${name} 이 선발 라인업 아홉 명에 없다 - 라인업 카드가 중계를 반박한다`,
+      );
+    } else if (idx !== expect) {
+      bad(
+        `PLATE_SEQUENCE[${i}] 타순이 끊겼다 - ${HH_ORDER[expect]}(${expect + 1}번) 차례인데 ` +
+          `${name}(${idx + 1}번)이 나왔다`,
+      );
+    }
+    expect = ((idx < 0 ? expect : idx) + 1) % HH_ORDER.length;
+  }
+}
+
+if (failed === 0) {
+  const ls = lineScoreAt(FINAL_STEP);
+  console.log(
+    `  ✓ ${GAME_LOG.length + 2}개 하프이닝 · 득점 ${finalScore.away}:${finalScore.home} · ` +
+      `안타 ${ls.away.hits}:${ls.home.hits} · 실책 ${ls.away.errors}:${ls.home.errors} · 타순 연속`,
+  );
+}
 
 console.log('\n═══ 2. 타자 지표 ═══');
 console.log('  이름     타율   출루   장타   OPS    wOBA   wRC+  WAR   BABIP');
