@@ -20,7 +20,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextStyle,
   View,
@@ -43,6 +42,7 @@ import {
   typography,
 } from '../theme';
 import type { ButtonVariant, ControlSize, GaugeTone } from '../theme';
+import { Switch } from './Switch';
 
 /** 평평한 흰 카드. 그림자·테두리 없이 페이지 배경과의 대비만으로 구분한다 */
 export function Card({
@@ -918,15 +918,10 @@ export function AlertToggle({
         <Text style={s.alertRowLabel}>{label ?? '알림 신청'}</Text>
         {caption ? <Text style={s.alertRowCaption}>{caption}</Text> : null}
       </View>
-      <Switch
-        value={on}
-        onValueChange={onPress}
-        trackColor={{ false: colors.dim, true: colors.brand }}
-        thumbColor="#FFFFFF"
-        // 웹(react-native-web)은 켜진 상태의 썸 색을 activeThumbColor 로 받는다 - 타입에는 없다
-        {...(Platform.OS === 'web' ? ({ activeThumbColor: '#FFFFFF' } as object) : null)}
-        accessibilityLabel={label ?? '알림 신청'}
-      />
+      {/* 플랫폼이 그리던 스위치를 우리 것으로 바꿨다 - 폰과 웹에서 모양이 갈리던 자리다
+          (./Switch 주석 참고). trackColor·thumbColor·activeThumbColor 를 플랫폼별로
+          덧대던 것도 같이 사라진다 */}
+      <Switch value={on} onValueChange={onPress} accessibilityLabel={label ?? '알림 신청'} />
     </View>
   );
 }
