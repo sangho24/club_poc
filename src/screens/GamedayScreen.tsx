@@ -13,6 +13,7 @@
 // 안 된 것처럼 보였다. 동선은 하나지만 목적은 둘이라(오늘 갈 준비 / 어디서 먹지) 갈랐다.
 import { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import {
   AlertToggle,
@@ -105,6 +106,52 @@ function InfoTiles({ onPick }: { onPick: (k: InfoKey) => void }) {
         </Pressable>
       ))}
     </View>
+  );
+}
+
+/**
+ * 좌석 위치 미니 배치도.
+ *
+ * **구역 번호는 처음 오는 팬에게 암호다.** '105~108'이 1루인지 외야인지 알 수 없어서
+ * 번호 옆에 '1루 응원석'이라고 글로 덧붙이고 있었는데, 목록 다섯 줄에 그 설명이
+ * 반복되면 그게 다시 읽을 거리가 된다. 그림 하나가 설명을 대신하고 **눈이 글자보다
+ * 자리를 먼저 잡는다.**
+ *
+ * 구장을 사실적으로 그리지 않는다. 파울라인 둘 + 외야 아치 + 내야 마름모면 야구장으로
+ * 읽히고, 22px 에서 그보다 자세히 그리면 선이 뭉갠다. 구단 공식 배치도를 쓰지 않은
+ * 이유이기도 하다 - 그건 이 크기로 줄이면 아무것도 안 보인다.
+ */
+function SeatSpot({ x, y }: { x: number; y: number }) {
+  return (
+    <Svg width={26} height={26} viewBox="0 0 24 24">
+      {/* 외야 펜스 - 홈에서 퍼지는 아치 */}
+      <Path
+        d="M4.2 13.2 A11 11 0 0 1 19.8 13.2"
+        stroke={colors.borderStrong}
+        strokeWidth={1.4}
+        fill="none"
+        strokeLinecap="round"
+      />
+      {/* 파울라인 */}
+      <Path
+        d="M12 21 L4.2 13.2 M12 21 L19.8 13.2"
+        stroke={colors.borderStrong}
+        strokeWidth={1.4}
+        fill="none"
+        strokeLinecap="round"
+      />
+      {/* 내야 - 있어야 '어디가 홈인지'가 잡힌다 */}
+      <Path
+        d="M12 19.2 L14.6 16.6 L12 14 L9.4 16.6 Z"
+        stroke={colors.dim}
+        strokeWidth={1.2}
+        fill="none"
+        strokeLinejoin="round"
+      />
+      {/* r 2.6 으로 그렸더니 점이 구장을 덮어 무엇을 가리키는지 되레 흐려졌다.
+          자리를 짚는 표시이지 그 자체가 주인공이 아니다 */}
+      <Circle cx={x} cy={y} r={1.9} fill={colors.brand} />
+    </Svg>
   );
 }
 
@@ -218,6 +265,9 @@ export function GamedayScreen() {
                         key={g.id}
                         style={[st.seatRow, i < SEAT_GRADES.length - 1 && st.divider]}
                       >
+                        {/* 그림이 이름 왼쪽에 붙는다 - 목록을 훑을 때 눈이 글자를 읽기
+                            전에 자리부터 잡는다 */}
+                        <SeatSpot x={view.spot.x} y={view.spot.y} />
                         <View style={{ flex: 1 }}>
                           <Text style={st.seatName}>{g.name}</Text>
                           <Text style={st.seatNote}>{g.note}</Text>

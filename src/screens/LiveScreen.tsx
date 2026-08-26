@@ -25,7 +25,7 @@ import {
   SponsorMoment,
 } from '../components/common';
 import { PhotoHeader, PlayerAvatar, stadiumPhoto } from '../components/photos';
-import { PLATE_SEQUENCE, TODAY_GAME } from '../game';
+import { LINESCORE, PLATE_SEQUENCE, TODAY_GAME } from '../game';
 import {
   CLUTCH_LI,
   basesLabel,
@@ -38,6 +38,78 @@ import {
 import { UserProfile } from '../profile';
 import { BATTERS, OPPONENT_PITCHERS } from '../roster';
 import { colors, radius, spacing, tabularFigures, typography } from '../theme';
+
+/**
+ * 라인스코어 표.
+ *
+ * ── 390px 에 12열을 넣는다 ──────────────────────────────────
+ * 9이닝 + R·H·E 에 팀 이름까지 13열이다. 가로 스크롤로 밀면 **오른쪽 끝의 R(총점)이
+ * 안 보이는데**, 총점은 이 표에서 가장 자주 보는 값이라 스크롤 뒤에 숨기면 안 된다.
+ * 숫자 칸을 24px 로 좁히고 팀 이름을 짧게 잡아 한 화면에 들어가게 했다.
+ *
+ * ── 아직 치르지 않은 이닝은 비운다 ──────────────────────────
+ * 8회말 진행 중인데 그 칸에 0 을 적으면 **'0점으로 끝난 이닝'**이 되어 지금 벌어지는
+ * 공격이 표에서 사라진다. `null` 은 '·' 로 그리고, **지금 공격 중인 칸만** 구단 색
+ * 점으로 표시해 눈이 현재 위치를 찾게 한다.
+ */
+function LineScoreBoard({ inning, half }: { inning: number; half: 'top' | 'bottom' }) {
+  const INNINGS = LINESCORE.away.innings.length;
+
+  const row = (
+    name: string,
+    line: typeof LINESCORE.away,
+    runs: number,
+    isHome: boolean,
+    ours: boolean,
+  ) => (
+    <View style={st.lsRow}>
+      <Text style={[st.lsTeam, ours && st.lsOurs]} numberOfLines={1}>
+        {name}
+      </Text>
+      {line.innings.map((v, i) => {
+        // 지금 공격 중인 칸 - 이닝이 같고 초/말이 이 팀의 차례일 때
+        const active = i + 1 === inning && (half === 'bottom') === isHome;
+        return (
+          <View key={i} style={st.lsCell}>
+            {v === null ? (
+              active ? (
+                <View style={st.lsNow} />
+              ) : (
+                <Text style={st.lsEmpty}>·</Text>
+              )
+            ) : (
+              <Text style={[st.lsScore, v > 0 && st.lsScored]}>{v}</Text>
+            )}
+          </View>
+        );
+      })}
+      <Text style={[st.lsTotal, ours && st.lsOurs]}>{runs}</Text>
+      <Text style={st.lsSub}>{line.hits}</Text>
+      <Text style={st.lsSub}>{line.errors}</Text>
+    </View>
+  );
+
+  return (
+    <Card style={{ marginTop: spacing.cardGap, paddingHorizontal: spacing.md }}>
+      <View style={st.lsRow}>
+        <Text style={st.lsTeam} />
+        {Array.from({ length: INNINGS }, (_, i) => (
+          <View key={i} style={st.lsCell}>
+            <Text style={st.lsHead}>{i + 1}</Text>
+          </View>
+        ))}
+        <Text style={[st.lsTotal, st.lsHead]}>R</Text>
+        <Text style={[st.lsSub, st.lsHead]}>H</Text>
+        <Text style={[st.lsSub, st.lsHead]}>E</Text>
+      </View>
+
+      <View style={st.lsDivider} />
+
+      {row(TODAY_GAME.opponent.short, LINESCORE.away, TODAY_GAME.theirScore, false, false)}
+      {row('한화', LINESCORE.home, TODAY_GAME.ourScore, true, true)}
+    </Card>
+  );
+}
 
 export function LiveScreen({ profile }: { profile: UserProfile }) {
   const [step, setStep] = useState(3); // 만루 직전부터 - 시연에서 바로 핵심을 보여준다
@@ -128,6 +200,18 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
             </PhotoHeader>
           ) : null}
         </View>
+
+        {/* ── 라인스코어 ─────────────────────────────────────────
+            중계 화면에서 가장 먼저 보는 것인데 없었다. 총점 3:4 는 "몇 점 차인가"에만
+            답하고 **"어떻게 흘러온 경기인가"에는 답하지 못한다.** 5회에 2점을 준 경기와
+            매 이닝 1점씩 준 경기는 같은 4점이어도 다른 경기다.
+
+            이 앱에서는 특히 필요하다 - 레버리지가 "지금이 왜 결정적인가"를 말하는데
+            그 근거의 절반이 경기가 여기까지 어떻게 왔는가이기 때문이다.
+
+            히어로 바로 아래, '이 승부'보다 위다. 승부 예측은 이 표를 읽은 다음에 오는
+            이야기라 순서가 뒤집히면 안 된다 ── */}
+        <LineScoreBoard inning={s.inning} half={s.half} />
 
         {/* ── 이 승부 ────────────────────────────────────────────
             베이스·볼카운트·레버리지가 따로 카드를 갖고 있었다. 둘 다 **같은 한 가지**
@@ -423,6 +507,35 @@ const st = StyleSheet.create({
   alertRow: { alignItems: 'flex-start', paddingVertical: spacing.lg },
   alertTitle: { ...typography.bodyStrong, lineHeight: 21 },
   alertBody: { ...typography.caption, lineHeight: 19 },
+
+  // ── 라인스코어 ───────────────────────────────────────────
+  // 숫자 칸은 24px. 여기서 더 넓히면 R(총점)이 화면 밖으로 밀린다
+  lsRow: { flexDirection: 'row', alignItems: 'center' },
+  lsTeam: { ...typography.micro, width: 34, color: colors.text },
+  lsOurs: { color: colors.brandText },
+  lsCell: { width: 24, alignItems: 'center', justifyContent: 'center', height: 26 },
+  lsHead: { ...typography.micro, fontSize: 10, color: colors.mutedText, fontWeight: '600' },
+  lsScore: { ...typography.micro, ...tabularFigures, fontWeight: '400', color: colors.subText },
+  // 점수가 난 이닝만 진하게 - 0 이 늘어선 표에서 눈이 갈 곳을 만든다
+  lsScored: { color: colors.text, fontWeight: '700' },
+  lsEmpty: { ...typography.micro, color: colors.dim },
+  // 지금 공격 중인 칸. 숫자가 아니라 점이라 '아직 결과가 없다'가 그대로 읽힌다
+  lsNow: { width: 6, height: 6, borderRadius: radius.chip, backgroundColor: colors.brand },
+  lsTotal: {
+    ...typography.bodyStrong,
+    ...tabularFigures,
+    fontSize: 14,
+    width: 28,
+    textAlign: 'center',
+  },
+  lsSub: {
+    ...typography.micro,
+    ...tabularFigures,
+    fontWeight: '400',
+    width: 22,
+    textAlign: 'center',
+  },
+  lsDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
 
   // 면을 비우고 테두리만 - 콘텐츠 카드와 나란히 놓였을 때 한눈에 갈린다
   demoCard: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },

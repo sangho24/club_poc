@@ -43,6 +43,33 @@ export const TODAY_GAME: TodayGame = {
   half: 'bottom',
 };
 
+/**
+ * 이닝별 점수 - 라인스코어.
+ *
+ * 야구 중계 화면에서 **가장 먼저 보는 것**인데 앱에 없었다. 총점만 3:4 로 보여 주면
+ * "지금 몇 점 차인가"에는 답하지만 **"어떻게 흘러온 경기인가"에는 답하지 못한다.**
+ * 5회에 2점을 준 경기와 매 이닝 1점씩 준 경기는 같은 4점이어도 완전히 다른 경기다.
+ *
+ * 이 앱에서는 특히 중요하다. 레버리지·기대득점이 "지금 이 순간이 왜 결정적인가"를
+ * 말하는데, 그 근거의 절반은 **경기가 여기까지 어떻게 왔는가**이기 때문이다.
+ *
+ * ⚠ 원정팀이 초, 홈팀이 말이다. 한화는 홈이라 8회말 공격 중이고 그 칸은 아직 비어 있다 -
+ * 0 으로 채우면 '0점으로 끝난 이닝'이 되어 진행 중인 공격이 사라진다.
+ */
+export interface LineScore {
+  /** 이닝별 득점. null 이면 **아직 치르지 않은 이닝**(진행 중이거나 홈팀 9회 불필요) */
+  innings: (number | null)[];
+  hits: number;
+  errors: number;
+}
+
+export const LINESCORE: { away: LineScore; home: LineScore } = {
+  // LG (원정 · 초 공격) - 8회초까지 마쳤다
+  away: { innings: [0, 1, 0, 0, 2, 0, 1, 0, null], hits: 9, errors: 0 },
+  // 한화 (홈 · 말 공격) - 8회말 진행 중
+  home: { innings: [0, 0, 2, 0, 0, 1, 0, null, null], hits: 7, errors: 1 },
+};
+
 const bases = (f: boolean, s: boolean, t: boolean): Bases => ({
   first: f,
   second: s,
