@@ -41,12 +41,19 @@ import { colors, pressHighlight, radius, spacing, typography } from './src/theme
 export type TabKey = 'home' | 'live' | 'players' | 'gameday' | 'store' | 'my';
 
 // 픽토그램은 글자를 그림으로 되풀이하는 것이 아니라 **그 탭이 무엇을 하는 곳인지**를
-// 가리킨다. 그래서 선수는 사람이 아니라 배트다 - 사람을 쓰면 MY 와 겹치고, 이 탭은
-// '나'가 아니라 '선수단'이기 때문이다.
+// 가리킨다.
+//
+// ── players 는 '선수'가 아니라 '기록'이다 (2026-08-26) ───────
+// 홈의 지름길 타일은 이 탭을 **막대그래프 + '기록'**으로 부르고 하단탭은 **방망이 +
+// '선수'**로 불렀다. 같은 화면인데 이름도 그림도 달라서, 둘을 나란히 본 사람은 서로
+// 다른 두 곳으로 읽는다. 하단탭을 홈에 맞춘다 - 이 탭이 실제로 펼치는 것은 선수 소개가
+// 아니라 **스탯 표**라서, 화면의 내용과도 그쪽이 맞다.
+//
+// (방망이 그림 `assets/icons/tab-bat.svg` 는 지우지 않고 남겨 뒀다. 쓰이지는 않는다)
 const TABS: { key: TabKey; label: string; icon: TabIconName }[] = [
   { key: 'home', label: '홈', icon: 'home' },
   { key: 'live', label: '라이브', icon: 'live' },
-  { key: 'players', label: '선수', icon: 'bat' },
+  { key: 'players', label: '기록', icon: 'stats' },
   { key: 'gameday', label: '직관', icon: 'diamond' },
   { key: 'store', label: '굿즈', icon: 'bag' },
   { key: 'my', label: 'MY', icon: 'person' },

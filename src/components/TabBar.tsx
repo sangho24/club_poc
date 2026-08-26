@@ -28,11 +28,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import BagIcon from '../../assets/icons/tab-bag.svg';
-import BatIcon from '../../assets/icons/tab-bat.svg';
 import DiamondIcon from '../../assets/icons/tab-diamond.svg';
 import HomeIcon from '../../assets/icons/tab-home.svg';
 import LiveIcon from '../../assets/icons/tab-live.svg';
 import PersonIcon from '../../assets/icons/tab-person.svg';
+// 기록 탭은 홈의 지름길 타일과 **같은 파일**을 쓴다(tab-stats.svg 를 따로 두지 않는다).
+// 두 자리가 같은 곳을 가리키는데 그림이 둘이면 언젠가 한쪽만 고쳐져 어긋난다 -
+// 실제로 어긋나 있었다: 홈은 막대그래프, 하단탭은 방망이였다.
+import StatsIcon from '../../assets/icons/stats.svg';
 import { colors, radius, spacing, tabCapsule } from '../theme';
 
 /** 드래그로 인정하기 시작하는 가로 이동량 - 이보다 작으면 '누름'이다 */
@@ -78,7 +81,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const TAB_ICONS = {
   home: HomeIcon,
   live: LiveIcon,
-  bat: BatIcon,
+  stats: StatsIcon,
   diamond: DiamondIcon,
   bag: BagIcon,
   person: PersonIcon,
