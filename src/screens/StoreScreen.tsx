@@ -39,6 +39,7 @@ import {
   stockLeft,
   stockRatio,
 } from '../goods';
+import { ATTENDANCE, attendanceSummary, membershipOf } from '../my';
 import { UserProfile } from '../profile';
 import { BATTERS, PITCHERS } from '../roster';
 import { colors, radius, spacing, tabularFigures, typography } from '../theme';
@@ -53,6 +54,10 @@ const FILTERS: { key: 'all' | 'onsale' | 'upcoming'; label: string }[] = [
 ];
 
 export function StoreScreen({ profile }: { profile: UserProfile }) {
+  // 등급은 저장하지 않고 직관 기록에서 매번 집계한다(my.ts 원칙) - MY 화면의 값과 언제나 맞는다
+  const member = membershipOf(attendanceSummary(ATTENDANCE).games);
+  const discount = member.tier.goodsDiscount;
+
   const [filter, setFilter] = useState<'all' | 'onsale' | 'upcoming'>('all');
   const [open, setOpen] = useState<GoodsDrop | null>(null);
   const [alerts, setAlerts] = useState<Record<string, boolean>>({ d1: true });
@@ -109,6 +114,17 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
               </Row>
             ))}
           </SectionCard>
+        ) : null}
+
+        {/* 할인가만 보여주면 "왜 싼지" 모른다. 등급을 여기서 한 번 말해 주면 굿즈 탭이
+            MY 와 이어지고, 팬은 등급이 실제로 돈이 된다는 것을 상세를 열기 전에 안다 */}
+        {discount > 0 ? (
+          <View style={st.tierNote}>
+            <Text style={st.tierNoteText}>
+              <Text style={st.tierNoteStrong}>{member.tier.label}</Text> 등급 · 굿즈{' '}
+              {Math.round(discount * 100)}% 할인이 적용된 가격입니다
+            </Text>
+          </View>
         ) : null}
 
         <SectionTitle title="발매 소식" />
@@ -222,7 +238,22 @@ export function StoreScreen({ profile }: { profile: UserProfile }) {
                           </Text>
                         ) : null}
                       </View>
-                      <Text style={st.itemPrice}>{it.price.toLocaleString()}원</Text>
+                      {/* 등급 할인이 **여기서 실제로 작동한다.** MY 에 "굿즈 5% 할인"이라고
+                          적어만 두면 그건 약속이지 기능이 아니다. 정가에 취소선을 긋고
+                          할인가를 보여줘야 팬이 등급의 값어치를 눈으로 안다 */}
+                      {discount > 0 ? (
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={st.itemPriceWas}>{it.price.toLocaleString()}원</Text>
+                          <Text style={st.itemPrice}>
+                            {Math.round((it.price * (1 - discount)) / 10) * 10 > 0
+                              ? (Math.round((it.price * (1 - discount)) / 10) * 10).toLocaleString()
+                              : it.price.toLocaleString()}
+                            원
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={st.itemPrice}>{it.price.toLocaleString()}원</Text>
+                      )}
                     </View>
                   ))}
                 </GroupCard>
@@ -396,9 +427,21 @@ const st = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
   },
+  // 등급 안내 - 카드가 아니라 지면 위 한 줄. 카드로 세우면 굿즈보다 먼저 읽힌다
+  tierNote: { marginTop: spacing.cardGap },
+  tierNoteText: { ...typography.caption, lineHeight: 18 },
+  tierNoteStrong: { color: colors.brandText, fontWeight: '700' },
+
   itemName: { ...typography.caption, color: colors.text },
   itemLimit: { ...typography.micro, ...tabularFigures, fontWeight: '400', marginTop: 2 },
   itemPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 13.5 },
+  // 정가는 취소선으로 남긴다 - 지우면 얼마를 아꼈는지가 사라져 할인이 할인으로 안 읽힌다
+  itemPriceWas: {
+    ...typography.micro,
+    ...tabularFigures,
+    fontWeight: '400',
+    textDecorationLine: 'line-through',
+  },
 
   sheetHeadRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   sheetBody: { ...typography.body, fontSize: 13.5, lineHeight: 21 },

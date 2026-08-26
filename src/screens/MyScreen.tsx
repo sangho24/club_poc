@@ -9,7 +9,7 @@
 //   알림        온보딩 STEP 3 와 같은 세 스위치 - 온보딩 이후의 유일한 변경 지점
 //   나의 직관   직관 기록과 집계 (kbo_poc 정체성 원장의 라이트판)
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   AlertToggle,
@@ -26,9 +26,10 @@ import { PlayerAvatar } from '../components/photos';
 import { SEAT_GRADES } from '../gameday';
 import { STANDING } from '../game';
 import { ATTENDANCE, attendanceEdge, attendanceSummary, membershipOf, seatHabit } from '../my';
+import { SEAT_VIEWS, seatViewUrl } from '../seatView';
 import { KNOWLEDGE_OPTIONS, KnowledgeLevel, UserProfile } from '../profile';
 import { BATTERS, PITCHERS } from '../roster';
-import { colors, radius, spacing, tabularFigures, typography } from '../theme';
+import { colors, radius, spacing, states, tabularFigures, typography } from '../theme';
 
 export function MyScreen({
   profile,
@@ -58,10 +59,7 @@ export function MyScreen({
   const summary = attendanceSummary(ATTENDANCE);
   const member = membershipOf(summary.games);
   const edge = attendanceEdge(ATTENDANCE, STANDING.winRate);
-  const seat = seatHabit(
-    ATTENDANCE,
-    SEAT_GRADES.map((g) => g.name),
-  );
+  const seat = seatHabit(ATTENDANCE, SEAT_GRADES);
 
   return (
     <>
@@ -145,6 +143,31 @@ export function MyScreen({
               />
             </View>
           ) : null}
+
+          <Divider />
+
+          {/* ⚠ 등급이 가르는 것은 "무엇을 볼 수 있나"가 아니라 **"무엇을 먼저·싸게
+              할 수 있나"**다. 심화 지표와 승부 예측은 등급과 무관하게 전부 열려 있다 -
+              그건 이 앱을 여는 이유이고, 잠그는 순간 팬이 앱을 안 쓴다.
+              잠긴 것을 회색으로 **보여준다** - 감추면 다음 등급을 왜 올리는지 모른다 */}
+          <View style={{ gap: 6 }}>
+            {member.tier.perks.map((p) => (
+              <Text key={p} style={st.perkOn}>
+                ✓ {p}
+              </Text>
+            ))}
+          </View>
+
+          {member.next ? (
+            <View style={st.lockBox}>
+              <Text style={st.lockHead}>{member.next.label} 에서 열립니다</Text>
+              {member.next.unlocks.map((p) => (
+                <Text key={p} style={st.perkOff}>
+                  · {p}
+                </Text>
+              ))}
+            </View>
+          ) : null}
         </SectionCard>
 
         {/* ── 알림 - 온보딩 STEP 3 와 같은 부품 ──────────────── */}
@@ -205,10 +228,22 @@ export function MyScreen({
             </Text>
           </View>
 
+          {/* 기록에 좌석이 남아 있는데 아무 데도 쓰지 않고 있었다. 내가 앉았던 자리를
+              **구단 공식 VR 로 다시 볼 수 있다** - 예매 화면의 시야 링크와 같은 리소스지만,
+              거기서는 '고르는 중'이고 여기서는 '내가 앉았던 곳'이라 성격이 다르다 */}
           {seat ? (
-            <Text style={st.seatHabit}>
-              가장 자주 앉은 자리 <Text style={st.edgeStrong}>{seat.name}</Text> · {seat.times}회
-            </Text>
+            <Pressable
+              onPress={() => Linking.openURL(seatViewUrl(SEAT_VIEWS[seat.grade.id].scene))}
+              hitSlop={8}
+              accessibilityRole="link"
+              accessibilityLabel={`${seat.grade.name} 대표 구역 360도 시야 보기`}
+              style={({ pressed }) => pressed && states.pressed}
+            >
+              <Text style={st.seatHabit}>
+                가장 자주 앉은 자리 <Text style={st.edgeStrong}>{seat.grade.name}</Text> ·{' '}
+                {seat.times}회<Text style={st.edgeStrong}> · 시야 ›</Text>
+              </Text>
+            </Pressable>
           ) : null}
 
           <Divider />
@@ -294,6 +329,17 @@ const st = StyleSheet.create({
     overflow: 'hidden',
   },
   tierFill: { height: '100%', borderRadius: radius.bar, backgroundColor: colors.brand },
+
+  // 열린 혜택과 잠긴 혜택. 잠긴 쪽은 감추지 않고 회색으로 둔다 - 감추면 올릴 이유를 모른다
+  perkOn: { ...typography.body, color: colors.text, lineHeight: 20 },
+  lockBox: {
+    gap: 5,
+    padding: spacing.md,
+    borderRadius: radius.tile,
+    backgroundColor: colors.surface,
+  },
+  lockHead: { ...typography.micro, color: colors.subText },
+  perkOff: { ...typography.caption, lineHeight: 19 },
 
   // 직관 승률 해석 - 사실(수치)과 해석(표본 경고)을 한 상자에 묶는다
   edgeBox: { gap: 3 },
