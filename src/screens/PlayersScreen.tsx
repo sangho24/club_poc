@@ -79,6 +79,7 @@ import {
   obpOf,
   opsOf,
   pitcherWarOf,
+  qualifiedBF,
   qualifiedIPOuts,
   qualifiedPA,
   slgOf,
@@ -104,6 +105,8 @@ type RoleFilter = '전체' | '선발' | '불펜' | '마무리';
 const TEAM_GAMES = STANDING.w + STANDING.l + STANDING.d;
 const QUAL_PA = qualifiedPA(TEAM_GAMES);
 const QUAL_OUTS = qualifiedIPOuts(TEAM_GAMES);
+/** 투수 타일은 상대타자로 표본을 세므로 규정선도 그 단위로 환산해 둔다 */
+const QUAL_BF = qualifiedBF(TEAM_GAMES);
 
 /**
  * 정렬 기준.
@@ -1346,9 +1349,10 @@ function BatterDetail({
           것 하나만 - 셋을 다 늘어놓으면 경고가 배경이 되어 아무것도 안 읽힌다 */}
       <TrustCard
         sample={b.pa}
+        qual={QUAL_PA}
         items={
           profile.level === 'rookie'
-            ? worstTrustItems(metrics, b.pa)
+            ? worstTrustItems(metrics, b.pa, QUAL_PA)
             : metrics.map((m) => ({ metric: m.key, label: m.label }))
         }
       />
@@ -1423,6 +1427,7 @@ function PitcherDetail({
             value={fip.toFixed(2)}
             statKey="fip"
             sample={p.bf}
+            qual={QUAL_BF}
             onGlossary={onGlossary}
             active={glossaryKey === 'fip'}
           />
@@ -1431,6 +1436,7 @@ function PitcherDetail({
             value={`${(kRateOf(p) * 100).toFixed(1)}%`}
             statKey="kRate"
             sample={p.bf}
+            qual={QUAL_BF}
             onGlossary={onGlossary}
             active={glossaryKey === 'kRate'}
           />
@@ -1439,6 +1445,7 @@ function PitcherDetail({
             value={`${(bbRateOf(p) * 100).toFixed(1)}%`}
             statKey="bbRate"
             sample={p.bf}
+            qual={QUAL_BF}
             onGlossary={onGlossary}
             active={glossaryKey === 'bbRate'}
           />
@@ -1858,6 +1865,7 @@ function MetricTiles({
           value={m.format(stat)}
           statKey={m.key}
           sample={stat.pa}
+          qual={QUAL_PA}
           onGlossary={onGlossary}
           active={glossaryKey === m.key}
           wide={wide}
@@ -1908,6 +1916,7 @@ function MetricTile({
   value,
   statKey,
   sample,
+  qual,
   onGlossary,
   active,
   wide,
@@ -1916,13 +1925,15 @@ function MetricTile({
   value: string;
   statKey: string;
   sample: number;
+  /** 이 표본을 견줄 규정선 - 타자는 규정타석, 투수는 그것을 상대타자로 옮긴 값 */
+  qual: number;
   onGlossary: (k: string | null) => void;
   /** 지금 이 지표의 설명이 열려 있는가 - 어느 타일을 눌렀는지 표시한다 */
   active?: boolean;
   /** 한 줄에 둘씩 접히는 폭 - 넷을 고른 경우 */
   wide?: boolean;
 }) {
-  const trust = trustOf(statKey, sample);
+  const trust = trustOf(statKey, sample, qual);
   const dot = { high: colors.trustHigh, mid: colors.trustMid, low: colors.trustLow }[trust];
   // 설명이 없는 지표는 누를 수 없다. 꺾쇠만 있고 아무 일도 안 일어나면 그게 더 나쁘다
   const explained = !!GLOSSARY[statKey];
@@ -2047,12 +2058,14 @@ const TRUST_RANK = { low: 0, mid: 1, high: 2 } as const;
  * 입문 수준에서 쓴다. 신뢰도 경고를 지표 수만큼 늘어놓으면 그 카드가 화면에서 가장
  * 긴 덩어리가 되고, 정작 '무엇을 조심하라'는 말은 배경으로 밀린다.
  */
-function worstTrustItems(metrics: MetricOpt[], sample: number) {
+function worstTrustItems(metrics: MetricOpt[], sample: number, qual: number) {
   const items = metrics.map((m) => ({ metric: m.key, label: m.label }));
   if (items.length === 0) return items;
   return [
     items.reduce((a, c) =>
-      TRUST_RANK[trustOf(c.metric, sample)] < TRUST_RANK[trustOf(a.metric, sample)] ? c : a,
+      TRUST_RANK[trustOf(c.metric, sample, qual)] < TRUST_RANK[trustOf(a.metric, sample, qual)]
+        ? c
+        : a,
     ),
   ];
 }
@@ -2060,25 +2073,28 @@ function worstTrustItems(metrics: MetricOpt[], sample: number) {
 function TrustCard({
   items,
   sample,
+  qual,
 }: {
   items: { metric: string; label: string }[];
   sample: number;
+  /** 규정선. 판정이 '안정화 표본'이 아니라 여기서 나온다 */
+  qual: number;
 }) {
   if (items.length === 0) return null;
-  const levels = items.map((i) => trustOf(i.metric, sample));
+  const levels = items.map((i) => trustOf(i.metric, sample, qual));
   const worst = levels.reduce((a, b) => (TRUST_RANK[b] < TRUST_RANK[a] ? b : a));
   const tone = ({ high: 'win', mid: 'warn', low: 'live' } as const)[worst];
   const word = { high: '충분', mid: '보통', low: '부족' } as const;
 
   return (
-    <NoticeCard tone={tone} title={`표본 ${sample}타석 · 신뢰도 ${word[worst]}`}>
+    <NoticeCard tone={tone} title={`표본 ${sample}타석 · 규정 ${qual}타석 대비 ${word[worst]}`}>
       <View>
         {items.map((it, i) => (
           <NoticeRow
             key={it.metric}
             first={i === 0}
             label={`${it.label} · ${word[levels[i]]}`}
-            text={trustSentence(it.metric, sample)}
+            text={trustSentence(it.metric, sample, qual)}
           />
         ))}
       </View>

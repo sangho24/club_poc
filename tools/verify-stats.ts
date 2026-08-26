@@ -5,6 +5,7 @@
 //
 // 실행: npx tsc -p tools/tsconfig.verify.json && node .tmp/tools/verify-stats.js
 import { JosaKind, josa } from '../src/korean';
+import { STANDING } from '../src/game';
 import { BATTERS, OPPONENT_PITCHERS, PITCHERS, verifyRoster } from '../src/roster';
 import {
   GameSituation,
@@ -27,6 +28,7 @@ import {
   obpOf,
   opsOf,
   pitcherWarOf,
+  qualifiedPA,
   slgOf,
   trustSentence,
   whipOf,
@@ -282,10 +284,16 @@ console.log(
 );
 
 console.log('\n═══ 12. 신뢰도 경고 ═══');
-for (const b of [BATTERS[0], BATTERS[6]]) {
-  console.log(`  ${b.name} BABIP ${babipOf(b.stat).toFixed(3)}`);
-  console.log(`    ${trustSentence('babip', b.stat.pa)}`);
-  console.log(`    ${trustSentence('wrcPlus', b.stat.pa)}`);
+// 판정 기준은 '안정화 표본'이 아니라 **규정타석**이다. 화면(PlayersScreen)이 쓰는 것과
+// 같은 수를 여기서도 만들어야, 검증은 통과했는데 화면만 다른 말을 하는 일이 없다
+const TEAM_G = STANDING.w + STANDING.l + STANDING.d;
+const QUAL_PA = qualifiedPA(TEAM_G);
+console.log(`  규정타석 ${QUAL_PA}타석 (팀 ${TEAM_G}경기)`);
+for (const b of [BATTERS[0], BATTERS[4], BATTERS[9]]) {
+  console.log(`  ${b.name} ${b.stat.pa}타석 · BABIP ${babipOf(b.stat).toFixed(3)}`);
+  for (const m of ['babip', 'wrcPlus', 'soRate']) {
+    console.log(`    [${m}] ${trustSentence(m, b.stat.pa, QUAL_PA)}`);
+  }
 }
 
 console.log(

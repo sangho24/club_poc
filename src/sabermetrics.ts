@@ -334,6 +334,9 @@ export type TrustLevel = 'high' | 'mid' | 'low';
  * "BABIP 설명 수준 보완"의 실질이 여기에 있다.
  *
  * 출처: 세이버메트릭스 통설(신뢰도 0.5 도달 표본). KBO 재추정 필요.
+ *
+ * ⚠ 이 값은 **단독 기준이 아니다.** 화면의 판정은 readableAt() 이 규정타석과 견줘
+ *   정한다 - 여기 적힌 820 을 그대로 쓰면 BABIP 가 누구에게나 영원히 '부족'이 된다.
  */
 export const STABILIZATION_PA: Record<string, number> = {
   kRate: 60,
@@ -357,21 +360,58 @@ export const STABILIZATION_PA: Record<string, number> = {
   war: 500,
 };
 
-export function trustOf(metric: string, sample: number): TrustLevel {
-  const need = STABILIZATION_PA[metric] ?? 300;
+/**
+ * 이 값을 읽으려면 몇 타석이 필요한가 - 둘 중 **먼저 오는 쪽**.
+ *
+ *   ① 규정타석    - 이 선수가 주전만큼 뛰었나 (팀 경기수 × 3.1)
+ *   ② 안정화 표본 - 이 지표가 그 전에 이미 형태를 잡는가
+ *
+ * ── 왜 안정화 표본 하나로는 안 되나 ─────────────────────────
+ * BABIP 의 안정화 표본 820타석은 **한 시즌에 도달할 수 없는 수**다(규정타석이 500 남짓).
+ * 그것만 기준으로 두면 BABIP 는 누구에게나 영원히 '부족'이 되어, 500타석 주전과 150타석
+ * 백업이 같은 딱지를 받는다. 조건이 있으나 마나 한 경고는 정보가 아니라 서식이 되고,
+ * 정작 구분해야 할 때도 못 쓴다.
+ *
+ * ── 왜 규정타석 하나로도 안 되나 ───────────────────────────
+ * 삼진율은 60타석이면 형태가 잡힌다. 210타석 백업의 삼진율에 '규정 미달' 딱지를 붙이면
+ * 화면이 이 앱의 용어 해설(삼진율 trap - "가장 빨리 안정되는 값")과 다른 말을 한다.
+ *
+ * 그래서 min() 이다. 지표가 빨리 자리 잡으면 그 표본에서 끊고, 그렇지 않으면 '주전만큼
+ * 뛰었나'로 묻는다 - 어느 쪽이든 **도달할 수 있는 기준만** 남는다.
+ *
+ * ⚠ 이 함수가 재는 것은 '이 지표가 통계적으로 안정됐나'가 아니라 '이 값을 읽을 만큼
+ *   뛰었나'다. BABIP 가 한 시즌으로 안정되지 않는다는 사실은 지표의 성질이라
+ *   statGlossary 의 trap 이 맡는다.
+ */
+export function readableAt(metric: string, qualSample: number): number {
+  const stabilization = STABILIZATION_PA[metric] ?? qualSample;
+  return Math.min(qualSample, stabilization);
+}
+
+export function trustOf(metric: string, sample: number, qualSample: number): TrustLevel {
+  const need = readableAt(metric, qualSample);
   if (sample >= need) return 'high';
   if (sample >= need * 0.5) return 'mid';
   return 'low';
 }
 
-/** 신뢰도를 문장으로 - 화면이 값 옆에 그대로 붙인다 */
-export function trustSentence(metric: string, sample: number): string {
-  const need = STABILIZATION_PA[metric] ?? 300;
-  const t = trustOf(metric, sample);
-  if (t === 'high') return `표본 ${sample}타석 - 이 지표가 안정되는 ${need}타석을 넘겼습니다.`;
-  if (t === 'mid')
-    return `표본 ${sample}타석 - 안정 기준 ${need}타석의 절반은 넘겼지만 아직 흔들립니다.`;
-  return `표본 ${sample}타석 - 안정 기준 ${need}타석에 한참 못 미칩니다. 이 값으로 선수를 판단하면 안 됩니다.`;
+/**
+ * 신뢰도를 문장으로 - 화면이 값 옆에 그대로 붙인다.
+ *
+ * 기준이 어디서 왔는지까지 밝힌다. 같은 210타석이 삼진율에는 '충분', BABIP 에는 '부족'인
+ * 이유가 문장 안에 없으면 사용자는 앱이 변덕을 부린다고 읽는다.
+ *
+ * ⚠ 숫자 바로 뒤에 조사를 두지 않는다 - 447 은 "사백사십칠"이라 받침이 있고 442 는
+ *   "사백사십이"라 없다. 그래서 기준 표기는 언제나 `…타석` 으로 끝맺는다.
+ */
+export function trustSentence(metric: string, sample: number, qualSample: number): string {
+  const need = readableAt(metric, qualSample);
+  const t = trustOf(metric, sample, qualSample);
+  const basis =
+    need < qualSample ? `이 지표가 자리를 잡는 ${need}타석` : `규정 ${qualSample}타석`;
+  if (t === 'high') return `표본 ${sample}타석 - ${basis}을 넘겼습니다.`;
+  if (t === 'mid') return `표본 ${sample}타석 - ${basis}의 절반은 넘겼지만 아직 흔들립니다.`;
+  return `표본 ${sample}타석 - ${basis}에 한참 못 미칩니다. 이 값으로 선수를 판단하면 안 됩니다.`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -452,3 +492,12 @@ export function sumPitcherLines(lines: PitcherStatLine[]): PitcherStatLine {
  */
 export const qualifiedPA = (teamGames: number) => Math.ceil(teamGames * 3.1);
 export const qualifiedIPOuts = (teamGames: number) => teamGames * 3;
+
+/**
+ * 규정이닝을 **상대한 타자 수**로 옮긴 값 - 투수 지표의 표본 기준.
+ *
+ * 투수 타일은 이닝이 아니라 상대타자(bf)로 표본을 센다(비율 지표의 분모라서). 규정타석을
+ * 그대로 갖다 쓰면 기준이 낮아져 불펜이 전부 '충분'으로 찍힌다. 이닝당 상대타자는 리그
+ * 평균 4.3명 언저리다 - 정밀한 수가 아니라 자릿수를 맞추기 위한 환산이다.
+ */
+export const qualifiedBF = (teamGames: number) => Math.ceil((qualifiedIPOuts(teamGames) / 3) * 4.3);
