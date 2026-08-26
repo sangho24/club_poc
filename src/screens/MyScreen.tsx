@@ -39,7 +39,7 @@ import {
   upcomingTickets,
 } from '../tickets';
 import { couponCode } from '../partners';
-import { ATTENDANCE, attendanceEdge, attendanceSummary, membershipOf, seatHabit } from '../my';
+import { ATTENDANCE, attendanceSummary, membershipOf, seatHabit } from '../my';
 import { SEAT_VIEWS, seatViewUrl } from '../seatView';
 import { KNOWLEDGE_OPTIONS, KnowledgeLevel, UserProfile } from '../profile';
 import { BATTERS, PITCHERS } from '../roster';
@@ -203,7 +203,6 @@ export function MyScreen({
 
   const summary = attendanceSummary(ATTENDANCE);
   const member = membershipOf(summary.games);
-  const edge = attendanceEdge(ATTENDANCE, STANDING.winRate);
   const seat = seatHabit(ATTENDANCE, SEAT_GRADES);
 
   return (
@@ -374,19 +373,12 @@ export function MyScreen({
             <StatTile label="승률" value={summary.winRate.toFixed(3)} />
           </View>
 
-          {/* ⚠ 팬이 가장 하고 싶어 하는 말("내가 가면 이긴다")을 앱이 대신 해 주되
-              **단정하지 않는다.** 5경기 .600 은 3승 2패일 뿐이고 한 경기만 뒤집혀도
-              .400 이 된다. 심화 지표에 표본 신뢰도를 붙인 것과 같은 원칙이다 -
-              팬이 재미로 보는 값이어도 근거 없이 단정하면 다른 수치까지 못 믿게 된다 */}
+          {/* 값 둘을 나란히 두는 것으로 끝낸다. 표본이 작다는 사정을 문장으로 덧붙이지
+              않는다 - docs/design-decisions.md 의 '부연 설명은 AI 분석에서만' 참조 */}
           <View style={st.edgeBox}>
             <Text style={st.edgeLine}>
               내가 간 날 <Text style={st.edgeStrong}>{summary.winRate.toFixed(3)}</Text>
               <Text style={st.edgeDim}> · 팀 시즌 {STANDING.winRate.toFixed(3)}</Text>
-            </Text>
-            <Text style={st.edgeNote}>
-              {edge.settled
-                ? `표본이 ${summary.games}경기라 경향으로 읽어도 됩니다.`
-                : `${summary.games}경기는 아직 우연입니다. ${edge.gamesToTrust}번 더 가면 경향이라 말할 수 있습니다.`}
             </Text>
           </View>
 
@@ -596,7 +588,6 @@ const st = StyleSheet.create({
   edgeLine: { ...typography.bodyStrong, ...tabularFigures },
   edgeStrong: { color: colors.brandText },
   edgeDim: { ...typography.caption, fontWeight: '400' },
-  edgeNote: { ...typography.caption, lineHeight: 18 },
   seatHabit: { ...typography.caption, lineHeight: 18 },
 
   // 접어 둔 기록을 여는 줄 - 카드 안이라 Row 의 좌우 여백을 지우고 카드에 맞춘다

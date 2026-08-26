@@ -30,7 +30,6 @@ import {
   GroupCard,
   Label,
   NoticeCard,
-  NoticeRow,
   RangeGauge,
   RichText,
   Row,
@@ -89,7 +88,6 @@ import {
   sumBatterLines,
   sumPitcherLines,
   trustOf,
-  trustSentence,
   walkRateOf,
   whipOf,
   wobaOf,
@@ -1363,18 +1361,6 @@ function BatterDetail({
         <BattedBall gb={b.gbRate} fb={b.fbRate} ld={b.ldRate} />
       </Card>
 
-      {/* 신뢰도도 **지금 보고 있는 지표**를 따라간다. 입문 수준에는 그중 가장 못 믿을
-          것 하나만 - 셋을 다 늘어놓으면 경고가 배경이 되어 아무것도 안 읽힌다 */}
-      <TrustCard
-        sample={b.pa}
-        qual={QUAL_PA}
-        items={
-          profile.level === 'rookie'
-            ? worstTrustItems(metrics, b.pa, QUAL_PA)
-            : metrics.map((m) => ({ metric: m.key, label: m.label }))
-        }
-      />
-
       <AiAnalysis analysis={analyzeBatter(batter, PARK)} />
     </View>
   );
@@ -2028,68 +2014,6 @@ function BattedBall({ gb, fb, ld }: { gb: number; fb: number; ld: number }) {
         ]}
       />
     </View>
-  );
-}
-
-/**
- * 표본 신뢰도 - 지표가 여러 개여도 **카드는 하나다.**
- *
- * 처음에는 지표마다 틴트 카드를 하나씩 띄웠는데, 그러면 색 있는 상자가 연달아 서서
- * 경고가 배경이 된다(common.tsx 의 NoticeCard 주석과 같은 이유). Flighty 도 공항의
- * 출발·도착·날씨 문제를 카드 하나 안의 세 행으로 묶는다.
- *
- * 카드의 색은 **가장 못 믿을 지표**를 따른다. 셋 중 하나가 표본 부족이면 그 카드는
- * 초록일 수 없다 - 안심하고 넘어가라는 신호가 되어 버린다.
- */
-const TRUST_RANK = { low: 0, mid: 1, high: 2 } as const;
-
-/**
- * 고른 지표 중 **가장 못 믿을 것 하나**.
- *
- * 입문 수준에서 쓴다. 신뢰도 경고를 지표 수만큼 늘어놓으면 그 카드가 화면에서 가장
- * 긴 덩어리가 되고, 정작 '무엇을 조심하라'는 말은 배경으로 밀린다.
- */
-function worstTrustItems<T>(metrics: MetricOpt<T>[], sample: number, qual: number) {
-  const items = metrics.map((m) => ({ metric: m.key, label: m.label }));
-  if (items.length === 0) return items;
-  return [
-    items.reduce((a, c) =>
-      TRUST_RANK[trustOf(c.metric, sample, qual)] < TRUST_RANK[trustOf(a.metric, sample, qual)]
-        ? c
-        : a,
-    ),
-  ];
-}
-
-function TrustCard({
-  items,
-  sample,
-  qual,
-}: {
-  items: { metric: string; label: string }[];
-  sample: number;
-  /** 규정선. 판정이 '안정화 표본'이 아니라 여기서 나온다 */
-  qual: number;
-}) {
-  if (items.length === 0) return null;
-  const levels = items.map((i) => trustOf(i.metric, sample, qual));
-  const worst = levels.reduce((a, b) => (TRUST_RANK[b] < TRUST_RANK[a] ? b : a));
-  const tone = ({ high: 'win', mid: 'warn', low: 'live' } as const)[worst];
-  const word = { high: '충분', mid: '보통', low: '부족' } as const;
-
-  return (
-    <NoticeCard tone={tone} title={`표본 ${sample}타석 · 규정 ${qual}타석 대비 ${word[worst]}`}>
-      <View>
-        {items.map((it, i) => (
-          <NoticeRow
-            key={it.metric}
-            first={i === 0}
-            label={`${it.label} · ${word[levels[i]]}`}
-            text={trustSentence(it.metric, sample, qual)}
-          />
-        ))}
-      </View>
-    </NoticeCard>
   );
 }
 

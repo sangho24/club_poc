@@ -192,8 +192,7 @@ export const walkRateOf = (b: BatterStatLine) => r3(safe(b.bb, b.pa));
  * 홈런은 야수가 손댈 수 없으므로 둘 다 "수비가 개입할 여지"가 없다.
  * 남은 것이 인플레이 타구이고, 그중 몇 개가 안타가 됐는지를 세는 값이다.
  */
-export const babipOf = (b: BatterStatLine) =>
-  r3(safe(b.h - b.hr, b.ab - b.so - b.hr + b.sf));
+export const babipOf = (b: BatterStatLine) => r3(safe(b.h - b.hr, b.ab - b.so - b.hr + b.sf));
 
 /** 피BABIP - 투수판. 계산 구조는 같다 */
 export function babipAllowedOf(p: PitcherStatLine): number {
@@ -396,10 +395,14 @@ export function trustOf(metric: string, sample: number, qualSample: number): Tru
 }
 
 /**
- * 신뢰도를 문장으로 - 화면이 값 옆에 그대로 붙인다.
+ * 신뢰도를 문장으로 - **검증 도구 전용이다. 화면에 붙이지 않는다.**
  *
- * 기준이 어디서 왔는지까지 밝힌다. 같은 210타석이 삼진율에는 '충분', BABIP 에는 '부족'인
- * 이유가 문장 안에 없으면 사용자는 앱이 변덕을 부린다고 읽는다.
+ * ⚠ 이 문장을 화면에 되돌리지 말 것. 값 옆에 표본 사정을 문장으로 덧붙이는 것은
+ *   금지되어 있다 - docs/design-decisions.md 의 '부연 설명은 AI 분석에서만' 참조.
+ *   화면에서 표본을 말해야 하면 지표 타일의 **색 점**(trustOf)으로 한다.
+ *
+ * 남겨 두는 이유는 tools/verify-stats.ts 다. 목업 원자료가 야구적으로 말이 되는지
+ * 사람이 읽어 확인하는 자리이고, 거기서는 문장이 곧 검산 결과다.
  *
  * ⚠ 숫자 바로 뒤에 조사를 두지 않는다 - 447 은 "사백사십칠"이라 받침이 있고 442 는
  *   "사백사십이"라 없다. 그래서 기준 표기는 언제나 `…타석` 으로 끝맺는다.
@@ -407,8 +410,7 @@ export function trustOf(metric: string, sample: number, qualSample: number): Tru
 export function trustSentence(metric: string, sample: number, qualSample: number): string {
   const need = readableAt(metric, qualSample);
   const t = trustOf(metric, sample, qualSample);
-  const basis =
-    need < qualSample ? `이 지표가 자리를 잡는 ${need}타석` : `규정 ${qualSample}타석`;
+  const basis = need < qualSample ? `이 지표가 자리를 잡는 ${need}타석` : `규정 ${qualSample}타석`;
   if (t === 'high') return `표본 ${sample}타석 - ${basis}을 넘겼습니다.`;
   if (t === 'mid') return `표본 ${sample}타석 - ${basis}의 절반은 넘겼지만 아직 흔들립니다.`;
   return `표본 ${sample}타석 - ${basis}에 한참 못 미칩니다. 이 값으로 선수를 판단하면 안 됩니다.`;
@@ -430,29 +432,61 @@ export function trustSentence(metric: string, sample: number, qualSample: number
 export function sumBatterLines(lines: BatterStatLine[]): BatterStatLine {
   const z: BatterStatLine = {
     g: 0,
-    pa: 0, ab: 0, h: 0, double: 0, triple: 0, hr: 0,
-    bb: 0, ibb: 0, hbp: 0, so: 0, sf: 0, sh: 0,
-    sb: 0, cs: 0, r: 0, rbi: 0, gdp: 0,
-    gbRate: 0, fbRate: 0, ldRate: 0,
-    fieldingRuns: 0, positionAdj: 0,
+    pa: 0,
+    ab: 0,
+    h: 0,
+    double: 0,
+    triple: 0,
+    hr: 0,
+    bb: 0,
+    ibb: 0,
+    hbp: 0,
+    so: 0,
+    sf: 0,
+    sh: 0,
+    sb: 0,
+    cs: 0,
+    r: 0,
+    rbi: 0,
+    gdp: 0,
+    gbRate: 0,
+    fbRate: 0,
+    ldRate: 0,
+    fieldingRuns: 0,
+    positionAdj: 0,
   };
-  const out = lines.reduce((a, s) => ({
-    ...a,
-    // 경기 수는 팀 경기 수를 넘을 수 있다 - 같은 날 여러 선수가 나오기 때문이다.
-    // 합계 화면에서 이 값을 팀 경기 수로 읽지 않도록 주의
-    g: a.g + s.g,
-    pa: a.pa + s.pa, ab: a.ab + s.ab, h: a.h + s.h,
-    double: a.double + s.double, triple: a.triple + s.triple, hr: a.hr + s.hr,
-    bb: a.bb + s.bb, ibb: a.ibb + s.ibb, hbp: a.hbp + s.hbp,
-    so: a.so + s.so, sf: a.sf + s.sf, sh: a.sh + s.sh,
-    sb: a.sb + s.sb, cs: a.cs + s.cs, r: a.r + s.r, rbi: a.rbi + s.rbi, gdp: a.gdp + s.gdp,
-    fieldingRuns: a.fieldingRuns + s.fieldingRuns,
-    // 비율과 포지션 조정은 아래에서 가중 평균한다
-    gbRate: a.gbRate + s.gbRate * s.pa,
-    fbRate: a.fbRate + s.fbRate * s.pa,
-    ldRate: a.ldRate + s.ldRate * s.pa,
-    positionAdj: a.positionAdj + s.positionAdj * s.pa,
-  }), z);
+  const out = lines.reduce(
+    (a, s) => ({
+      ...a,
+      // 경기 수는 팀 경기 수를 넘을 수 있다 - 같은 날 여러 선수가 나오기 때문이다.
+      // 합계 화면에서 이 값을 팀 경기 수로 읽지 않도록 주의
+      g: a.g + s.g,
+      pa: a.pa + s.pa,
+      ab: a.ab + s.ab,
+      h: a.h + s.h,
+      double: a.double + s.double,
+      triple: a.triple + s.triple,
+      hr: a.hr + s.hr,
+      bb: a.bb + s.bb,
+      ibb: a.ibb + s.ibb,
+      hbp: a.hbp + s.hbp,
+      so: a.so + s.so,
+      sf: a.sf + s.sf,
+      sh: a.sh + s.sh,
+      sb: a.sb + s.sb,
+      cs: a.cs + s.cs,
+      r: a.r + s.r,
+      rbi: a.rbi + s.rbi,
+      gdp: a.gdp + s.gdp,
+      fieldingRuns: a.fieldingRuns + s.fieldingRuns,
+      // 비율과 포지션 조정은 아래에서 가중 평균한다
+      gbRate: a.gbRate + s.gbRate * s.pa,
+      fbRate: a.fbRate + s.fbRate * s.pa,
+      ldRate: a.ldRate + s.ldRate * s.pa,
+      positionAdj: a.positionAdj + s.positionAdj * s.pa,
+    }),
+    z,
+  );
   const w = out.pa || 1;
   return {
     ...out,
@@ -466,20 +500,51 @@ export function sumBatterLines(lines: BatterStatLine[]): BatterStatLine {
 /** 투수판 - 가중치는 상대한 타자 수 */
 export function sumPitcherLines(lines: PitcherStatLine[]): PitcherStatLine {
   const z: PitcherStatLine = {
-    g: 0, gs: 0, ipOuts: 0, h: 0, hr: 0, bb: 0, ibb: 0, hbp: 0,
-    so: 0, r: 0, er: 0, w: 0, l: 0, sv: 0, hld: 0, bf: 0,
-    gbRate: 0, fbRate: 0, ldRate: 0,
+    g: 0,
+    gs: 0,
+    ipOuts: 0,
+    h: 0,
+    hr: 0,
+    bb: 0,
+    ibb: 0,
+    hbp: 0,
+    so: 0,
+    r: 0,
+    er: 0,
+    w: 0,
+    l: 0,
+    sv: 0,
+    hld: 0,
+    bf: 0,
+    gbRate: 0,
+    fbRate: 0,
+    ldRate: 0,
   };
-  const out = lines.reduce((a, s) => ({
-    ...a,
-    g: a.g + s.g, gs: a.gs + s.gs, ipOuts: a.ipOuts + s.ipOuts,
-    h: a.h + s.h, hr: a.hr + s.hr, bb: a.bb + s.bb, ibb: a.ibb + s.ibb, hbp: a.hbp + s.hbp,
-    so: a.so + s.so, r: a.r + s.r, er: a.er + s.er,
-    w: a.w + s.w, l: a.l + s.l, sv: a.sv + s.sv, hld: a.hld + s.hld, bf: a.bf + s.bf,
-    gbRate: a.gbRate + s.gbRate * s.bf,
-    fbRate: a.fbRate + s.fbRate * s.bf,
-    ldRate: a.ldRate + s.ldRate * s.bf,
-  }), z);
+  const out = lines.reduce(
+    (a, s) => ({
+      ...a,
+      g: a.g + s.g,
+      gs: a.gs + s.gs,
+      ipOuts: a.ipOuts + s.ipOuts,
+      h: a.h + s.h,
+      hr: a.hr + s.hr,
+      bb: a.bb + s.bb,
+      ibb: a.ibb + s.ibb,
+      hbp: a.hbp + s.hbp,
+      so: a.so + s.so,
+      r: a.r + s.r,
+      er: a.er + s.er,
+      w: a.w + s.w,
+      l: a.l + s.l,
+      sv: a.sv + s.sv,
+      hld: a.hld + s.hld,
+      bf: a.bf + s.bf,
+      gbRate: a.gbRate + s.gbRate * s.bf,
+      fbRate: a.fbRate + s.fbRate * s.bf,
+      ldRate: a.ldRate + s.ldRate * s.bf,
+    }),
+    z,
+  );
   const w = out.bf || 1;
   return { ...out, gbRate: out.gbRate / w, fbRate: out.fbRate / w, ldRate: out.ldRate / w };
 }
