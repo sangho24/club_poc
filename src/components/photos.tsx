@@ -312,6 +312,53 @@ export function PlayerAvatar({
   );
 }
 
+/**
+ * 선수 컷 - 타일·배너처럼 **네모난 자리**를 사진으로 채운다.
+ *
+ * PlayerAvatar 가 동그란 얼굴 자리라면 이쪽은 면이다. 크롭 규칙은 같다 - 상자보다
+ * 키가 큰 칸에 cover 로 채우고 아래를 잘라 얼굴이 있는 위쪽을 남긴다(FACE_BIAS).
+ *
+ * 사진이 없으면 등번호 유니폼 아바타로 떨어진다. 빈 면을 두면 그 타일만 '깨진 자리'로
+ * 읽히는데, 격자에서는 그 하나가 줄 전체를 무너뜨린다.
+ */
+export function PlayerShot({ playerId, height }: { playerId: string; height: number }) {
+  const photo = PLAYER_PHOTOS[playerId];
+  const back = BACK_NUMBERS[playerId];
+
+  if (!photo) {
+    return (
+      <View style={[ps.fallback, { height }]}>
+        {back === undefined ? (
+          <CapMark size={Math.round(height * 0.42)} />
+        ) : (
+          <JerseyAvatar back={back} size={Math.round(height * 0.46)} />
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[ps.frame, { height }]}>
+      <Image
+        source={photo}
+        style={{ width: '100%', height: height * FACE_BIAS }}
+        resizeMode="cover"
+      />
+    </View>
+  );
+}
+
+const ps = StyleSheet.create({
+  // justifyContent 기본값(flex-start)이 곧 '위 기준 크롭'이다
+  frame: { width: '100%', overflow: 'hidden', backgroundColor: colors.surface },
+  fallback: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
 // ── 유니폼 그림 ───────────────────────────────────────────────
 /**
  * 유니폼 앞판.

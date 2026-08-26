@@ -57,7 +57,15 @@ import {
   Row,
   SectionTitle,
 } from '../components/common';
-import { GoodsShowcase, JerseyArt, PlayerAvatar, TeamEmblem } from '../components/photos';
+import {
+  GoodsShowcase,
+  JerseyArt,
+  PhotoHeader,
+  PlayerAvatar,
+  PlayerShot,
+  TeamEmblem,
+  stadiumPhoto,
+} from '../components/photos';
 import {
   CATEGORIES,
   CardGate,
@@ -351,7 +359,11 @@ function VenueTab({
           label="오늘 경기"
           title="대전 한화생명 볼파크"
           right={
-            checkedIn ? <Badge text="입장 확인됨" tone="win" /> : <Badge text="미인증" tone="muted" />
+            checkedIn ? (
+              <Badge text="입장 확인됨" tone="win" />
+            ) : (
+              <Badge text="미인증" tone="muted" />
+            )
           }
         />
         <Text style={st.body}>
@@ -359,12 +371,9 @@ function VenueTab({
             ? '오늘 경기 입장이 확인되었습니다. 오늘의 카드를 선점할 수 있습니다.'
             : '오늘의 카드는 경기장에 온 분만 살 수 있습니다. 입장 게이트에서 찍은 티켓과 현재 위치로 확인합니다.'}
         </Text>
-        {checkedIn ? null : (
-          <Button label="구장에서 입장 인증" onPress={onCheckIn} full />
-        )}
+        {checkedIn ? null : <Button label="구장에서 입장 인증" onPress={onCheckIn} full />}
         <Text style={st.footNote}>
-          지난 경기 카드는 인증이 필요 없습니다 - MY 탭의 직관 기록이 그날 자리를 대신
-          증명합니다.
+          지난 경기 카드는 인증이 필요 없습니다 - MY 탭의 직관 기록이 그날 자리를 대신 증명합니다.
         </Text>
       </Card>
 
@@ -388,14 +397,19 @@ function VenueTab({
 
       {buyable.length > 0 ? (
         <>
-          <SectionTitle title="내가 간 경기" right={<Text style={st.countHint}>{buyable.length}경기</Text>} />
-          <View style={{ gap: spacing.cardGap }}>
+          <SectionTitle
+            title="내가 간 경기"
+            right={<Text style={st.countHint}>{buyable.length}경기</Text>}
+          />
+          {/* 지난 카드는 **장면으로 고른다.** 날짜만 적힌 목록에서는 어느 날이 어느
+              날인지 팬도 기억하지 못한다 - 얼굴이 보이면 그날이 바로 떠오른다.
+              서식은 유니폼 격자와 같다(gridStage 주석 참조) */}
+          <View style={st.grid}>
             {buyable.map((g) => (
-              <PhotoCardItem
+              <PhotoCardTile
                 key={g.card.id}
                 card={g.card}
                 gate={g.gate}
-                checkedIn={checkedIn}
                 bought={!!bought[g.card.id]}
                 onPress={() => onOpen(g.card)}
               />
@@ -449,8 +463,27 @@ function PhotoCardItem({
       : gateBadge(gate);
   const days = (photocardCloseAt(card) - DEMO_NOW) / 86400000;
 
+  // 장면이 정해졌으면 그 선수를, 아직이면 그날의 구장을 띄운다.
+  //
+  // '오늘의 카드'는 이 갈래에서 유일하게 **아직 물건이 아닌 것**을 파는 자리다(경기가
+  // 끝나야 도안이 확정된다). 그림이 없으면 그 사실이 글자로만 남아 카드가 통째로
+  // 공지문처럼 읽혔다 - 구장 사진 한 장이 "오늘, 여기"를 글자보다 먼저 말한다.
+  const shot = card.moment ? null : stadiumPhoto('대전');
+
   return (
     <Card onPress={onPress}>
+      {card.moment ? (
+        <View style={st.todayShot}>
+          <PlayerShot playerId={card.moment.playerId} height={150} />
+        </View>
+      ) : shot ? (
+        <View style={st.todayShot}>
+          <PhotoHeader source={shot} height={150}>
+            <Text style={st.todayShotText}>장면은 경기가 끝나면 정해집니다</Text>
+          </PhotoHeader>
+        </View>
+      ) : null}
+
       <View style={st.cardHead}>
         {card.moment ? (
           <PlayerAvatar playerId={card.moment.playerId} team="HH" size={46} />
@@ -461,7 +494,11 @@ function PhotoCardItem({
         )}
         <View style={{ flex: 1 }}>
           <CardHeading
-            label={card.result ? (card.result.win ? '승' : '패') + ` ${card.result.ours}:${card.result.theirs}` : '경기 중'}
+            label={
+              card.result
+                ? (card.result.win ? '승' : '패') + ` ${card.result.ours}:${card.result.theirs}`
+                : '경기 중'
+            }
             title={`${gameKey(card)} ${card.opponent}전`}
             right={<Badge text={badge.text} tone={badge.tone} />}
           />
@@ -492,6 +529,67 @@ function PhotoCardItem({
         </Text>
       </View>
     </Card>
+  );
+}
+
+/**
+ * 포토카드 타일 - '내가 간 경기' 격자 한 칸.
+ *
+ * 서식은 유니폼 타일과 같다. 굿즈 탭 안에서 갈래마다 타일 생김새가 다르면 팬은 그
+ * 차이를 '무슨 뜻이 있나' 하고 읽는데, 여기엔 뜻이 없다.
+ *
+ * 그림 자리에는 **그날의 장면에 박힌 선수**를 둔다. 포토카드가 파는 것이 정확히
+ * 그것이고, 사진이 없는 선수는 등번호 아바타로 떨어진다(PlayerShot).
+ */
+function PhotoCardTile({
+  card,
+  gate,
+  bought,
+  onPress,
+}: {
+  card: PhotoCard;
+  gate: CardGate;
+  bought: boolean;
+  onPress: () => void;
+}) {
+  const days = (photocardCloseAt(card) - DEMO_NOW) / 86400000;
+  const badge = bought ? { text: '구매 완료', tone: 'brand' as const } : null;
+  const score = card.result
+    ? `${card.result.win ? '승' : '패'} ${card.result.ours}:${card.result.theirs}`
+    : '경기 중';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [st.tileSlot, pressed && { opacity: 0.6 }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${gameKey(card)} ${card.opponent}전 포토카드 ${card.price.toLocaleString()}원`}
+    >
+      <View style={st.gridStage}>
+        {card.moment ? (
+          <PlayerShot playerId={card.moment.playerId} height={132} />
+        ) : (
+          <TeamEmblem team="HH" size={54} />
+        )}
+        {badge ? (
+          <View style={st.gridBadge}>
+            <Badge text={badge.text} tone={badge.tone} />
+          </View>
+        ) : null}
+      </View>
+      <Text style={st.gridKind} numberOfLines={1}>
+        {gameKey(card)} {card.opponent}전 · {score}
+      </Text>
+      <Text style={st.gridName} numberOfLines={2}>
+        {card.moment ? `${card.moment.playerName} · ${card.moment.line}` : '장면 확정 전'}
+      </Text>
+      <Text style={st.gridPrice}>{card.price.toLocaleString()}원</Text>
+      <Text style={st.gridMeta} numberOfLines={1}>
+        {gate === 'open'
+          ? `${card.remain?.toLocaleString()}장 남음 · 마감 ${days < 1 ? `${Math.max(1, Math.round(days * 24))}시간` : `${Math.ceil(days)}일`} 전`
+          : stockLabel('soldout')}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -540,7 +638,11 @@ function CardSheet({
             </View>
           ) : gate === 'open' ? (
             <View style={{ flex: 1 }}>
-              <Button label={`${card.price.toLocaleString()}원 구매`} onPress={() => onBuy(card.id)} full />
+              <Button
+                label={`${card.price.toLocaleString()}원 구매`}
+                onPress={() => onBuy(card.id)}
+                full
+              />
             </View>
           ) : (
             <View style={{ flex: 1 }}>
@@ -562,9 +664,7 @@ function CardSheet({
               </View>
               <Text style={st.body}>{gateReason(gate, card)}</Text>
               {gate === 'pending' && !checkedIn ? (
-                <Text style={st.footNote}>
-                  입장 인증은 게이트를 지날 때 자동으로 됩니다.
-                </Text>
+                <Text style={st.footNote}>입장 인증은 게이트를 지날 때 자동으로 됩니다.</Text>
               ) : null}
             </Card>
           </View>
@@ -925,7 +1025,8 @@ function MilestoneChart({ m, p }: { m: Milestone; p: MilestoneProgress }) {
           <View style={st.legendMark} />
           <Text style={st.legendText}>
             {threshold.toLocaleString()}
-            {m.unit}부터 예약 {p.reserveOpen ? '· 지금 열려 있습니다' : `· ${p.toReserve}${m.unit} 남음`}
+            {m.unit}부터 예약{' '}
+            {p.reserveOpen ? '· 지금 열려 있습니다' : `· ${p.toReserve}${m.unit} 남음`}
           </Text>
         </View>
       </View>
@@ -1042,22 +1143,22 @@ function UniformTile({ u, onOpen }: { u: Uniform; onOpen: (u: Uniform) => void }
     >
       {/* 그림 자리 - 타일 높이의 대부분을 여기에 준다. 커머스에서 글자가 그림보다
           많아지는 순간 그 화면은 카탈로그가 아니라 목록이 된다 */}
-      <View style={st.uniStage}>
+      <View style={st.gridStage}>
         <JerseyArt colorway={u.colorway} height={116} />
         {badge ? (
-          <View style={st.uniBadge}>
+          <View style={st.gridBadge}>
             <Badge text={badge} tone={stockTone(u.status)} />
           </View>
         ) : null}
       </View>
-      <Text style={st.uniKind} numberOfLines={1}>
+      <Text style={st.gridKind} numberOfLines={1}>
         {u.kind} · {u.wear}
       </Text>
-      <Text style={st.uniName} numberOfLines={2}>
+      <Text style={st.gridName} numberOfLines={2}>
         {u.name}
       </Text>
-      <Text style={st.uniPrice}>{u.price.toLocaleString()}원</Text>
-      <Text style={st.uniMeta} numberOfLines={1}>
+      <Text style={st.gridPrice}>{u.price.toLocaleString()}원</Text>
+      <Text style={st.gridMeta} numberOfLines={1}>
         {meta}
       </Text>
     </Pressable>
@@ -1355,7 +1456,12 @@ const st = StyleSheet.create({
   reserveCount: { ...typography.bodyStrong, ...tabularFigures, fontSize: 15 },
   track: { height: 6, borderRadius: radius.bar, backgroundColor: colors.dim, overflow: 'hidden' },
   fill: { height: 6, borderRadius: radius.bar, backgroundColor: colors.brand },
-  remainText: { ...typography.bodyStrong, ...tabularFigures, fontSize: 14, color: colors.brandText },
+  remainText: {
+    ...typography.bodyStrong,
+    ...tabularFigures,
+    fontSize: 14,
+    color: colors.brandText,
+  },
 
   sheetHeadRow: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   etaLine: { ...typography.bodyStrong, color: colors.brandText, fontSize: 14 },
@@ -1445,9 +1551,16 @@ const st = StyleSheet.create({
   tileName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19 },
   tilePrice: { ...typography.micro, ...tabularFigures, color: colors.brandText },
 
-  // ── 유니폼 격자 ────────────────────────────────────────────
+  // '오늘의 카드' 그림 자리 - 격자 타일보다 크다. 한 장뿐이라 폭을 다 쓴다
+  todayShot: { borderRadius: radius.tile, overflow: 'hidden', marginBottom: spacing.md },
+  todayShotText: { ...typography.micro, color: '#FFFFFF' },
+
+  // ── 격자 타일 공용 서식 ────────────────────────────────────
+  // 유니폼과 포토카드가 같은 서식을 쓴다. 굿즈 탭 안에서 갈래마다 타일 생김새가
+  // 다르면 팬은 그 차이를 '무슨 뜻이 있나' 하고 읽는다 - 뜻이 없으면 서식은 같아야 한다.
+  //
   // 그림 자리. 흰 유니폼이 흰 카드에 묻히지 않게 한 단계 낮은 면을 깐다
-  uniStage: {
+  gridStage: {
     height: 132,
     borderRadius: radius.tile,
     backgroundColor: colors.surface,
@@ -1456,9 +1569,9 @@ const st = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: spacing.sm,
   },
-  uniBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm },
-  uniKind: { ...typography.micro, fontWeight: '400', color: colors.mutedText },
-  uniName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19, marginTop: 2 },
-  uniPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 14, marginTop: 3 },
-  uniMeta: { ...typography.micro, fontWeight: '400', color: colors.mutedText, marginTop: 1 },
+  gridBadge: { position: 'absolute', top: spacing.sm, left: spacing.sm },
+  gridKind: { ...typography.micro, fontWeight: '400', color: colors.mutedText },
+  gridName: { ...typography.bodyStrong, fontSize: 13.5, lineHeight: 19, marginTop: 2 },
+  gridPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 14, marginTop: 3 },
+  gridMeta: { ...typography.micro, fontWeight: '400', color: colors.mutedText, marginTop: 1 },
 });
