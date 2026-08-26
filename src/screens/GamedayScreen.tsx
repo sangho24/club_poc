@@ -664,7 +664,8 @@ export function GamedayScreen() {
 }
 
 const st = StyleSheet.create({
-  tabsWrap: { backgroundColor: colors.card },
+  // 알약 탭은 지면 위에 떠 있는다 - 흰 띠를 깔면 브랜드 바가 두 겹으로 보인다
+  tabsWrap: { paddingHorizontal: spacing.screenX, paddingTop: spacing.md },
   headNote: typography.micro,
 
   heroTitle: { fontSize: 17, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.3 },

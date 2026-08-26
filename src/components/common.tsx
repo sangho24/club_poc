@@ -200,7 +200,50 @@ export function Segmented<T extends string>({
   );
 }
 
-/** 상단 서브탭 - 텍스트 + 밑줄. 칩은 '고르는 것', 서브탭은 '있는 곳'이라 형태를 나눈다 */
+/** 트랙 안쪽 여백 - HeroUI `.tabs__list--variant-primary` 의 padding: 3px */
+const TOP_TAB_PAD = 3;
+/** 한 칸의 높이. 여백까지 더하면 44 라 손가락 최소 터치와 정확히 맞는다 */
+const TOP_TAB_H = spacing.touchMin - TOP_TAB_PAD * 2;
+
+/**
+ * 알약이 앉는 방식 - 떠 있는 하단 탭 캡슐과 같은 물리값을 쓴다.
+ * 위아래 두 탭이 서로 다른 속도로 움직이면 같은 제품의 부품으로 안 읽힌다.
+ */
+const TOP_TAB_SPRING = {
+  useNativeDriver: Platform.OS !== 'web',
+  stiffness: 210,
+  damping: 24,
+  mass: 1,
+  restDisplacementThreshold: 0.2,
+  restSpeedThreshold: 0.2,
+};
+
+/**
+ * 상단 서브탭 - HeroUI Tabs 의 `primary` 변형 + `Tabs.Separator`.
+ *
+ * ── 왜 밑줄을 버렸나 (2026-08-26) ────────────────────────────
+ * 초판은 텍스트 + 밑줄이었다. 웹 문서의 탭 문법이라, **떠 있는 캡슐(하단 탭)과 흰 카드로
+ * 짜인 이 앱 안에서 그 줄만 홀로 각져 있었다.** 게다가 밑줄을 화면 끝까지 그으려면 지면
+ * 폭을 가로지르는 흰 띠가 필요했고, 브랜드 바 바로 아래에 그 띠가 붙으니 헤더가 두 겹으로
+ * 보였다 - 크롬이 어디서 끝나는지가 흐려진다.
+ *
+ * 지금은 트랙 하나 안에서 흰 알약이 미끄러진다. 하단 탭과 같은 어법이라 화면 위아래가
+ * 같은 말을 하고, 띠가 사라지니 브랜드 바의 헤어라인 하나가 다시 크롬의 끝이 된다.
+ *
+ * ── HeroUI 에서 그대로 가져온 값 ────────────────────────────
+ * (heroui-native `src/styles/components/tabs.css`)
+ *   - 트랙: 안쪽 여백 3px · 큰 라운드 · muted 면(`--color-default`)
+ *   - 인디케이터: 흰 면(`--color-segment`) + 아주 옅은 그림자. **위치만** 애니메이션한다
+ *   - 구분선: 폭 1px · 높이 60% · 세로 가운데. 선택된 칸에 닿는 순간 사라진다
+ *
+ * 구분선이 사라지는 것이 이 변형의 핵심이다. 알약의 둥근 옆면을 직선이 찌르면 두 형태가
+ * 서로를 자르는 것처럼 보인다. HeroUI 도 같은 이유로 `betweenValues` 를 두고 opacity 만
+ * 애니메이션한다.
+ *
+ * ⚠ 구분선 색은 HeroUI 가 `--color-separator` 의 30% 를 쓰지만 여기서는 `borderStrong`
+ * 을 그대로 쓴다. 알파를 섞으면 뒤에 깔린 따뜻한 회색과 hue 가 어긋난 1px 짜리 파란 선이
+ * 남는다 - 이 저장소의 회색은 전부 구단 오렌지 쪽으로 기울어 있다(theme.ts 참고).
+ */
 export function TopTabs<T extends string>({
   tabs,
   value,
@@ -210,20 +253,89 @@ export function TopTabs<T extends string>({
   value: T;
   onChange: (k: T) => void;
 }) {
+  const found = tabs.findIndex((t) => t.key === value);
+  const index = found < 0 ? 0 : found;
+
+  // 트랙 안쪽 폭을 재야 한 칸(slot)이 몇 px 인지 안다. 재기 전에는 알약을 그리지 않는다
+  const [innerW, setInnerW] = useState(0);
+  const slot = innerW > 0 ? innerW / tabs.length : 0;
+
+  /** 알약의 가로 위치. 이 값 하나가 위치·라벨 진하기·구분선 유무를 전부 만든다 */
+  const [x] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (slot > 0) Animated.spring(x, { ...TOP_TAB_SPRING, toValue: index * slot }).start();
+  }, [index, slot, x]);
+
   return (
-    <View style={s.topTabs}>
-      {tabs.map((t) => {
-        const on = t.key === value;
+    <View
+      style={s.topTabs}
+      onLayout={(e) => setInnerW(e.nativeEvent.layout.width - TOP_TAB_PAD * 2)}
+      accessibilityRole="tablist"
+    >
+      {slot > 0 ? (
+        <Animated.View style={[s.topTabPill, { width: slot, transform: [{ translateX: x }] }]} />
+      ) : null}
+
+      {/* 구분선은 칸과 칸 사이에만 선다 - 첫 칸 앞에는 없다.
+          HeroUI 도 첫 Tab 에서만 Separator 를 뺀다 */}
+      {slot > 0
+        ? tabs.slice(1).map((t, i) => {
+            const at = (i + 1) * slot;
+            return (
+              <Animated.View
+                key={t.key}
+                style={[
+                  s.topTabSep,
+                  {
+                    left: TOP_TAB_PAD + at - 0.5,
+                    // 알약이 이 선의 양옆 어느 칸에 걸쳐 있는 동안은 0 이다.
+                    // 툭 꺼지지 않고 알약이 다가오는 만큼 옅어진다
+                    opacity: x.interpolate({
+                      inputRange: [at - 2 * slot, at - slot, at, at + slot],
+                      outputRange: [1, 0, 0, 1],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+                ]}
+              />
+            );
+          })
+        : null}
+
+      {tabs.map((t, i) => {
+        // 알약이 이 칸에 얼마나 걸쳐 있는지(0~1). 글자색은 애니메이션할 수 없으니
+        // 같은 라벨 두 벌을 겹쳐 두고 서로 교차시킨다 - 하단 탭과 같은 수법이다
+        const span = slot > 0 ? [(i - 1) * slot, i * slot, (i + 1) * slot] : null;
+        const onAlpha = span
+          ? x.interpolate({ inputRange: span, outputRange: [0, 1, 0], extrapolate: 'clamp' })
+          : i === index
+            ? 1
+            : 0;
+        const offAlpha = span
+          ? x.interpolate({ inputRange: span, outputRange: [1, 0, 1], extrapolate: 'clamp' })
+          : i === index
+            ? 0
+            : 1;
+
         return (
           <Pressable
             key={t.key}
             onPress={() => onChange(t.key)}
             style={s.topTab}
             accessibilityRole="tab"
-            accessibilityState={{ selected: on }}
+            accessibilityState={{ selected: i === index }}
+            aria-selected={i === index}
           >
-            <Text style={[s.topTabText, on && s.topTabTextOn]}>{t.label}</Text>
-            <View style={[s.topTabBar, on && s.topTabBarOn]} />
+            <Animated.Text style={[s.topTabText, { opacity: offAlpha }]} numberOfLines={1}>
+              {t.label}
+            </Animated.Text>
+            <Animated.Text
+              style={[s.topTabText, s.topTabTextOn, s.topTabTextOver, { opacity: onAlpha }]}
+              numberOfLines={1}
+            >
+              {t.label}
+            </Animated.Text>
           </Pressable>
         );
       })}
@@ -1140,12 +1252,48 @@ const s = StyleSheet.create({
   segLabel: { fontSize: 13, fontWeight: '600', color: colors.subText },
   segLabelOn: { color: colors.text, fontWeight: '700' },
 
-  topTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border },
-  topTab: { flex: 1, alignItems: 'center', paddingTop: spacing.md, gap: spacing.sm },
-  topTabText: { fontSize: 15, fontWeight: '600', color: colors.mutedText },
+  // HeroUI Tabs `primary` - muted 트랙 위에 흰 알약. Segmented 와 같은 가족이지만
+  // 라운드가 알약(chip)이고 칸 사이에 구분선이 선다는 점이 다르다
+  topTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: spacing.touchMin,
+    padding: TOP_TAB_PAD,
+    borderRadius: radius.chip,
+    backgroundColor: colors.raised,
+  },
+  topTabPill: {
+    position: 'absolute',
+    // 알약은 탭 위에 떠 있는 면일 뿐이다 - 터치는 아래 Pressable 로 통과시킨다
+    // (props.pointerEvents 는 RN 0.86 에서 폐기됐다. style 쪽으로 쓴다)
+    pointerEvents: 'none',
+    left: TOP_TAB_PAD,
+    top: TOP_TAB_PAD,
+    height: TOP_TAB_H,
+    borderRadius: radius.chip,
+    backgroundColor: colors.card,
+    ...(Platform.OS === 'web' ? { boxShadow: '0 1px 4px rgba(9, 22, 45, 0.12)' } : null),
+  },
+  // 폭 1px · 높이 60% · 세로 가운데 (HeroUI `.tabs__separator`)
+  topTabSep: {
+    position: 'absolute',
+    pointerEvents: 'none',
+    top: '20%',
+    height: '60%',
+    width: 1,
+    backgroundColor: colors.borderStrong,
+  },
+  topTab: {
+    flex: 1,
+    height: TOP_TAB_H,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.chip,
+  },
+  topTabText: { fontSize: 15, fontWeight: '600', color: colors.subText, letterSpacing: -0.2 },
   topTabTextOn: { color: colors.text, fontWeight: '700' },
-  topTabBar: { height: 2, alignSelf: 'stretch', backgroundColor: 'transparent' },
-  topTabBarOn: { backgroundColor: colors.brand },
+  // 선택된 벌은 흐린 벌 위에 겹친다. inset 을 주지 않으면 부모의 정렬(가운데)을 따른다
+  topTabTextOver: { position: 'absolute' },
 
   chip: {
     paddingHorizontal: spacing.lg,

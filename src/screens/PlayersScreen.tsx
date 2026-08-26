@@ -2218,7 +2218,7 @@ function GlossaryCard({
 }
 
 const st = StyleSheet.create({
-  // 알약 탭은 지면 위에 떠 있는다 - 흰 띄를 깔면 브랜드 바가 두 겹으로 보인다
+  // 알약 탭은 지면 위에 떠 있는다 - 흰 띠를 깔면 브랜드 바가 두 겹으로 보인다
   tabsWrap: { paddingHorizontal: spacing.screenX, paddingTop: spacing.md },
 
   playerRow: { paddingVertical: spacing.lg },
