@@ -28,8 +28,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
-import { colors, radius, spacing, typography } from '../theme';
+import { BATTERS, OPPONENT_PITCHERS, PITCHERS } from '../roster';
+import { colors, palette, radius, spacing, typography } from '../theme';
 
 // ── 구단 엠블럼 ───────────────────────────────────────────────
 export type EmblemTeam = 'HH' | 'LG' | 'KIA' | 'SS' | 'OB' | 'KT' | 'SSG' | 'LT' | 'NC' | 'WO';
@@ -158,9 +160,19 @@ export function stadiumPhoto(name: string): ImageSourcePropType | undefined {
 // ── 선수 사진 ─────────────────────────────────────────────────
 // 키는 roster.ts 의 선수 id 다.
 //
-// **22명 중 5명뿐이다.** 나머지는 위키미디어 커먼즈에 자유 라이선스 사진이 없다.
-// 국내 선수는 대부분 구단·언론사 보도사진뿐이라 받지 않았다.
+// **35명 중 3명뿐이고, 셋 다 한화 유니폼이다.** 커먼즈 전수를 훑은 결과이지 게으름이
+// 아니다 - 한화 선수를 자유 라이선스로 올리는 사람은 커먼즈에 사실상 한 명뿐이고
+// (User:Seohae1999, 대전 한화생명 볼파크에서 직접 찍어 CC BY-SA 로 올린다),
+// 나머지 32명은 국내 선수든 외국인 선수든 구단·언론사 보도사진밖에 없다.
+//
 // 그래서 Record 가 아니라 Partial 이고, **폴백은 예외 처리가 아니라 기본 경로다.**
+// 다만 그 폴백도 이제 한화 유니폼이다 - JerseyAvatar 주석 참조.
+//
+// ⚠ **남의 유니폼은 여기에 올리지 않는다.** 폰세·와이스·플로리얼 사진이 파일로는
+//   남아 있지만 지도에서 뺐다. 앞의 둘은 2026 로스터에 없는 선수이고, 플로리얼은
+//   애초에 마이너리그(양키스) 시절 사진이었다. 구단 앱에서 남의 옷을 입은 얼굴은
+//   화질로 갚아지지 않는다 - 류현진 사진을 다저스에서 한화로 바꾼 것과 같은 이유다.
+//   require 가 없으면 번들에도 들어가지 않으므로 파일만 남는 값은 0 이다.
 //
 // aspect(가로/세로)를 함께 적는 이유는 아래 PlayerAvatar 주석 참조.
 interface PlayerPhoto {
@@ -169,23 +181,92 @@ interface PlayerPhoto {
 }
 
 const PLAYER_PHOTOS: Partial<Record<string, PlayerPhoto>> = {
+  cjh: { source: require('../../assets/photo/player/cjh.jpg'), aspect: 500 / 560 }, // 최재훈
   ryu: { source: require('../../assets/photo/player/ryu.jpg'), aspect: 500 / 556 }, // 류현진
-  pon: { source: require('../../assets/photo/player/pon.jpg'), aspect: 500 / 700 }, // 폰세
-  wei: { source: require('../../assets/photo/player/wei.jpg'), aspect: 500 / 625 }, // 와이스
   mdj: { source: require('../../assets/photo/player/mdj.jpg'), aspect: 500 / 506 }, // 문동주
-  flo: { source: require('../../assets/photo/player/flo.jpg'), aspect: 500 / 401 }, // 플로리얼
 };
+
+// ── 등번호 ────────────────────────────────────────────────────
+// 사진 없는 선수의 아바타에 새길 번호다. roster 를 그대로 읽는다 - 번호를 두 벌 두면
+// 트레이드나 번호 변경 때 화면이 로스터와 다른 말을 하게 된다(채은성 9 → 22 가 그랬다).
+const BACK_NUMBERS: Record<string, number> = {};
+for (const p of [...BATTERS, ...PITCHERS, ...OPPONENT_PITCHERS]) {
+  BACK_NUMBERS[p.id] = p.back;
+}
 
 export function hasPlayerPhoto(id: string): boolean {
   return PLAYER_PHOTOS[id] !== undefined;
 }
 
 /**
+ * 유니폼 아바타 - 사진이 없는 한화 선수의 얼굴 자리.
+ *
+ * ── 왜 모자 마크로는 부족한가 ───────────────────────────────
+ * 전에는 사진 없는 한화 선수가 전원 같은 모자 마크였다. 다섯 명일 때는 견딜 만했지만
+ * 서른둘이 되면 **선수 목록 한 화면이 똑같은 동그라미 열 줄**이 된다. 아바타가 아무도
+ * 가리키지 못하면 그 자리는 '사진이 없는 것'이 아니라 **'정보가 없는 것'**이 된다.
+ *
+ * ── 그래서 무엇을 그리나 ────────────────────────────────────
+ * 얼굴은 지어낼 수 없다. 하지만 **유니폼은 지어내는 것이 아니다.** 등번호는 로스터가
+ * 이미 갖고 있는 사실이고 색은 구단 CI 다. 홈 유니폼 등판을 그대로 옮긴다 -
+ * 오렌지 칼라 · 따뜻한 흰 원단 · 네이비 등번호.
+ *
+ * 32px 에서는 번호만 읽히는데 그것이 맞다. 관중석에서 등번호가 하는 일이 정확히 그것이다.
+ *
+ * ⚠ 실서비스에서는 이 자리에 구단 프로필 촬영본이 들어간다. 그때도 이 컴포넌트는
+ *   시즌 중 합류처럼 **촬영이 아직 없는 선수**의 자리로 남는다 - 지울 코드가 아니다.
+ */
+export function JerseyAvatar({ back, size = 44 }: { back: number; size?: number }) {
+  const digits = String(back);
+  // 두 자리는 폭이 두 배다. 같은 크기로 두면 칼라 아래 폭을 넘어 원 밖으로 밀린다
+  const fontSize = Math.round(size * (digits.length > 1 ? 0.36 : 0.42));
+
+  return (
+    <View style={{ width: size, height: size }}>
+      <Svg width={size} height={size} viewBox="0 0 100 100">
+        {/* 원단. 순백으로 두면 흰 카드 위에서 원의 아래쪽 절반이 사라져 테두리를 준다 */}
+        <Circle
+          cx={50}
+          cy={50}
+          r={49}
+          fill={palette.orange[50]}
+          stroke={palette.orange[200]}
+          strokeWidth={2}
+        />
+        {/* 칼라 - 원의 위쪽을 가로지르는 현(chord)이다. y=26 에서 r=49 원과 만나는 x 가 7.28 */}
+        <Path d="M7.28 26A49 49 0 0 1 92.72 26Z" fill={colors.brand} />
+        {/* 목둘레 - 언더셔츠가 비치는 자리라 네이비다 */}
+        <Path d="M35 26C37 41 63 41 65 26Z" fill={palette.navy[900]} />
+      </Svg>
+      {/* 번호는 **칼라 아래 74% 의 한가운데**에 온다. 원 전체의 한가운데가 아니다 */}
+      <View style={[j.numberBox, { top: size * 0.26 }]}>
+        <Text style={[j.number, { fontSize, lineHeight: Math.round(fontSize * 1.06) }]}>
+          {digits}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const j = StyleSheet.create({
+  numberBox: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  number: { fontWeight: '800', color: palette.navy[900], letterSpacing: -0.5 },
+});
+
+/**
  * 선수 얼굴 원형 썸네일.
  *
- * 이 컴포넌트의 본론은 사진이 아니라 **폴백**이다 - 22명 중 17명은 사진이 없다.
- * 빈 원이나 이니셜 글자를 두면 그 자리가 '깨진 자리'로 읽히므로, 같은 지름의 연회색 원에
- * 구단 엠블럼을 얹어 **없는 것이 아니라 다른 것**으로 보이게 한다.
+ * 이 컴포넌트의 본론은 사진이 아니라 **폴백**이다 - 35명 중 32명은 사진이 없다.
+ * 빈 원이나 이니셜 글자를 두면 그 자리가 '깨진 자리'로 읽히므로, 한화 선수는 등번호가
+ * 박힌 유니폼 아바타로, 타 구단 선수는 연회색 원 위의 엠블럼으로 채워
+ * **없는 것이 아니라 다른 것**으로 보이게 한다.
  *
  * **크롭 주의**: 확보한 사진은 대부분 세로 인물사진이고 얼굴은 늘 위쪽에 있다.
  * RN 코어 Image 의 cover 는 세로 **중앙**을 남기므로 얼굴이 잘려 나간다. CSS
@@ -205,10 +286,13 @@ export function PlayerAvatar({
   const box = { width: size, height: size, borderRadius: size / 2 };
 
   if (!photo) {
-    // 한화 선수는 모자 마크가 원을 꽉 채운다. 타 구단은 연회색 원 위에 엠블럼을 얹는다
-    // (KBO 엠블럼 세트는 대부분 검정·남색 외곽선이라 어두운 면에서 형태가 뭉개진다)
+    // 한화 선수는 등번호를 새긴 유니폼 아바타로 채운다. 타 구단은 연회색 원 위에 엠블럼을
+    // 얹는다 (KBO 엠블럼 세트는 대부분 검정·남색 외곽선이라 어두운 면에서 형태가 뭉개진다)
     if (team === 'HH') {
-      return <CapMark size={size} />;
+      const back = BACK_NUMBERS[playerId];
+      // 로스터에 없는 id 는 번호도 없다 - 최애 미선택('')이나 지난 시즌 선수가 그렇다.
+      // 그 자리에는 지어낸 번호 대신 모자 마크를 둔다
+      return back === undefined ? <CapMark size={size} /> : <JerseyAvatar back={back} size={size} />;
     }
     return (
       <View style={[s.avatar, box]}>

@@ -23,15 +23,13 @@
 
 ## 선수 사진 (`player/`)
 
-키는 `src/roster.ts` 의 선수 id 다.
+키는 `src/roster.ts` 의 선수 id 다. **화면에 실제로 쓰이는 것은 아래 세 장뿐이고, 셋 다 한화 유니폼이다.**
 
-| 파일 | 선수 | 출처 | 저작자 | 라이선스 | 촬영 시점 주의 |
+| 파일 | 선수 | 출처 | 저작자 | 라이선스 | 촬영 시점 |
 |---|---|---|---|---|---|
-| `pon.jpg` | 폰세 | [Cody Joe Ponce Eagles 20240409.jpg](https://commons.wikimedia.org/wiki/File:Cody_Joe_Ponce_Eagles_20240409.jpg) | 커먼즈 기재 | CC BY-SA 4.0 | **한화 유니폼** - 구 CI(2024) |
-| `wei.jpg` | 와이스 | [Ryan Weiss 2025.jpg](https://commons.wikimedia.org/wiki/File:Ryan_Weiss_2025.jpg) | 커먼즈 기재 | CC BY-SA 4.0 | **한화 신 CI 유니폼** - 현행 일치 |
-| `mdj.jpg` | 문동주 | `kbo_poc` 에서 이관 (원 출처는 `SOURCES-kbo.md`) | 〃 | 〃 | 한화 |
-| `ryu.jpg` | 류현진 | [Ryu Hyun-jin 2025.jpg](https://commons.wikimedia.org/wiki/File:Ryu_Hyun-jin_2025.jpg) | Trainholic | CC BY-SA 4.0 | **한화 신 CI 유니폼(2025-04-11)** - 현행 일치. 3002x3002 → 상반신 크롭 후 500x556 |
-| `flo.jpg` | 플로리얼 | [Estevan Florial in 2019.png](https://commons.wikimedia.org/wiki/File:Estevan_Florial_in_2019.png) | 커먼즈 기재 | CC BY 3.0 | ⚠ **마이너리그 시절(2019)** - 얼굴 정면이라 아바타로는 적합 |
+| `ryu.jpg` | 류현진 | [Ryu Hyun-jin 2025.jpg](https://commons.wikimedia.org/wiki/File:Ryu_Hyun-jin_2025.jpg) | Trainholic | CC BY-SA 4.0 | **한화 신 CI(2025-04-11)** - 3002x3002 → 상반신 크롭 후 500x556 |
+| `mdj.jpg` | 문동주 | `kbo_poc` 에서 이관 (원 출처는 `SOURCES-kbo.md`) | 커먼즈 기재 | CC BY-SA 4.0 | 한화 |
+| `cjh.jpg` | 최재훈 | [Choi Jaehoon 2025.jpg](https://commons.wikimedia.org/wiki/File:Choi_Jaehoon_2025.jpg) | Seohae1999 | CC BY-SA 4.0 | **한화 신 CI(2025)** - 2700x3600 → 상반신 크롭 후 500x560 |
 
 > **류현진 사진을 2026-08-26 에 바꿨다.** 원래는 커먼즈에서 가장 화질이 좋은 [다저스 시절(2013)](https://commons.wikimedia.org/wiki/File:Hyun_jin_Ryu_2013_NLDS.jpg) 사진이었는데,
 > 구단 앱에서 **자기 팀 선수가 남의 유니폼을 입고 있는 것**은 화질로 갚아지지 않는다.
@@ -39,15 +37,43 @@
 > 2024년 사진은 촬영자 워터마크가 박혀 있다. 남은 2025년 사진이 해상도·신 CI·
 > 투구 직후 자세 세 가지를 다 만족한다.
 
-### 확보하지 못한 선수
+### 파일은 있으나 쓰지 않는 것
 
-노시환 · 채은성 · 문현빈 · 최재훈 · 안치홍 · 황영묵 · 김태연 · 김서현 · 주현상, 그리고 상대팀(LG) 투수 전원.
+`pon.jpg`(폰세) · `wei.jpg`(와이스) · `flo.jpg`(플로리얼) 은 남아 있지만 `PLAYER_PHOTOS` 에서 뺐다.
 
-국내 선수는 커먼즈에 자유 라이선스 사진이 거의 없고, 있는 것은 대부분 구단·언론사 보도사진이라 받지 않았다. **이 선수들은 구단 엠블럼 폴백으로 표시된다** (`PlayerAvatar`).
+- 폰세·와이스는 **2026 로스터에 없다.** 언제든 돌아올 수 있어 파일은 두되 지도에서만 뺐다.
+- 플로리얼은 애초에 **양키스 마이너리그(2019) 사진**이었다. 로스터에서도 빠졌고, 남았더라도
+  류현진을 다저스 사진에서 바꾼 것과 같은 이유로 쓸 수 없다.
+
+`require` 가 없으면 Metro 번들에도 들어가지 않으므로 파일만 남는 값은 0 이다.
+
+### 확보하지 못한 선수 - 35명 중 32명
+
+2026-08-26 에 **한화 로스터 35명(타자 11 · 투수 24) 전원을 전수 조사**했다. 커먼즈에서 나온 것은
+위 세 장이 전부다. 조사 범위는 이렇다.
+
+- `Category:Hanwha Eagles` 하위 트리 전부, `Category:2024/2025/2026 in KBO League`
+- 35명 각각을 **한글 이름 + 로마자 표기**로 파일 네임스페이스 검색
+- 한국어 위키백과 35개 문서의 대표사진(`pageimages`)
+- 파일명에 `Hanwha` 가 들어간 커먼즈 파일 전수
+
+**한화 선수를 자유 라이선스로 올리는 사람은 사실상 한 명이다** - [User:Seohae1999](https://commons.wikimedia.org/wiki/User:Seohae1999)
+가 대전 한화생명 볼파크에서 직접 찍어 CC BY-SA 로 올린다(이 문서의 `HH.jpg` 구장 사진도 같은 사람이다).
+그 사람의 업로드 26장 중 현 로스터와 겹치는 것이 문동주·최재훈뿐이다.
+나머지 32명은 국내 선수든 외국인 선수든 **구단·언론사 보도사진밖에 없어 받지 않았다.**
+
+**이 32명은 등번호가 박힌 한화 홈 유니폼 아바타로 표시된다** (`JerseyAvatar`, `src/components/photos.tsx`).
+얼굴은 지어낼 수 없지만 등번호는 로스터가 가진 사실이고 색은 구단 CI 다.
+
+> **구단 공식 프로필 사진을 받으면** `node tools/ingest-player-photos.js` 로 한 번에 넣는다.
+> 크롭·리사이즈·지도 갱신까지 도구가 하고, 이 표에 출처 줄을 채우는 것만 사람이 한다.
+> ⚠ 구단 촬영본은 **저작권이 구단에 있다.** 사내 시연 범위를 벗어나려면 승인이 필요하다.
 
 ### 수집 중 걸러 낸 것
 
 - **주현상**: 검색어 `Ju Hyun-sang` 이 가수 서현(Seohyun) 사진에 오매칭됐다. 눈으로 확인해 삭제했다. **자동 수집한 이미지는 반드시 육안 검수가 필요하다.**
+- **강백호**: 자유 라이선스 사진이 [한 장 있으나](https://commons.wikimedia.org/wiki/File:Kang_Baek-Ho_2019_Premier_12.jpg) **2019 프리미어12 국가대표 유니폼**이라 뺐다. 같은 검색어가 가수 백호(NU'EST)에도 대량으로 걸린다.
+- **이상규**: `이상규` 검색이 LG전자 임원 사진에 오매칭됐다.
 - **함덕주**: 자유 라이선스 사진이 있었으나 **두산 시절 유니폼**이라 뺐다. 이 앱에서 함덕주는 LG 불펜으로 설정돼 있어 소속팀이 어긋난다.
 
 ---
