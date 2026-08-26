@@ -223,6 +223,43 @@ export const RECENT: RecentGame[] = [
   { date: '08.05', opponent: 'SSG', result: 'L', score: '3:8' },
 ];
 
+/**
+ * 다가오는 경기.
+ *
+ * ── 왜 직관 탭인가 ──────────────────────────────────────────
+ * 일정만 따로 있는 화면은 달력이지 앱이 아니다. 팬이 일정을 보는 이유는 **"언제 갈까"**
+ * 하나이고, 그 답을 정하면 곧바로 예매와 주차가 필요하다. 그래서 일정을 직관 탭 맨 위에
+ * 두어 **일정 → 예매 → 주차**가 한 화면에서 이어지게 한다.
+ *
+ * 라이브 탭에 두지 않은 이유도 같다. 라이브는 '지금 이 경기'만 다루는 자리라
+ * 일정을 얹으면 화면의 질문이 둘이 된다.
+ *
+ * ⚠ 시연용 샘플이다. 실서비스에서는 KBO 일정 API 를 받는다.
+ */
+export interface ScheduledGame {
+  /** 'MM.DD' */
+  date: string;
+  /** 요일 - 주말 경기는 출발 시각 판단이 달라진다 */
+  day: string;
+  opponent: string;
+  /** 홈경기여야 예매·주차가 의미를 갖는다 */
+  home: boolean;
+  startTime: string;
+  /** 홈경기 중 예매가 이미 열린 경기 */
+  ticketOpen?: boolean;
+}
+
+export const SCHEDULE: ScheduledGame[] = [
+  { date: '08.12', day: '화', opponent: 'LG', home: true, startTime: '18:30', ticketOpen: true },
+  { date: '08.13', day: '수', opponent: 'LG', home: true, startTime: '18:30', ticketOpen: true },
+  { date: '08.14', day: '목', opponent: 'LG', home: true, startTime: '18:30' },
+  { date: '08.15', day: '금', opponent: 'KIA', home: true, startTime: '17:00' },
+  { date: '08.16', day: '토', opponent: 'KIA', home: true, startTime: '17:00' },
+  { date: '08.17', day: '일', opponent: 'KIA', home: true, startTime: '17:00' },
+  { date: '08.19', day: '화', opponent: '롯데', home: false, startTime: '18:30' },
+  { date: '08.20', day: '수', opponent: '롯데', home: false, startTime: '18:30' },
+];
+
 export const STANDING = {
   // KBO 앱 목업(7/25 기준 7위 44-48)에서 상승세로 이어진 값. 두 앱을 나란히
   // 시연해도 궤적이 맞도록 여기만 따로 바꾸지 않는다

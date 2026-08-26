@@ -53,7 +53,7 @@ import {
   telUrl,
 } from '../gameday';
 import { SEAT_VIEWS, SEAT_VIEW_CAPTION, seatViewUrl } from '../seatView';
-import { TODAY_GAME } from '../game';
+import { SCHEDULE, TODAY_GAME } from '../game';
 import { countdown } from '../goods';
 import { Partner, TIER_SPEC, couponCode, sortedPartners, todayPerks } from '../partners';
 import BringIcon from '../../assets/icons/bring.svg';
@@ -169,6 +169,35 @@ export function GamedayScreen() {
                   </PhotoHeader>
                 ) : null}
               </View>
+
+              {/* ── 일정 ───────────────────────────────────────
+                  일정만 있는 화면은 달력이지 앱이 아니다. 팬이 일정을 보는 이유는
+                  **"언제 갈까"** 하나이고, 정하면 곧바로 예매와 주차가 필요하다.
+                  그래서 여기 맨 위에 두어 **일정 → 예매 → 주차**가 한 화면에서 이어진다.
+
+                  원정 경기도 지운다 - 못 가는 날인지 아는 것도 정보다. 다만 예매·주차가
+                  걸리지 않으므로 회색으로 물리고 '원정'을 명시한다 ── */}
+              <SectionCard title="다가오는 경기" right={<Text style={st.headNote}>8월</Text>}>
+                {SCHEDULE.map((g, i) => (
+                  <Row key={g.date} last={i === SCHEDULE.length - 1} style={st.gameRow}>
+                    <Text style={[st.gameDate, !g.home && st.gameAway]}>
+                      {g.date}
+                      <Text style={st.gameDay}> {g.day}</Text>
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.gameOpp, !g.home && st.gameAway]}>
+                        {g.home ? `${g.opponent}전` : `${g.opponent}전 (원정)`}
+                      </Text>
+                      <Text style={st.gameTime}>
+                        {g.startTime}
+                        {g.home ? ' · 대전' : ''}
+                      </Text>
+                    </View>
+                    {/* 예매가 열린 홈경기만 배지를 단다 - 전부 달면 배지가 배경이 된다 */}
+                    {g.home && g.ticketOpen ? <Badge text="예매 중" tone="brand" /> : null}
+                  </Row>
+                ))}
+              </SectionCard>
 
               {/* ── 예매 ───────────────────────────────────────
                   예매·주차·혜택은 각각 **묶음**이다. 셋 다 "가기 전에 정하는 것"이지만
@@ -721,6 +750,21 @@ const st = StyleSheet.create({
   lotMeta: { ...typography.micro, ...tabularFigures, fontWeight: '400' },
   lotStatus: { ...typography.caption, color: colors.text, fontWeight: '600' },
   chevron: { fontSize: 18, color: colors.mutedText, marginTop: 2 },
+
+  // 일정 행 - 날짜가 붙박이 폭을 가져야 아래로 줄이 맞는다
+  gameRow: { gap: spacing.md },
+  gameDate: {
+    ...typography.bodyStrong,
+    ...tabularFigures,
+    fontSize: 14,
+    width: 58,
+    color: colors.text,
+  },
+  gameDay: { ...typography.micro, fontWeight: '400' },
+  gameOpp: { ...typography.bodyStrong, fontSize: 14 },
+  gameTime: { ...typography.micro, ...tabularFigures, fontWeight: '400', marginTop: 1 },
+  // 원정은 예매·주차가 걸리지 않는 날이다. 지우지 않고 물린다 - 못 가는 날도 정보다
+  gameAway: { color: colors.mutedText },
 
   // 셋을 여는 타일 - 한 줄에 나란히. 각자 곡률 사각형을 등에 지고 서로 갈린다
   infoRow: { flexDirection: 'row', gap: spacing.sm },
