@@ -51,6 +51,7 @@ import {
   parkingAdvice,
   telUrl,
 } from '../gameday';
+import { SEAT_VIEWS, SEAT_VIEW_CAPTION, seatViewUrl } from '../seatView';
 import { TODAY_GAME } from '../game';
 import { countdown } from '../goods';
 import { Partner, TIER_SPEC, couponCode, sortedPartners, todayPerks } from '../partners';
@@ -177,35 +178,66 @@ export function GamedayScreen() {
                 <CardHeading label={TICKET_CHANNEL.channel} title="8월 14일 오후 2시 오픈" />
 
                 <View>
-                  {SEAT_GRADES.map((g, i) => (
-                    <View key={g.id} style={[st.seatRow, i < SEAT_GRADES.length - 1 && st.divider]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={st.seatName}>{g.name}</Text>
-                        <Text style={st.seatNote}>{g.note}</Text>
-                      </View>
-                      <View style={st.seatRight}>
-                        <Text style={st.seatPrice}>{g.price.toLocaleString()}원</Text>
-                        {/* 내부 비율(%)은 관리자 대시보드의 단위다. 팬에게는 판단만 말한다 */}
-                        <Text
-                          style={[
-                            st.seatRemain,
-                            g.remainRatio <= 0.05
-                              ? { color: colors.live, fontWeight: '700' }
+                  {SEAT_GRADES.map((g, i) => {
+                    const view = SEAT_VIEWS[g.id];
+                    return (
+                      <View
+                        key={g.id}
+                        style={[st.seatRow, i < SEAT_GRADES.length - 1 && st.divider]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={st.seatName}>{g.name}</Text>
+                          <Text style={st.seatNote}>{g.note}</Text>
+                          {/* 구역 표기와 링크를 한 줄로 합쳤다. 행에는 이미 이름·설명·
+                              가격·잔여가 있어서, 구역을 따로 적고 링크를 또 버튼으로
+                              세우면 한 등급이 다섯 조각으로 흩어진다. 구역 번호 자체가
+                              누를 수 있는 것이 되면 "저기를 보여준다"가 한 번에 읽힌다.
+                              작은 글자라 표적이 모자라므로 hitSlop 으로 벌린다 */}
+                          <Pressable
+                            onPress={() => Linking.openURL(seatViewUrl(view.scene))}
+                            hitSlop={10}
+                            accessibilityRole="link"
+                            accessibilityLabel={`${view.zoneLabel} 대표 구역 360도 시야 보기`}
+                            style={({ pressed }) => [st.seatViewLink, pressed && states.pressed]}
+                          >
+                            {/* 구역 번호는 사실이고 '시야 ›' 만 행동이다. 줄 전체를 구단
+                                색으로 칠했더니 좌석 다섯 줄이 오렌지로 반복되어, 정작
+                                이 카드가 답해야 하는 가격·잔여보다 먼저 눈에 들어왔다.
+                                누를 수 있다는 신호는 꺾쇠 쪽에만 남긴다 */}
+                            <Text style={st.seatViewText}>
+                              {view.zoneLabel}
+                              <Text style={st.seatViewCta}> · 시야 ›</Text>
+                            </Text>
+                          </Pressable>
+                        </View>
+                        <View style={st.seatRight}>
+                          <Text style={st.seatPrice}>{g.price.toLocaleString()}원</Text>
+                          {/* 내부 비율(%)은 관리자 대시보드의 단위다. 팬에게는 판단만 말한다 */}
+                          <Text
+                            style={[
+                              st.seatRemain,
+                              g.remainRatio <= 0.05
+                                ? { color: colors.live, fontWeight: '700' }
+                                : g.remainRatio <= 0.25
+                                  ? { color: colors.warn, fontWeight: '600' }
+                                  : null,
+                            ]}
+                          >
+                            {g.remainRatio <= 0.05
+                              ? '매진 임박'
                               : g.remainRatio <= 0.25
-                                ? { color: colors.warn, fontWeight: '600' }
-                                : null,
-                          ]}
-                        >
-                          {g.remainRatio <= 0.05
-                            ? '매진 임박'
-                            : g.remainRatio <= 0.25
-                              ? '잔여 적음'
-                              : '여유'}
-                        </Text>
+                                ? '잔여 적음'
+                                : '여유'}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
+
+                {/* 캡션은 카드에 한 번만. 행마다 붙이면 다섯 줄짜리 경고문이 되어
+                    정작 가격·잔여가 안 읽힌다 */}
+                <Text style={st.seatViewCaption}>{SEAT_VIEW_CAPTION}</Text>
 
                 <AlertToggle
                   on={ticketAlert}
@@ -648,6 +680,12 @@ const st = StyleSheet.create({
   },
   seatName: { ...typography.bodyStrong, fontSize: 14 },
   seatNote: { ...typography.micro, marginTop: 2 },
+  // 링크는 행 안에서 물러난 자리다. 구단 색을 면으로 깔면 좌석 다섯 줄이 전부
+  // 오렌지 블록이 되어 무엇이 주된 행동(예매)인지 사라진다 - 글자 색으로만 말한다
+  seatViewLink: { alignSelf: 'flex-start', marginTop: 3 },
+  seatViewText: { ...typography.micro },
+  seatViewCta: { color: colors.brandText },
+  seatViewCaption: { ...typography.caption, marginTop: -spacing.xs },
   seatRight: { alignItems: 'flex-end', gap: 2 },
   seatPrice: { ...typography.bodyStrong, ...tabularFigures, fontSize: 14 },
   seatRemain: { ...typography.micro, ...tabularFigures },

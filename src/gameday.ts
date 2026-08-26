@@ -133,7 +133,12 @@ export interface SeatGrade {
   note: string;
 }
 
-export const SEAT_GRADES: SeatGrade[] = [
+/**
+ * ⚠ `as const satisfies` 인 이유: 아래 id 들이 그대로 타입(`SeatGradeId`)이 되어,
+ * 등급을 하나 더하면 좌석 시야 매핑(`src/seatView.ts`)에서 컴파일이 멈춘다.
+ * 그냥 `SeatGrade[]` 로 두면 id 가 string 이라 짝을 빠뜨려도 아무도 모른다.
+ */
+export const SEAT_GRADES = [
   {
     id: 's1',
     name: '중앙 테이블석',
@@ -157,7 +162,10 @@ export const SEAT_GRADES: SeatGrade[] = [
     note: '가족 단위 · 응원 소음 적음',
   },
   { id: 's5', name: '잔디석', price: 9000, remainRatio: 0.73, note: '돗자리 지참 · 지정석 아님' },
-];
+] as const satisfies readonly SeatGrade[];
+
+/** 등급 id - 등급마다 하나씩 짝이 있어야 하는 표(좌석 시야 등)의 열쇠 */
+export type SeatGradeId = (typeof SEAT_GRADES)[number]['id'];
 
 /** 예매 오픈까지 남은 시간 - 시연 기준일 고정 */
 export const TICKET_OPEN_AT = '2026-08-14T14:00:00+09:00';
