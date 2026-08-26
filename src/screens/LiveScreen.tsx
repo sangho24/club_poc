@@ -265,12 +265,8 @@ export function LiveScreen({ profile }: { profile: UserProfile }) {
           </>
         ) : null}
 
-        {/* ── 시연용 ─────────────────────────────────────────────
-            앱의 콘텐츠가 아니라 **데모를 넘기는 장치**다. 흰 카드를 입고 있으면 위 카드들과
-            같은 위계로 읽혀서, 팬에게 보여줄 때 이것도 기능인 줄 안다.
-            면을 비우고 테두리만 남겨 "지면에 얹힌 것이 아니다"를 눈으로 말한다 ── */}
-        <SectionTitle title="타석 이동" right={<Text style={st.sectionCount}>시연용</Text>} />
-        <Card style={st.demoCard}>
+        <SectionTitle title="타석 이동" />
+        <Card>
           <Text style={st.seqOutcome}>{pa.outcome}</Text>
           <View style={st.seqRow}>
             <Pressable
@@ -412,7 +408,6 @@ const st = StyleSheet.create({
   logName: { ...typography.bodyStrong, fontSize: 14, width: 64 },
   logText: { ...typography.body, fontSize: 13.5, lineHeight: 21, flex: 1 },
 
-  sectionCount: typography.micro,
 
   adviceText: typography.body,
 
@@ -421,8 +416,6 @@ const st = StyleSheet.create({
   alertBody: { ...typography.caption, lineHeight: 19 },
 
   // 면을 비우고 테두리만 - 콘텐츠 카드와 나란히 놓였을 때 한눈에 갈린다
-  demoCard: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
-
   seqOutcome: typography.body,
   seqRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   seqBtn: {

@@ -6,10 +6,6 @@
 // 무엇을 조심할지 붙인다. 실서비스에서 이 자리에 모델을 넣는다면 교체 지점은
 // analyzeBatter() 하나이고, 반환 형태(lines: string[])만 지키면 화면은 그대로 간다.
 //
-// 화면에는 'AI 선수 분석'으로 뜨되 그 옆에 생성 방식을 한 줄로 밝힌다. 자동 생성된
-// 문장을 사람이 쓴 스카우팅 리포트처럼 내놓으면, 틀렸을 때 사용자가 그것을 틀렸다고
-// 판단할 근거를 못 받는다 - 이 화면이 신뢰도 점을 찍는 이유와 같다.
-//
 // ── 문장을 셋으로 나눈 이유 ──────────────────────────────────
 //   ① 어떤 타자인가   - 종합 수치(wRC+·WAR)와 한 줄 성격
 //   ② 무엇이 만들었나 - 세 축 중 강점과 약점. 같은 wRC+ 110 도 경로가 다르다
@@ -63,8 +59,6 @@ const dec3 = (v: number) => v.toFixed(3);
 export interface PlayerAnalysis {
   /** 한 줄씩 문단이 된다. `**강조**` 표기를 쓰므로 화면은 RichText 로 그린다 */
   lines: string[];
-  /** 이 분석이 어떻게 나왔는지 - 문장 옆에 그대로 붙는다 */
-  source: string;
 }
 
 /**
@@ -215,7 +209,7 @@ export function analyzeBatter(batter: Batter, park: string): PlayerAnalysis {
   }
   if (extra.length > 0) lines.push(`${extra.join('. ')}.`);
 
-  return { lines, source: `${b.pa}타석 기록에서 자동 생성 · 시연용` };
+  return { lines };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -376,5 +370,5 @@ export function analyzePitcher(pitcher: Pitcher, park: string, qualBF: number): 
   else if (p.hld >= 10) extra.push(`홀드 ${p.hld}개로 중간을 이어 왔습니다`);
   if (extra.length > 0) lines.push(`${extra.join('. ')}.`);
 
-  return { lines, source: `상대타자 ${p.bf}명 기록에서 자동 생성 · 시연용` };
+  return { lines };
 }

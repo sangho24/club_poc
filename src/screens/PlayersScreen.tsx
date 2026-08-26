@@ -1897,23 +1897,11 @@ function MetricGauges<T>({ stat, metrics }: { stat: T; metrics: MetricOpt<T>[] }
   );
 }
 
-/**
- * AI 선수 분석.
- *
- * ── 왜 생성 방식을 같이 적나 ────────────────────────────────
- * 이 화면은 심화 지표마다 '이 값을 믿어도 되는지'를 점으로 찍는다. 그래 놓고 정작
- * **문장은 어디서 왔는지 안 밝히면** 앞의 규칙이 무색해진다. 자동 생성된 해설이
- * 사람이 쓴 스카우팅 리포트처럼 보이는 순간, 사용자는 그것을 의심할 근거를 잃는다.
- *
- * 문장을 짓는 규칙은 src/playerAnalysis.ts 에 있다 (모델 호출이 아니라 규칙이다).
- */
+/** AI 선수 분석. 문장을 짓는 규칙은 src/playerAnalysis.ts 에 있다 */
 function AiAnalysis({ analysis: a }: { analysis: PlayerAnalysis }) {
   return (
     <View style={st.aiWrap}>
-      <View style={st.aiHead}>
-        <Text style={st.aiTitle}>AI 선수 분석</Text>
-        <Text style={st.aiSource}>{a.source}</Text>
-      </View>
+      <Text style={st.aiTitle}>AI 선수 분석</Text>
       {a.lines.map((line, i) => (
         <RichText key={i} text={line} style={st.aiLine} />
       ))}
@@ -2213,25 +2201,22 @@ const st = StyleSheet.create({
   pickDim: { color: colors.mutedText },
   pickFoot: { ...typography.micro, lineHeight: 17, paddingHorizontal: spacing.xs },
 
-  // AI 선수 분석 - 카드 안의 한 단계 낮은 면에 브랜드 선을 세운다.
-  // 면만 두면 위의 지표 타일과 같은 회색이라 어디부터가 '해설'인지 경계가 없다
+  // AI 선수 분석 - 결정적 순간(common.tsx `momentWrap`)과 같은 왼쪽 띠.
+  // 회색 면 + 라운드였는데, 둥근 모서리를 따라 띠가 휘어 손톱처럼 보였다. 면까지 깔면
+  // 위의 지표 타일과 같은 회색 상자가 하나 더 느는 셈이라 띠 하나로 줄인다
   aiWrap: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.tile,
+    paddingLeft: spacing.md,
+    paddingVertical: spacing.xs,
+    gap: 6,
     borderLeftWidth: 3,
     borderLeftColor: colors.brand,
-    padding: spacing.md,
-    gap: 6,
   },
-  aiHead: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
   aiTitle: {
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.2,
     color: colors.brandText,
   },
-  // 생성 방식은 제목과 같은 줄에 둔다. 아래로 내리면 해설 문단과 섞여 읽힌다
-  aiSource: { ...typography.micro, fontSize: 10, flex: 1, textAlign: 'right' },
   aiLine: { ...typography.body, fontSize: 13.5, lineHeight: 21 },
 
   // 상황별 - 왼쪽에 라벨과 기회 막대, 오른쪽에 성적

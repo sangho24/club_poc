@@ -123,7 +123,7 @@ export function GamedayScreen() {
   const [sort, setSort] = useState<ParkingSort>('near');
   // 렌더마다 new Date() 를 부르면 순수하지 않다. 화면이 열린 시각을 한 번만 잡는다
   const [now] = useState(() => new Date());
-  const { minutes, assumed } = minutesToStart(TODAY_GAME.startTime, now);
+  const { minutes } = minutesToStart(TODAY_GAME.startTime, now);
   const [won, setWon] = useState(true);
   const [openLot, setOpenLot] = useState<ParkingLot | null>(null);
   const [openPartner, setOpenPartner] = useState<Partner | null>(null);
@@ -271,8 +271,7 @@ export function GamedayScreen() {
                       {TODAY_GAME.startTime} · {TODAY_GAME.opponent.name}전
                     </Text>
                   </View>
-                  {/* 시연 시각이 경기 시각과 동떨어졌을 때 조용히 바꿔치기하지 않는다 */}
-                  <Badge text={assumed ? '시연 기준' : '지금 출발 기준'} tone="brand" />
+                  <Badge text="지금 출발 기준" tone="brand" />
                 </View>
 
                 {/* 근거는 머리글에서 카드 안으로 내렸다. 스폰서 표기와 한 줄에 두면

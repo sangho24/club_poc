@@ -159,7 +159,7 @@ export function MyScreen({
         </Card>
 
         {/* iOS 설정 하단의 버전 표기 문법 - 카드가 아니라 지면에 직접 */}
-        <Text style={st.appInfo}>이글스 앱 PoC v0.1 · 모든 데이터는 시연용 샘플</Text>
+        <Text style={st.appInfo}>이글스 앱 v0.1</Text>
       </ScrollView>
 
       <DetailSheet

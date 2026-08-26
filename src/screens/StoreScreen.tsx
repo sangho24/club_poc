@@ -561,8 +561,7 @@ function CardSheet({
               <Text style={st.body}>{gateReason(gate, card)}</Text>
               {gate === 'pending' && !checkedIn ? (
                 <Text style={st.footNote}>
-                  입장 인증은 게이트를 지날 때 자동으로 됩니다. 시연에서는 아래 버튼으로
-                  대신합니다.
+                  입장 인증은 게이트를 지날 때 자동으로 됩니다.
                 </Text>
               ) : null}
             </Card>
